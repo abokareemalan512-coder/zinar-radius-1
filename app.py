@@ -1,46 +1,72 @@
-from datetime import datetime
-from flask import Flask, flash, redirect, render_template, request, url_for
+import os
+from flask import Flask, render_template, request, redirect, url_for, flash
 from flask_sqlalchemy import SQLAlchemy
-from mikrotik_api import MikroTikAPI
 
 app = Flask(__name__)
-app.config['SECRET_KEY'] = 'zinar_secret_key_2026'
-app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///zinar.db'
+app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', 'zinar-secret-key-123')
+
+# إعداد قاعدة البيانات (يدعم SQLite محلياً و PostgreSQL على Render)
+database_url = os.environ.get('DATABASE_URL', 'sqlite:///zinar.db')
+if database_url and database_url.startswith('postgres://'):
+    database_url = database_url.replace('postgres://', 'postgresql://', 1)
+
+app.config['SQLALCHEMY_DATABASE_URI'] = database_url
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 
 db = SQLAlchemy(app)
 
-# جداول قاعدة البيانات الحقيقية
+# ----------------- نماذج قاعدة البيانات (Models) -----------------
 class Router(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     name = db.Column(db.String(100), nullable=False)
-    ip = db.Column(db.String(100), nullable=False)
-    username = db.Column(db.String(100), nullable=False)
-    password = db.Column(db.String(100), nullable=False)
-    port = db.Column(db.Integer, default=8728)
+    ip_address = db.Column(db.String(50), nullable=False)
+    username = db.Column(db.String(50), nullable=False)
+    password = db.Column(db.String(50), nullable=False)
 
 class Subscriber(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     username = db.Column(db.String(100), unique=True, nullable=False)
     password = db.Column(db.String(100), nullable=False)
-    profile = db.Column(db.String(100), nullable=False)
-    phone = db.Column(db.String(50))
-    expiry_date = db.Column(db.String(50))
+    profile = db.Column(db.String(50), nullable=False)
+    phone = db.Column(db.String(30), nullable=True)
+    expiry_date = db.Column(db.String(50), nullable=True)
     status = db.Column(db.String(20), default='active')
-    router_id = db.Column(db.Integer, db.ForeignKey('router.id'))
 
+# إنشاء الجداول عند بدء التشغيل
 with app.app_context():
     db.create_all()
 
+# ----------------- معالج الترجمة للقوالب -----------------
+@app.context_processor
+def utility_processor():
+    def t(key):
+        translations = {
+            'brand_sub': 'نظام إدارة المشتركين',
+            'dashboard': 'لوحة التحكم',
+            'routers': 'الراوترات',
+            'subscribers': 'المشتركين'
+        }
+        return translations.get(key, key)
+    return dict(t=t)
+
+# ----------------- المسارات (Routes) -----------------
 @app.route('/')
+def index():
+    return redirect(url_for('dashboard'))
+
 @app.route('/dashboard')
 def dashboard():
-    routers_count = Router.query.count()
-    sub_count = Subscriber.query.count()
-    active_subs = Subscriber.query.filter_by(status='active').count()
-    subscribers = Subscriber.query.all()
-    
-    # متغيرات إضافية لمنع أي خطأ في قالب لوحة التحكم
+    try:
+        routers_count = Router.query.count()
+        sub_count = Subscriber.query.count()
+        active_subs = Subscriber.query.filter_by(status='active').count()
+        subscribers = Subscriber.query.all()
+    except Exception:
+        routers_count = 0
+        sub_count = 0
+        active_subs = 0
+        subscribers = []
+
     active_sessions = 0
     today_revenue = 0
     active_vouchers = 0
@@ -53,86 +79,57 @@ def dashboard():
         subscribers=subscribers,
         active_sessions=active_sessions,
         today_revenue=today_revenue,
-        active_vouchers=active_vouchers,
+        active_vouchers=active_vouchers
     )
 
 @app.route('/routers', methods=['GET', 'POST'])
 def routers():
     if request.method == 'POST':
         name = request.form.get('name')
-        ip = request.form.get('ip')
+        ip_address = request.form.get('ip_address')
         username = request.form.get('username')
         password = request.form.get('password')
-        port = int(request.form.get('port', 8728))
-
-        new_router = Router(name=name, ip=ip, username=username, password=password, port=port)
-        db.session.add(new_router)
-        db.session.commit()
-        flash('تم إضافة الراوتر بنجاح!', 'success')
+        if name and ip_address:
+            new_router = Router(name=name, ip_address=ip_address, username=username, password=password)
+            db.session.add(new_router)
+            db.session.commit()
         return redirect(url_for('routers'))
-
-    all_routers = Router.query.all()
-    return render_template('routers.html', routers=all_routers)
+    
+    try:
+        routers_list = Router.query.all()
+    except Exception:
+        routers_list = []
+    return render_template('routers.html', routers=routers_list)
 
 @app.route('/subscribers')
 def subscribers():
-    all_subs = Subscriber.query.all()
-    return render_template('subscribers.html', subscribers=all_subs)
+    try:
+        subscribers_list = Subscriber.query.all()
+    except Exception:
+        subscribers_list = []
+    return render_template('subscribers.html', subscribers=subscribers_list)
 
 @app.route('/add_subscriber', methods=['GET', 'POST'])
 def add_subscriber():
-    all_routers = Router.query.all()
     if request.method == 'POST':
         username = request.form.get('username')
         password = request.form.get('password')
-        profile = request.form.get('profile')
-        phone = request.form.get('phone')
-        expiry = request.form.get('expiry_date')
-        router_id = request.form.get('router_id')
-
-        new_sub = Subscriber(
-            username=username,
-            password=password,
-            profile=profile,
-            phone=phone,
-            expiry_date=expiry,
-            router_id=router_id,
-        )
-        db.session.add(new_sub)
-        db.session.commit()
-
-        router = Router.query.get(router_id)
-        if router:
-            mk = MikroTikAPI(router.ip, router.username, router.password, router.port)
-            if mk.connect():
-                mk.add_hotspot_user(username, password, profile)
-                flash('تم إضافة المشترك محلياً وتفعيله على الميكروتيك بنجاح!', 'success')
-            else:
-                flash('تم الحفظ محلياً، ولكن تعذر الاتصال بسيرفر الميكروتيك!', 'warning')
-
+        profile = request.form.get('profile', 'Default')
+        phone = request.form.get('phone', '')
+        expiry_date = request.form.get('expiry_date', '')
+        if username and password:
+            sub = Subscriber(username=username, password=password, profile=profile, phone=phone, expiry_date=expiry_date)
+            db.session.add(sub)
+            db.session.commit()
         return redirect(url_for('dashboard'))
-
-    return render_template('add_subscriber.html', routers=all_routers)
+    return render_template('add_subscriber.html')
 
 @app.route('/delete_subscriber/<int:id>')
 def delete_subscriber(id):
     sub = Subscriber.query.get_or_404(id)
     db.session.delete(sub)
     db.session.commit()
-    flash('تم حذف المشترك بنجاح.', 'success')
     return redirect(url_for('dashboard'))
 
-@app.route('/packages')
-def packages():
-    return render_template('packages.html')
-
-@app.route('/sessions')
-def sessions():
-    return render_template('packages.html')
-
-@app.route('/payments')
-def payments():
-    return render_template('packages.html')
-
 if __name__ == '__main__':
-    app.run(host='0.0.0.0', port=5000, debug=True)
+    app.run(debug=True, host='0.0.0.0', port=5000)
