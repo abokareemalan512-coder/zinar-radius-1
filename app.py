@@ -15,6 +15,20 @@ app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 
 db = SQLAlchemy(app)
 
+# تعريف دالة الترجمة وجعلها متاحة عالمياً لجميع القوالب لمنع خطأ t is undefined نهائياً
+def t(key):
+    translations = {
+        'brand_sub': 'نظام إدارة المشتركين',
+        'dashboard': 'لوحة التحكم',
+        'routers': 'الراوترات',
+        'subscribers': 'المشتركين',
+        'add_subscriber': 'إضافة مشترك',
+        'packages': 'الباقات'
+    }
+    return translations.get(key, key)
+
+app.jinja_env.globals['t'] = t
+
 # ----------------- نماذج قاعدة البيانات -----------------
 class Router(db.Model):
     id = db.Column(db.Integer, primary_key=True)
@@ -35,21 +49,6 @@ class Subscriber(db.Model):
 # إنشاء الجداول عند البدء
 with app.app_context():
     db.create_all()
-
-# ----------------- معالج الترجمة المدمج للقوالب -----------------
-@app.context_processor
-def utility_processor():
-    def t(key):
-        translations = {
-            'brand_sub': 'نظام إدارة المشتركين',
-            'dashboard': 'لوحة التحكم',
-            'routers': 'الراوترات',
-            'subscribers': 'المشتركين',
-            'add_subscriber': 'إضافة مشترك',
-            'packages': 'الباقات'
-        }
-        return translations.get(key, key)
-    return dict(t=t)
 
 # ----------------- المسارات -----------------
 @app.route('/')
