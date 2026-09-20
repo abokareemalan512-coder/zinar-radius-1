@@ -1,0 +1,50 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="d-flex justify-content-between align-items-center pt-3 pb-2 mb-3 border-bottom">
+    <h1 class="h2"><i class="fa-solid fa-user-plus text-primary"></i> إضافة مشترك جديد</h1>
+</div>
+
+<div class="row">
+    <div class="col-md-6 mx-auto">
+        <div class="card shadow-sm p-4">
+            <form method="POST">
+                <div class="mb-3">
+                    <label class="form-label">اسم المستخدم (Username)</label>
+                    <input type="text" name="username" class="form-control" required placeholder="مثال: user123">
+                </div>
+                <div class="mb-3">
+                    <label class="form-label">كلمة المرور (Password)</label>
+                    <input type="text" name="password" class="form-control" required placeholder="كلمة المرور لشبكة الهوتسبت">
+                </div>
+                <div class="mb-3">
+                    <label class="form-label">الباقة أو البروفايل (Profile)</label>
+                    <input type="text" name="profile" class="form-control" required placeholder="مثال: 1M_profile">
+                </div>
+                <div class="mb-3">
+                    <label class="form-label">رقم الهاتف</label>
+                    <input type="text" name="phone" class="form-control" placeholder="09xxxxxxxx">
+                </div>
+                <div class="mb-3">
+                    <label class="form-label">تاريخ الانتهاء</label>
+                    <input type="date" name="expiry_date" class="form-control">
+                </div>
+                <div class="mb-3">
+                    <label class="form-label">اختر الراوتر المرتبط</label>
+                    <select name="router_id" class="form-select" required>
+                        {% if routers %}
+                            {% for r in routers %}
+                                <option value="{{ r.id }}">{{ r.name }} ({{ r.ip }})</option>
+                            {% endfor %}
+                        {% else %}
+                            <option value="" disabled selected>لا توجد راوترات مضافة! أضف راوتر أولاً</option>
+                        {% endif %}
+                    </select>
+                </div>
+                <button type="submit" class="btn btn-primary w-100">
+                    <i class="fa-solid fa-check"></i> حفظ وتفعيل على الميكروتيك
+                </button>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}
