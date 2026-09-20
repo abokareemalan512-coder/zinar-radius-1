@@ -1,0 +1,67 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="d-flex justify-content-between align-items-center pt-3 pb-2 mb-3 border-bottom">
+    <h1 class="h2"><i class="fa-solid fa-server text-primary"></i> إدارة سيرفرات الميكروتيك</h1>
+</div>
+
+<div class="row">
+    <div class="col-md-4 mb-4">
+        <div class="card shadow-sm p-3">
+            <h5 class="mb-3">إضافة راوتر جديد</h5>
+            <form method="POST">
+                <div class="mb-3">
+                    <label class="form-label">اسم الراوتر</label>
+                    <input type="text" name="name" class="form-control" required placeholder="مثال: راوتر البرج الرئيسي">
+                </div>
+                <div class="mb-3">
+                    <label class="form-label">عنوان الآيباد (IP Address)</label>
+                    <input type="text" name="ip" class="form-control" required placeholder="192.168.88.1">
+                </div>
+                <div class="mb-3">
+                    <label class="form-label">اسم المستخدم (API User)</label>
+                    <input type="text" name="username" class="form-control" required value="admin">
+                </div>
+                <div class="mb-3">
+                    <label class="form-label">كلمة المرور</label>
+                    <input type="password" name="password" class="form-control" required>
+                </div>
+                <div class="mb-3">
+                    <label class="form-label">منفذ الـ API</label>
+                    <input type="number" name="port" class="form-control" value="8728">
+                </div>
+                <button type="submit" class="btn btn-primary w-100">حفظ وربط الراوتر</button>
+            </form>
+        </div>
+    </div>
+
+    <div class="col-md-8">
+        <div class="card shadow-sm p-3">
+            <h5>الراوترات المرتبطة حالياً</h5>
+            <table class="table table-striped mt-3">
+                <thead>
+                    <tr>
+                        <th>الاسم</th>
+                        <th>الآيباد (IP)</th>
+                        <th>المستخدم</th>
+                        <th>المنفذ</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% if routers %}
+                        {% for r in routers %}
+                        <tr>
+                            <td><strong>{{ r.name }}</strong></td>
+                            <td>{{ r.ip }}</td>
+                            <td>{{ r.username }}</td>
+                            <td>{{ r.port }}</td>
+                        </tr>
+                        {% endfor %}
+                    {% else %}
+                        <tr><td colspan="4" class="text-center text-muted">لا توجد راوترات مسجلة حتى الآن. أضف راوترك الأول!</td></tr>
+                    {% endif %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+{% endblock %}
