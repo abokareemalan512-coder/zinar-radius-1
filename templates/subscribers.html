@@ -1,0 +1,52 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="d-flex justify-content-between align-items-center pt-3 pb-2 mb-3 border-bottom">
+    <h1 class="h2"><i class="fa-solid fa-users text-primary"></i> إدارة المشتركين</h1>
+    <a href="{{ url_for('add_subscriber') }}" class="btn btn-primary btn-sm">
+        <i class="fa-solid fa-user-plus"></i> إضافة مشترك جديد
+    </a>
+</div>
+
+<div class="card shadow-sm p-3">
+    <table class="table table-striped align-middle">
+        <thead>
+            <tr>
+                <th>اسم المستخدم</th>
+                <th>الباقة (Profile)</th>
+                <th>رقم الهاتف</th>
+                <th>تاريخ الانتهاء</th>
+                <th>الحالة</th>
+                <th>الإجراءات</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% if subscribers %}
+                {% for sub in subscribers %}
+                <tr>
+                    <td><strong>{{ sub.username }}</strong></td>
+                    <td><span class="badge bg-secondary">{{ sub.profile }}</span></td>
+                    <td>{{ sub.phone or 'غير متوفر' }}</td>
+                    <td>{{ sub.expiry_date or 'مفتوح' }}</td>
+                    <td>
+                        {% if sub.status == 'active' %}
+                            <span class="badge bg-success">نشط</span>
+                        {% else %}
+                            <span class="badge bg-danger">منتهي</span>
+                        {% endif %}
+                    </td>
+                    <td>
+                        <a href="{{ url_for('delete_subscriber', id=sub.id) }}" class="btn btn-sm btn-danger" onclick="return confirm('هل أنت متأكد من الحذف؟')">
+                            <i class="fa-solid fa-trash"></i> حذف
+                        </a>
+                    </td>
+                </tr>
+                {% endfor %}
+            {% else %}
+                <tr>
+                    <td colspan="6" class="text-center text-muted py-4">لا يوجد مشتركين مسجلين حالياً.</td>
+                </tr>
+            {% endif %}
+        </tbody>
+    </table>
+</div>
+{% endblock %}
