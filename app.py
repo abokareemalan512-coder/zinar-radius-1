@@ -15,7 +15,7 @@ app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 
 db = SQLAlchemy(app)
 
-# تعريف دالة الترجمة وجعلها متاحة عالمياً لجميع القوالب لمنع خطأ t is undefined نهائياً
+# تعريف دالة الترجمة وجعلها متاحة عالمياً لجميع القوالب
 def t(key):
     translations = {
         'brand_sub': 'نظام إدارة المشتركين',
@@ -23,7 +23,8 @@ def t(key):
         'routers': 'الراوترات',
         'subscribers': 'المشتركين',
         'add_subscriber': 'إضافة مشترك',
-        'packages': 'الباقات'
+        'packages': 'الباقات',
+        'login': 'تسجيل الدخول'
     }
     return translations.get(key, key)
 
@@ -54,6 +55,13 @@ with app.app_context():
 @app.route('/')
 def index():
     return redirect(url_for('dashboard'))
+
+@app.route('/login', methods=['GET', 'POST'])
+def login():
+    if request.method == 'POST':
+        # يمكنك إضافة التحقق من بيانات الدخول هنا لاحقاً
+        return redirect(url_for('dashboard'))
+    return render_template('login.html') if os.path.exists('templates/login.html') else redirect(url_for('dashboard'))
 
 @app.route('/dashboard')
 def dashboard():
