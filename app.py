@@ -5,7 +5,7 @@ from flask_sqlalchemy import SQLAlchemy
 app = Flask(__name__)
 app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', 'zinar-secret-key-123')
 
-# إعداد قاعدة البيانات (يدعم SQLite محلياً و PostgreSQL على Render)
+# إعداد قاعدة البيانات
 database_url = os.environ.get('DATABASE_URL', 'sqlite:///zinar.db')
 if database_url and database_url.startswith('postgres://'):
     database_url = database_url.replace('postgres://', 'postgresql://', 1)
@@ -15,7 +15,7 @@ app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 
 db = SQLAlchemy(app)
 
-# ----------------- نماذج قاعدة البيانات (Models) -----------------
+# ----------------- نماذج قاعدة البيانات -----------------
 class Router(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     name = db.Column(db.String(100), nullable=False)
@@ -32,11 +32,11 @@ class Subscriber(db.Model):
     expiry_date = db.Column(db.String(50), nullable=True)
     status = db.Column(db.String(20), default='active')
 
-# إنشاء الجداول عند بدء التشغيل
+# إنشاء الجداول عند البدء
 with app.app_context():
     db.create_all()
 
-# ----------------- معالج الترجمة للقوالب -----------------
+# ----------------- معالج الترجمة المدمج للقوالب -----------------
 @app.context_processor
 def utility_processor():
     def t(key):
@@ -44,12 +44,14 @@ def utility_processor():
             'brand_sub': 'نظام إدارة المشتركين',
             'dashboard': 'لوحة التحكم',
             'routers': 'الراوترات',
-            'subscribers': 'المشتركين'
+            'subscribers': 'المشتركين',
+            'add_subscriber': 'إضافة مشترك',
+            'packages': 'الباقات'
         }
         return translations.get(key, key)
     return dict(t=t)
 
-# ----------------- المسارات (Routes) -----------------
+# ----------------- المسارات -----------------
 @app.route('/')
 def index():
     return redirect(url_for('dashboard'))
@@ -67,19 +69,15 @@ def dashboard():
         active_subs = 0
         subscribers = []
 
-    active_sessions = 0
-    today_revenue = 0
-    active_vouchers = 0
-
     return render_template(
         'dashboard.html',
         routers_count=routers_count,
         sub_count=sub_count,
         active_subs=active_subs,
         subscribers=subscribers,
-        active_sessions=active_sessions,
-        today_revenue=today_revenue,
-        active_vouchers=active_vouchers
+        active_sessions=0,
+        today_revenue=0,
+        active_vouchers=0
     )
 
 @app.route('/routers', methods=['GET', 'POST'])
