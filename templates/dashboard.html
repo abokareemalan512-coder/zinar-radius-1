@@ -11,28 +11,63 @@
 
 <!-- بطاقات الإحصائيات -->
 <div class="row">
+    <!-- الراوترات -->
     <div class="col-md-3 mb-4">
         <div class="card shadow-sm border-start border-primary border-4 p-3">
             <div class="text-muted small">الراوترات المضافة</div>
-            <h3 class="fw-bold mt-2">{{ routers_count }}</h3>
+            <h3 class="fw-bold mt-2">{{ routers_count | default(0) }}</h3>
         </div>
     </div>
+    <!-- الباقات -->
     <div class="col-md-3 mb-4">
         <div class="card shadow-sm border-start border-success border-4 p-3">
-            <div class="text-muted small">إجمالي المشتركين</div>
-            <h3 class="fw-bold mt-2">{{ sub_count }}</h3>
+            <div class="text-muted small">الباقات المتاحة</div>
+            <h3 class="fw-bold mt-2">{{ packages_count | default(6) }}</h3>
         </div>
     </div>
+    <!-- الجلسات النشطة -->
     <div class="col-md-3 mb-4">
         <div class="card shadow-sm border-start border-warning border-4 p-3">
-            <div class="text-muted small">المشتركون النشطون</div>
-            <h3 class="fw-bold mt-2">{{ active_subs }}</h3>
+            <div class="text-muted small">الجلسات النشطة</div>
+            <h3 class="fw-bold mt-2">{{ active_sessions | default(0) }}</h3>
         </div>
     </div>
+    <!-- إجمالي المستخدمين -->
     <div class="col-md-3 mb-4">
         <div class="card shadow-sm border-start border-info border-4 p-3">
-            <div class="text-muted small">أرباح اليوم</div>
-            <h3 class="fw-bold mt-2">$0</h3>
+            <div class="text-muted small">إجمالي المستخدمين</div>
+            <h3 class="fw-bold mt-2">{{ sub_count | default(0) }}</h3>
+        </div>
+    </div>
+</div>
+
+<div class="row">
+    <!-- مستخدمو اليوم -->
+    <div class="col-md-3 mb-4">
+        <div class="card shadow-sm border-start border-secondary border-4 p-3">
+            <div class="text-muted small">مستخدمو اليوم</div>
+            <h3 class="fw-bold mt-2">{{ new_users_today | default(0) }}</h3>
+        </div>
+    </div>
+    <!-- الكروت النشطة -->
+    <div class="col-md-3 mb-4">
+        <div class="card shadow-sm border-start border-danger border-4 p-3">
+            <div class="text-muted small">الكروت النشطة</div>
+            <h3 class="fw-bold mt-2">{{ active_vouchers | default(0) }}</h3>
+        </div>
+    </div>
+    <!-- العملاء -->
+    <div class="col-md-3 mb-4">
+        <div class="card shadow-sm border-start border-dark border-4 p-3">
+            <div class="text-muted small">إجمالي العملاء</div>
+            <h3 class="fw-bold mt-2">{{ customers_count | default(1) }}</h3>
+        </div>
+    </div>
+    <!-- إيرادات اليوم -->
+    <div class="col-md-3 mb-4">
+        <div class="card shadow-sm border-start border-success border-4 p-3">
+            <div class="text-muted small">إيرادات اليوم</div>
+            <h3 class="fw-bold mt-2">{{ today_revenue | default('$0') }}</h3>
         </div>
     </div>
 </div>
@@ -73,7 +108,7 @@
                         {% endfor %}
                     {% else %}
                         <tr>
-                            <td colspan="6" class="text-center text-muted py-4">لا توجد أي اشتراكات مضافة حتى الآن. ابدأ بإضافة مشترك جديد!</td>
+                            <td colspan="6" class="text-center text-muted py-4">لا توجد أي اشتراكات مضافة حتى الآن.</td>
                         </tr>
                     {% endif %}
                 </tbody>
