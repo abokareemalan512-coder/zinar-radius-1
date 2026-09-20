@@ -1,26 +1,83 @@
 {% extends "base.html" %}
 {% block content %}
 <div class="d-flex justify-content-between align-items-center pt-3 pb-2 mb-3 border-bottom">
-    <h1 class="h2"><i class="fa-solid fa-house text-primary"></i> لوحة التحكم</h1>
+    <h1 class="h2"><i class="fa-solid fa-house text-primary"></i> لوحة التحكم الرئيسية</h1>
+    <div class="btn-toolbar mb-2 mb-md-0">
+        <a href="{{ url_for('add_subscriber') }}" class="btn btn-sm btn-primary">
+            <i class="fa-solid fa-user-plus"></i> إضافة مشترك جديد
+        </a>
+    </div>
 </div>
 
+<!-- بطاقات الإحصائيات -->
 <div class="row">
-    <div class="col-md-4 mb-3">
-        <div class="card shadow-sm p-3 border-start border-primary border-4">
-            <h5>الراوترات المضافة</h5>
-            <h3>{{ routers_count }}</h3>
+    <div class="col-md-3 mb-4">
+        <div class="card shadow-sm border-start border-primary border-4 p-3">
+            <div class="text-muted small">الراوترات المضافة</div>
+            <h3 class="fw-bold mt-2">{{ routers_count }}</h3>
         </div>
     </div>
-    <div class="col-md-4 mb-3">
-        <div class="card shadow-sm p-3 border-start border-success border-4">
-            <h5>إجمالي المستخدمين</h5>
-            <h3>{{ sub_count }}</h3>
+    <div class="col-md-3 mb-4">
+        <div class="card shadow-sm border-start border-success border-4 p-3">
+            <div class="text-muted small">إجمالي المشتركين</div>
+            <h3 class="fw-bold mt-2">{{ sub_count }}</h3>
         </div>
     </div>
-    <div class="col-md-4 mb-3">
-        <div class="card shadow-sm p-3 border-start border-warning border-4">
-            <h5>المشتركون النشطون</h5>
-            <h3>{{ active_subs }}</h3>
+    <div class="col-md-3 mb-4">
+        <div class="card shadow-sm border-start border-warning border-4 p-3">
+            <div class="text-muted small">المشتركون النشطون</div>
+            <h3 class="fw-bold mt-2">{{ active_subs }}</h3>
+        </div>
+    </div>
+    <div class="col-md-3 mb-4">
+        <div class="card shadow-sm border-start border-info border-4 p-3">
+            <div class="text-muted small">أرباح اليوم</div>
+            <h3 class="fw-bold mt-2">$0</h3>
+        </div>
+    </div>
+</div>
+
+<!-- جدول المشتركين السريع -->
+<div class="card shadow-sm mt-4">
+    <div class="card-header bg-white py-3">
+        <h5 class="m-0 font-weight-bold text-primary"><i class="fa-solid fa-users"></i> آخر المشتركين المضافين</h5>
+    </div>
+    <div class="card-body">
+        <div class="table-responsive">
+            <table class="table table-hover align-middle">
+                <thead class="table-light">
+                    <tr>
+                        <th>اسم المستخدم</th>
+                        <th>الباقة / البروفايل</th>
+                        <th>رقم الهاتف</th>
+                        <th>تاريخ الانتهاء</th>
+                        <th>الحالة</th>
+                        <th>إجراءات</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% if subscribers %}
+                        {% for sub in subscribers %}
+                        <tr>
+                            <td><strong>{{ sub.username }}</strong></td>
+                            <td><span class="badge bg-secondary">{{ sub.profile }}</span></td>
+                            <td>{{ sub.phone or 'غير متوفر' }}</td>
+                            <td>{{ sub.expiry_date or 'دائم' }}</td>
+                            <td><span class="badge bg-success">نشط</span></td>
+                            <td>
+                                <a href="{{ url_for('delete_subscriber', id=sub.id) }}" class="btn btn-sm btn-outline-danger" onclick="return confirm('هل أنت متأكد من الحذف؟')">
+                                    <i class="fa-solid fa-trash"></i>
+                                </a>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    {% else %}
+                        <tr>
+                            <td colspan="6" class="text-center text-muted py-4">لا توجد أي اشتراكات مضافة حتى الآن. ابدأ بإضافة مشترك جديد!</td>
+                        </tr>
+                    {% endif %}
+                </tbody>
+            </table>
         </div>
     </div>
 </div>
