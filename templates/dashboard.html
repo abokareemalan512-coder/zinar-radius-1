@@ -1,0 +1,79 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
+    <h1 class="h2"><i class="fa-solid fa-chart-line text-primary"></i> لوحة التحكم الرئيسية</h1>
+    <div class="btn-toolbar mb-2 mb-md-0">
+        <a href="{{ url_for('add_subscriber') }}" class="btn btn-sm btn-primary">
+            <i class="fa-solid fa-user-plus"></i> إضافة مشترك جديد
+        </a>
+    </div>
+</div>
+
+<div class="row text-white mb-4">
+    <div class="col-md-4 mb-3">
+        <div class="card bg-primary shadow-sm p-3">
+            <h5><i class="fa-solid fa-server"></i> السيرفرات المرتبطة</h5>
+            <h3>{{ routers_count }}</h3>
+        </div>
+    </div>
+    <div class="col-md-4 mb-3">
+        <div class="card bg-success shadow-sm p-3">
+            <h5><i class="fa-solid fa-users"></i> إجمالي المشتركين</h5>
+            <h3>{{ sub_count }}</h3>
+        </div>
+    </div>
+    <div class="col-md-4 mb-3">
+        <div class="card bg-info shadow-sm p-3">
+            <h5><i class="fa-solid fa-user-check"></i> المشتركين النشطين</h5>
+            <h3>{{ active_subs }}</h3>
+        </div>
+    </div>
+</div>
+
+<div class="card shadow-sm">
+    <div class="card-header bg-dark text-white">
+        <i class="fa-solid fa-list"></i> قائمة المشتركين الحاليين
+    </div>
+    <div class="card-body table-responsive">
+        <table class="table table-striped table-hover align-middle">
+            <thead>
+                <tr>
+                    <th>اسم المستخدم</th>
+                    <th>الباقة (Profile)</th>
+                    <th>رقم الهاتـف</th>
+                    <th>تاريخ الانتهاء</th>
+                    <th>الحالة</th>
+                    <th>الإجراءات</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% if subscribers %}
+                    {% for sub in subscribers %}
+                    <tr>
+                        <td><strong>{{ sub.username }}</strong></td>
+                        <td><span class="badge bg-secondary">{{ sub.profile }}</span></td>
+                        <td>{{ sub.phone or 'غير متوفر' }}</td>
+                        <td>{{ sub.expiry_date or 'مفتوح' }}</td>
+                        <td>
+                            {% if sub.status == 'active' %}
+                                <span class="badge bg-success">نشط</span>
+                            {% else %}
+                                <span class="badge bg-danger">متوقف</span>
+                            {% endif %}
+                        </td>
+                        <td>
+                            <a href="{{ url_for('edit_subscriber', id=sub.id) }}" class="btn btn-sm btn-warning"><i class="fa-solid fa-pen-to-square"></i></a>
+                            <a href="{{ url_for('delete_subscriber', id=sub.id) }}" class="btn btn-sm btn-danger" onclick="return confirm('هل أنت متأكد من حذف المشترك؟')"><i class="fa-solid fa-trash"></i></a>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                {% else %}
+                    <tr>
+                        <td colspan="6" class="text-center text-muted py-4">لا يوجد مشتركين مسجلين حتى الآن. ابدأ بإضافة مشترك جديد!</td>
+                    </tr>
+                {% endif %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endblock %}
