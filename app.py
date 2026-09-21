@@ -4,7 +4,7 @@ import string
 from datetime import datetime, timedelta
 from flask import Flask, render_template, request, redirect, url_for
 from flask_sqlalchemy import SQLAlchemy
-from sqlalchemy import text
+import routeros_api
 
 app = Flask(__name__)
 app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', 'zinar-secret-key-123')
@@ -70,6 +70,41 @@ with app.app_context():
 def generate_random_str(length=6):
     chars = string.ascii_lowercase + string.digits
     return ''.join(random.choice(chars) for _ in range(length))
+
+# دالة مزامنة الحسابات مع User Manager في السيرفر الرئيسي
+def sync_userman(username, password, action='add'):
+    # جلب بيانات السيرفر الأول من قاعدة البيانات أو استخدام الإعدادات الافتراضية
+    main_router = Router.query.first()
+    router_ip = main_router.ip_address if main_router else "198.145.118.146"
+    api_user = main_router.username if main_router else "admin"
+    api_pass = main_router.password if (main_router and main_router.password) else ""
+    api_port = main_router.port if main_router else 8728
+
+    try:
+        connection = routeros_api.RouterOsApiPool(
+            router_ip,
+            username=api_user,
+            password=api_pass,
+            port=api_port,
+            plaintext_login=True
+        )
+        api = connection.get_api()
+        userman_users = api.get_resource('/tool/user-manager/user')
+
+        if action == 'add':
+            existing = userman_users.get(username=username)
+            if not existing:
+                userman_users.add(customer='admin', username=username, password=password)
+        elif action == 'delete':
+            existing = userman_users.get(username=username)
+            if existing:
+                userman_users.remove(id=existing[0]['.id'])
+
+        connection.disconnect()
+        return True
+    except Exception as e:
+        print(f"MikroTik API Sync Error: {e}")
+        return False
 
 # المسارات
 @app.route('/')
@@ -207,6 +242,9 @@ def add_subscriber():
                     )
                     db.session.add(sub)
                     db.session.commit()
+                    
+                    # إرسال الحساب مباشرة للسيرفر الأول (User Manager)
+                    sync_userman(username, password, action='add')
                 except Exception:
                     db.session.rollback()
 
@@ -235,12 +273,12 @@ def add_subscriber():
                         expiry_date=expiry_date
                     )
                     db.session.add(sub)
+                    db.session.commit()
+                    
+                    # إرسال كل كارت من الكروت المنشأة تلقائياً للسيرفر الأول
+                    sync_userman(uname, p_rand, action='add')
                 except Exception:
-                    pass
-            try:
-                db.session.commit()
-            except Exception:
-                db.session.rollback()
+                    db.session.rollback()
 
         return redirect(url_for('subscribers'))
 
@@ -251,6 +289,7 @@ def edit_subscriber(id):
     sub = Subscriber.query.get_or_404(id)
     if request.method == 'POST':
         try:
+            old_username = sub.username
             sub.username = request.form.get('username')
             sub.password = request.form.get('password')
             sub.service_type = request.form.get('service_type', 'PPPoE')
@@ -259,6 +298,10 @@ def edit_subscriber(id):
             sub.expiry_date = request.form.get('expiry_date')
             sub.status = request.form.get('status', 'active')
             db.session.commit()
+
+            # التحديث في User Manager عبر حذف القديم وإضافة الجديد
+            sync_userman(old_username, sub.password, action='delete')
+            sync_userman(sub.username, sub.password, action='add')
         except Exception:
             db.session.rollback()
         return redirect(url_for('subscribers'))
@@ -268,6 +311,9 @@ def edit_subscriber(id):
 def delete_subscriber(id):
     try:
         sub = Subscriber.query.get_or_404(id)
+        # حذف الحساب فورياً من User Manager بالسيرفر الرئيسي
+        sync_userman(sub.username, sub.password, action='delete')
+
         db.session.delete(sub)
         db.session.commit()
     except Exception:
