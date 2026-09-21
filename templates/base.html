@@ -10,30 +10,35 @@
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/all.min.css">
     <style>
         body {
-            background-color: #0b1329;
-            color: #f8fafc !important;
+            background-color: #0b1329 !important;
+            color: #ffffff !important;
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
         }
+        
+        /* القائمة الجانبية */
         .sidebar {
-            width: 260px;
-            background-color: #1e293b;
+            width: 270px;
+            background-color: #1e293b !important;
             min-height: 100vh;
             border-left: 1px solid #334155;
         }
         .sidebar .nav-link {
-            color: #cbd5e1 !important;
-            padding: 12px 20px;
-            margin: 4px 12px;
+            color: #e2e8f0 !important;
+            padding: 12px 18px;
+            margin: 4px 10px;
             border-radius: 8px;
-            font-weight: 500;
+            font-size: 15px;
+            font-weight: 600;
         }
         .sidebar .nav-link:hover, .sidebar .nav-link.active {
             color: #ffffff !important;
             background-color: #0284c7 !important;
         }
+        
+        /* المحتوى الرئيسي والكرت */
         .main-content {
             flex: 1;
-            padding: 30px;
+            padding: 28px;
         }
         .card-custom {
             background-color: #1e293b !important;
@@ -41,11 +46,19 @@
             border-radius: 12px;
             color: #ffffff !important;
         }
-        .form-label {
-            color: #e2e8f0 !important;
-            font-weight: 600;
-            margin-bottom: 6px;
+
+        /* إصلاح التباين وضمان نص أبيض واضح في جميع العناصر */
+        .text-muted {
+            color: #cbd5e1 !important; /* لون رمادي فاتح مقروء تماماً */
         }
+        .text-light-sub {
+            color: #94a3b8 !important;
+        }
+        h1, h2, h3, h4, h5, h6, label, p, span, div, td, th {
+            color: #ffffff;
+        }
+
+        /* المدخلات والقوائم */
         .form-control, .form-select {
             background-color: #0f172a !important;
             border: 1px solid #475569 !important;
@@ -56,25 +69,18 @@
             background-color: #0f172a !important;
             border-color: #38bdf8 !important;
             color: #ffffff !important;
-            box-shadow: 0 0 0 0.25rem rgba(56, 189, 248, 0.25);
         }
         .form-control::placeholder {
             color: #94a3b8 !important;
-            opacity: 1;
         }
-        .nav-tabs .nav-link {
-            color: #cbd5e1 !important;
-            border-color: #334155 !important;
-            background-color: #0f172a;
+
+        /* الجداول */
+        .table {
+            color: #ffffff !important;
         }
-        .nav-tabs .nav-link.active {
+        .table th {
             color: #38bdf8 !important;
-            background-color: #1e293b !important;
-            border-color: #38bdf8 #38bdf8 #1e293b !important;
-            font-weight: bold;
-        }
-        input[type="date"]::-webkit-calendar-picker-indicator {
-            filter: invert(1);
+            font-weight: 700;
         }
     </style>
 </head>
@@ -84,23 +90,27 @@
         <div class="sidebar p-3 d-flex flex-column">
             <div class="d-flex align-items-center gap-2 mb-4 px-2">
                 <i class="fa-solid fa-wifi text-info fs-3"></i>
-                <h4 class="m-0 fw-bold text-light">زينار <span class="fs-6 text-info">RADIUS</span></h4>
+                <h4 class="m-0 fw-bold text-white">زينار <span class="fs-6 text-info">RADIUS</span></h4>
             </div>
             <hr class="border-secondary mb-3">
             <ul class="nav nav-pills flex-column mb-auto">
                 <li class="nav-item">
-                    <a href="/dashboard" class="nav-link"><i class="fa-solid fa-chart-pie ms-2"></i> لوحة التحكم</a>
+                    <a href="/dashboard" class="nav-link"><i class="fa-solid fa-gauge-high ms-2 text-info"></i> لوحة التحكم</a>
                 </li>
                 <li>
-                    <a href="/subscribers" class="nav-link"><i class="fa-solid fa-users ms-2"></i> المشتركون</a>
+                    <a href="/subscribers" class="nav-link"><i class="fa-solid fa-users ms-2 text-info"></i> المشتركون والكروت</a>
                 </li>
                 <li>
-                    <a href="/add_subscriber" class="nav-link"><i class="fa-solid fa-user-plus ms-2"></i> إضافة مشترك / كروت</a>
+                    <a href="/add_subscriber" class="nav-link"><i class="fa-solid fa-user-plus ms-2 text-info"></i> إضافة / توليد حسابات</a>
                 </li>
                 <li>
-                    <a href="/routers" class="nav-link"><i class="fa-solid fa-server ms-2"></i> الراوترات</a>
+                    <a href="/routers" class="nav-link"><i class="fa-solid fa-server ms-2 text-info"></i> سيرفرات الميكروتيك</a>
                 </li>
             </ul>
+            <hr class="border-secondary my-3">
+            <div class="px-2">
+                <a href="/login" class="btn btn-outline-danger w-100 btn-sm fw-bold"><i class="fa-solid fa-right-from-bracket me-1"></i> تسجيل الخروج</a>
+            </div>
         </div>
 
         <!-- المحتوى الرئيسي -->
