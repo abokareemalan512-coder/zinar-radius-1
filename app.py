@@ -71,9 +71,8 @@ def generate_random_str(length=6):
     chars = string.ascii_lowercase + string.digits
     return ''.join(random.choice(chars) for _ in range(length))
 
-# دالة مزامنة الحسابات مع User Manager في السيرفر الرئيسي
+# دالة ربط المنصة بـ User Manager في السيرفر الأول
 def sync_userman(username, password, action='add'):
-    # جلب بيانات السيرفر الأول من قاعدة البيانات أو استخدام الإعدادات الافتراضية
     main_router = Router.query.first()
     router_ip = main_router.ip_address if main_router else "198.145.118.146"
     api_user = main_router.username if main_router else "admin"
@@ -103,7 +102,7 @@ def sync_userman(username, password, action='add'):
         connection.disconnect()
         return True
     except Exception as e:
-        print(f"MikroTik API Sync Error: {e}")
+        print(f"MikroTik API Error: {e}")
         return False
 
 # المسارات
@@ -142,10 +141,10 @@ def admin_settings():
                 admin_account.username = new_username
                 admin_account.password = new_password
                 db.session.commit()
-                message = "تم تعديل اسم المستخدم وكلمة المرور بنجاح!"
+                message = "تم تعديل حساب المسؤول بنجاح!"
             except Exception as e:
                 db.session.rollback()
-                error = "حدث خطأ أثناء تقيد البيانات."
+                error = "حدث خطأ أثناء حفظ البيانات."
         else:
             error = "جميع الحقول مطلوبة."
 
@@ -192,7 +191,7 @@ def routers():
                 )
                 db.session.add(new_router)
                 db.session.commit()
-            except Exception as e:
+            except Exception:
                 db.session.rollback()
         return redirect(url_for('routers'))
     
@@ -242,8 +241,6 @@ def add_subscriber():
                     )
                     db.session.add(sub)
                     db.session.commit()
-                    
-                    # إرسال الحساب مباشرة للسيرفر الأول (User Manager)
                     sync_userman(username, password, action='add')
                 except Exception:
                     db.session.rollback()
@@ -274,8 +271,6 @@ def add_subscriber():
                     )
                     db.session.add(sub)
                     db.session.commit()
-                    
-                    # إرسال كل كارت من الكروت المنشأة تلقائياً للسيرفر الأول
                     sync_userman(uname, p_rand, action='add')
                 except Exception:
                     db.session.rollback()
@@ -299,7 +294,6 @@ def edit_subscriber(id):
             sub.status = request.form.get('status', 'active')
             db.session.commit()
 
-            # التحديث في User Manager عبر حذف القديم وإضافة الجديد
             sync_userman(old_username, sub.password, action='delete')
             sync_userman(sub.username, sub.password, action='add')
         except Exception:
@@ -311,9 +305,7 @@ def edit_subscriber(id):
 def delete_subscriber(id):
     try:
         sub = Subscriber.query.get_or_404(id)
-        # حذف الحساب فورياً من User Manager بالسيرفر الرئيسي
         sync_userman(sub.username, sub.password, action='delete')
-
         db.session.delete(sub)
         db.session.commit()
     except Exception:
@@ -321,4 +313,5 @@ def delete_subscriber(id):
     return redirect(url_for('subscribers'))
 
 if __name__ == '__main__':
-    app.run(debug=True, host='0.0.0.0', port=5000)
+    port = int(os.environ.get('ZINAR_PORT', 1892))
+    app.run(debug=False, host='0.0.0.0', port=port)
