@@ -45,6 +45,7 @@ class Router(db.Model):
     ip_address = db.Column(db.String(50), nullable=False)
     username = db.Column(db.String(50), nullable=False)
     password = db.Column(db.String(50), nullable=False)
+    port = db.Column(db.Integer, default=8728)
 
 class Subscriber(db.Model):
     id = db.Column(db.Integer, primary_key=True)
@@ -114,13 +115,22 @@ def dashboard():
 def routers():
     if request.method == 'POST':
         name = request.form.get('name')
-        ip_address = request.form.get('ip_address')
+        ip_address = request.form.get('ip') or request.form.get('ip_address')
         username = request.form.get('username')
         password = request.form.get('password')
+        port = request.form.get('port', 8728)
+        try:
+            port = int(port)
+        except (TypeError, ValueError):
+            port = 8728
+
         if name and ip_address:
-            new_router = Router(name=name, ip_address=ip_address, username=username, password=password)
+            new_router = Router(name=name, ip_address=ip_address, username=username, password=password, port=port)
             db.session.add(new_router)
             db.session.commit()
+            flash('تمت إضافة الراوتر بنجاح', 'success')
+        else:
+            flash('لازم تعبي اسم الراوتر وعنوان الآيباد على الأقل', 'danger')
         return redirect(url_for('routers'))
 
     try:
