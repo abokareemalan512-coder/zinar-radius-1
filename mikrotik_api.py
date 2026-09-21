@@ -12,11 +12,14 @@ import routeros_api
 CONNECTION_TIMEOUT = 5
 
 
-def _connect(router, port=8728, use_ssl=False):
+def _connect(router, port=None, use_ssl=False):
     """
     يفتح اتصال جديد براوتر واحد ويرجع كائن API جاهز للاستخدام.
     لازم تستدعي .disconnect() على الـ connection بعد ما تخلص (أو استخدم try/finally).
     """
+    if port is None:
+        port = getattr(router, 'port', None) or 8728
+
     old_timeout = socket.getdefaulttimeout()
     socket.setdefaulttimeout(CONNECTION_TIMEOUT)
     try:
