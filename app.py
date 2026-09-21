@@ -1,4 +1,7 @@
 import os
+import random
+import string
+from datetime import datetime, timedelta
 from flask import Flask, render_template, request, redirect, url_for
 from flask_sqlalchemy import SQLAlchemy
 
@@ -39,7 +42,8 @@ class Subscriber(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     username = db.Column(db.String(100), unique=True, nullable=False)
     password = db.Column(db.String(100), nullable=False)
-    profile = db.Column(db.String(50), nullable=False)
+    service_type = db.Column(db.String(20), default='PPPoE')
+    profile = db.Column(db.String(50), nullable=False, default='Default')
     phone = db.Column(db.String(30), nullable=True)
     expiry_date = db.Column(db.String(50), nullable=True)
     status = db.Column(db.String(20), default='active')
@@ -49,6 +53,10 @@ with app.app_context():
         db.create_all()
     except Exception as e:
         print(f"Database creation error: {e}")
+
+def generate_random_str(length=6):
+    chars = string.ascii_lowercase + string.digits
+    return ''.join(random.choice(chars) for _ in range(length))
 
 @app.route('/')
 def index():
@@ -118,19 +126,61 @@ def subscribers():
 @app.route('/add_subscriber', methods=['GET', 'POST'])
 def add_subscriber():
     if request.method == 'POST':
-        username = request.form.get('username')
-        password = request.form.get('password')
+        mode = request.form.get('mode', 'single')
+        service_type = request.form.get('service_type', 'PPPoE')
         profile = request.form.get('profile', 'Default')
-        phone = request.form.get('phone', '')
         expiry_date = request.form.get('expiry_date', '')
-        if username and password:
+
+        if not expiry_date and service_type == 'PPPoE':
+            next_month = datetime.now() + timedelta(days=30)
+            expiry_date = next_month.strftime('%Y-%m-%d')
+
+        if mode == 'single':
+            username = request.form.get('username')
+            password = request.form.get('password')
+            phone = request.form.get('phone', '')
+            if username and password:
+                try:
+                    sub = Subscriber(
+                        username=username,
+                        password=password,
+                        service_type=service_type,
+                        profile=profile,
+                        phone=phone,
+                        expiry_date=expiry_date
+                    )
+                    db.session.add(sub)
+                    db.session.commit()
+                except Exception:
+                    db.session.rollback()
+
+        elif mode == 'bulk':
+            count = int(request.form.get('count', 10))
+            prefix = request.form.get('prefix', '')
+            pass_len = int(request.form.get('password_length', 6))
+
+            for _ in range(count):
+                u_rand = generate_random_str(5)
+                p_rand = generate_random_str(pass_len)
+                uname = f"{prefix}{u_rand}"
+                try:
+                    sub = Subscriber(
+                        username=uname,
+                        password=p_rand,
+                        service_type=service_type,
+                        profile=profile,
+                        expiry_date=expiry_date
+                    )
+                    db.session.add(sub)
+                except Exception:
+                    pass
             try:
-                sub = Subscriber(username=username, password=password, profile=profile, phone=phone, expiry_date=expiry_date)
-                db.session.add(sub)
                 db.session.commit()
             except Exception:
                 db.session.rollback()
+
         return redirect(url_for('subscribers'))
+
     return render_template('add_subscriber.html')
 
 @app.route('/edit_subscriber/<int:id>', methods=['GET', 'POST'])
@@ -140,6 +190,7 @@ def edit_subscriber(id):
         try:
             sub.username = request.form.get('username')
             sub.password = request.form.get('password')
+            sub.service_type = request.form.get('service_type', 'PPPoE')
             sub.profile = request.form.get('profile')
             sub.phone = request.form.get('phone')
             sub.expiry_date = request.form.get('expiry_date')
