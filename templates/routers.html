@@ -1,78 +1,101 @@
-{% extends "base.html" %}
-{% block title %}الراوترات{% endblock %}
-{% block content %}
-<div class="d-flex justify-content-between align-items-center pt-3 pb-2 mb-3 border-bottom">
-    <h1 class="h2"><i class="fa-solid fa-server text-primary"></i> إدارة سيرفرات الميكروتيك</h1>
-</div>
+{% extends 'base.html' %}
+{% block title %}إدارة سيرفرات الميكروتيك{% endblock %}
 
-<div class="row">
-    <div class="col-md-4 mb-4">
-        <div class="card shadow-sm p-3">
-            <h5 class="mb-3">إضافة راوتر جديد</h5>
-            <form method="POST">
-                <div class="mb-3">
-                    <label class="form-label">اسم الراوتر</label>
-                    <input type="text" name="name" class="form-control" required placeholder="مثال: راوتر البرج الرئيسي">
-                </div>
-                <div class="mb-3">
-                    <label class="form-label">عنوان الآيباد (IP Address)</label>
-                    <input type="text" name="ip" class="form-control" required placeholder="192.168.88.1">
-                </div>
-                <div class="mb-3">
-                    <label class="form-label">اسم المستخدم (API User)</label>
-                    <input type="text" name="username" class="form-control" required value="admin">
-                </div>
-                <div class="mb-3">
-                    <label class="form-label">كلمة المرور</label>
-                    <input type="password" name="password" class="form-control" required>
-                </div>
-                <div class="mb-3">
-                    <label class="form-label">منفذ الـ API</label>
-                    <input type="number" name="port" class="form-control" value="8728">
-                </div>
-                <button type="submit" class="btn btn-primary w-100">حفظ وربط الراوتر</button>
-            </form>
+{% block content %}
+<div class="container-fluid">
+    <!-- عنوان الصفحة -->
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <div>
+            <h3 class="fw-bold m-0 text-white"><i class="fa-solid fa-server text-info me-2"></i> إدارة سيرفرات الميكروتيك</h3>
+            <small class="text-light opacity-75">ربط واختبار الاتصال بسيرفرات الميكروتيك (MikroTik RouterOS API)</small>
         </div>
     </div>
 
-    <div class="col-md-8">
-        <div class="card shadow-sm p-3">
-            <h5>الراوترات المرتبطة حالياً</h5>
-            <table class="table table-striped mt-3">
-                <thead>
-                    <tr>
-                        <th>الاسم</th>
-                        <th>الآيباد (IP)</th>
-                        <th>المستخدم</th>
-                        <th>المنفذ</th>
-                        <th>الحالة</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    {% if routers %}
-                        {% for r in routers %}
-                        <tr>
-                            <td><strong>{{ r.name }}</strong></td>
-                            <td>{{ r.ip_address }}</td>
-                            <td>{{ r.username }}</td>
-                            <td>{{ r.port }}</td>
-                            <td>
-                                {% set status = connection_status.get(r.id) if connection_status else None %}
-                                {% if status and status.success %}
-                                    <span class="badge bg-success">{{ status.message }}</span>
-                                {% elif status %}
-                                    <span class="badge bg-danger" title="{{ status.message }}">غير متصل</span>
-                                {% else %}
-                                    <span class="badge bg-secondary">غير معروف</span>
-                                {% endif %}
-                            </td>
-                        </tr>
-                        {% endfor %}
-                    {% else %}
-                        <tr><td colspan="5" class="text-center text-muted">لا توجد راوترات مسجلة حتى الآن. أضف راوترك الأول!</td></tr>
-                    {% endif %}
-                </tbody>
-            </table>
+    <div class="row g-4">
+        <!-- كرت إضافة راوتر جديد -->
+        <div class="col-lg-5">
+            <div class="card card-custom p-4">
+                <div class="d-flex align-items-center gap-2 mb-3 border-bottom border-secondary pb-3">
+                    <i class="fa-solid fa-circle-plus text-info fs-4"></i>
+                    <h5 class="fw-bold m-0 text-white">إضافة راوتر / سيرفر جديد</h5>
+                </div>
+
+                <form action="/routers" method="POST">
+                    <div class="mb-3">
+                        <label class="form-label"><i class="fa-solid fa-tag text-info me-1"></i> اسم الراوتر</label>
+                        <input type="text" name="name" class="form-control" placeholder="مثال: راوتر البرج الرئيسي" required>
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label"><i class="fa-solid fa-globe text-info me-1"></i> عنوان الآيباد (IP Address / Host)</label>
+                        <input type="text" name="ip_address" class="form-control" placeholder="192.168.88.1" required>
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label"><i class="fa-solid fa-user-gear text-info me-1"></i> اسم المستخدم (API User)</label>
+                        <input type="text" name="username" class="form-control" placeholder="admin" value="admin" required>
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label"><i class="fa-solid fa-key text-info me-1"></i> كلمة المرور (API Password)</label>
+                        <input type="password" name="password" class="form-control" placeholder="أدخل كلمة مرور الـ API">
+                    </div>
+
+                    <div class="mb-4">
+                        <label class="form-label"><i class="fa-solid fa-plug text-info me-1"></i> منفذ الـ API (API Port)</label>
+                        <input type="number" name="port" class="form-control" value="8728" placeholder="8728">
+                    </div>
+
+                    <button type="submit" class="btn btn-info w-100 py-2 text-dark fw-bold">
+                        <i class="fa-solid fa-floppy-disk me-1"></i> حفظ وإضافة الراوتر
+                    </button>
+                </form>
+            </div>
+        </div>
+
+        <!-- جدول الراوترات المرتبطة -->
+        <div class="col-lg-7">
+            <div class="card card-custom p-4">
+                <div class="d-flex align-items-center gap-2 mb-3 border-bottom border-secondary pb-3">
+                    <i class="fa-solid fa-list-check text-info fs-4"></i>
+                    <h5 class="fw-bold m-0 text-white">الراوترات المرتبطة حالياً</h5>
+                </div>
+
+                <div class="table-responsive">
+                    <table class="table table-dark table-hover align-middle m-0">
+                        <thead>
+                            <tr class="text-light border-secondary">
+                                <th>الاسم</th>
+                                <th>الآيباد (IP)</th>
+                                <th>المستخدم</th>
+                                <th>المنفذ</th>
+                                <th>الحالة</th>
+                                <th class="text-center">حذف</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for router in routers %}
+                            <tr class="border-secondary">
+                                <td class="fw-bold text-info"><i class="fa-solid fa-server me-2 text-muted"></i>{{ router.name }}</td>
+                                <td><code>{{ router.ip_address }}</code></td>
+                                <td>{{ router.username }}</td>
+                                <td><span class="badge bg-secondary">{{ router.port or 8728 }}</span></td>
+                                <td><span class="badge bg-success">جاهز</span></td>
+                                <td class="text-center">
+                                    <a href="/delete_router/{{ router.id }}" class="btn btn-sm btn-outline-danger" onclick="return confirm('هل أنت متأكد من حذف هذا الراوتر؟')" title="حذف"><i class="fa-solid fa-trash"></i></a>
+                                </td>
+                            </tr>
+                            {% else %}
+                            <tr>
+                                <td colspan="6" class="text-center py-4 text-light opacity-75">
+                                    <i class="fa-solid fa-triangle-exclamation text-warning me-2"></i> لا توجد راوترات مسجلة حتى الآن. أضف راوترك الأول من النموذج المترابط!
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
         </div>
     </div>
 </div>
