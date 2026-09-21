@@ -69,6 +69,7 @@ def generate_random_str(length=6):
     chars = string.ascii_lowercase + string.digits
     return ''.join(random.choice(chars) for _ in range(length))
 
+# دالة الربط المباشر مع User Manager في الميكروتيك
 def sync_userman(username, password, action='add'):
     main_router = Router.query.first()
     router_ip = main_router.ip_address if main_router else "198.145.118.146"
@@ -85,11 +86,14 @@ def sync_userman(username, password, action='add'):
             plaintext_login=True
         )
         api = connection.get_api()
+        
+        # الاتصال المباشر بمسار User Manager
         userman_users = api.get_resource('/tool/user-manager/user')
 
         if action == 'add':
             existing = userman_users.get(username=username)
             if not existing:
+                # إضافة المستخدم داخل User Manager مع العميل الافتراضي admin
                 userman_users.add(customer='admin', username=username, password=password)
         elif action == 'delete':
             existing = userman_users.get(username=username)
@@ -99,7 +103,7 @@ def sync_userman(username, password, action='add'):
         connection.disconnect()
         return True
     except Exception as e:
-        print(f"MikroTik API Error: {e}")
+        print(f"User Manager API Error: {e}")
         return False
 
 @app.route('/')
