@@ -31,7 +31,6 @@ def t(key):
 
 app.jinja_env.globals['t'] = t
 
-# نماذج قاعدة البيانات
 class Admin(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     username = db.Column(db.String(50), nullable=False, default='admin')
@@ -55,7 +54,6 @@ class Subscriber(db.Model):
     expiry_date = db.Column(db.String(50), nullable=True)
     status = db.Column(db.String(20), default='active')
 
-# التهيئة والتأكد من وجود حساب Admin افتراضي
 with app.app_context():
     try:
         db.create_all()
@@ -71,7 +69,6 @@ def generate_random_str(length=6):
     chars = string.ascii_lowercase + string.digits
     return ''.join(random.choice(chars) for _ in range(length))
 
-# دالة ربط المنصة بـ User Manager في السيرفر الأول
 def sync_userman(username, password, action='add'):
     main_router = Router.query.first()
     router_ip = main_router.ip_address if main_router else "198.145.118.146"
@@ -105,7 +102,6 @@ def sync_userman(username, password, action='add'):
         print(f"MikroTik API Error: {e}")
         return False
 
-# المسارات
 @app.route('/')
 def index():
     return redirect(url_for('dashboard'))
