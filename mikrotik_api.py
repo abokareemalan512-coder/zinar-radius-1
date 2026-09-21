@@ -1,101 +1,155 @@
+"""
+mikrotik_api.py
+وحدة مسؤولة عن الاتصال بأجهزة MikroTik (RouterOS API) والتعامل معها.
+مصممة للعمل مع عدة راوترات في نفس الوقت - كل استدعاء بياخد كائن Router
+(فيه ip_address, username, password) ويتصل فيه بشكل مستقل.
+"""
+
 import socket
-import binascii
+import routeros_api
 
-class MikroTikAPI:
-    def __init__(self, host, port=8728, username='admin', password=''):
-        self.host = host
-        self.port = int(port)
-        self.username = username
-        self.password = password
-        self.sock = None
+# مهلة الاتصال بالثواني - إذا الراوتر مش قادر يوصل، ما منستنى أكتر من هيك
+CONNECTION_TIMEOUT = 5
 
-    def connect(self):
-        self.sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        self.sock.settimeout(5)
-        self.sock.connect((self.host, self.port))
 
-    def login(self):
-        self._write(['/login', '=name=' + self.username, '=password=' + self.password])
-        self._read()
+def _connect(router, port=8728, use_ssl=False):
+    """
+    يفتح اتصال جديد براوتر واحد ويرجع كائن API جاهز للاستخدام.
+    لازم تستدعي .disconnect() على الـ connection بعد ما تخلص (أو استخدم try/finally).
+    """
+    old_timeout = socket.getdefaulttimeout()
+    socket.setdefaulttimeout(CONNECTION_TIMEOUT)
+    try:
+        connection = routeros_api.RouterOsApiPool(
+            host=router.ip_address,
+            username=router.username,
+            password=router.password,
+            port=port,
+            use_ssl=use_ssl,
+            ssl_verify=False,
+            plaintext_login=True,
+        )
+        api = connection.get_api()
+        return connection, api
+    finally:
+        socket.setdefaulttimeout(old_timeout)
 
-    def _write(self, words):
-        for w in words:
-            self._send_len(len(w))
-            self.sock.send(w.encode('utf-8'))
-        self.sock.send(b'\x00')
 
-    def _send_len(self, length):
-        if length < 0x80:
-            self.sock.send(bytes([length]))
-        elif length < 0x4000:
-            length |= 0x8000
-            self.sock.send(bytes([(length >> 8) & 0xFF, length & 0xFF]))
-        elif length < 0x200000:
-            length |= 0xC00000
-            self.sock.send(bytes([(length >> 16) & 0xFF, (length >> 8) & 0xFF, length & 0xFF]))
-        elif length < 0x10000000:
-            length |= 0xE0000000
-            self.sock.send(bytes([(length >> 24) & 0xFF, (length >> 16) & 0xFF, (length >> 8) & 0xFF, length & 0xFF]))
-        else:
-            self.sock.send(bytes([0xF0, (length >> 24) & 0xFF, (length >> 16) & 0xFF, (length >> 8) & 0xFF, length & 0xFF]))
+def test_connection(router):
+    """
+    يتأكد فقط إنه الراوتر قابل للوصول والبيانات صحيحة.
+    يرجع dict فيه success (True/False) ورسالة، وما بيرمي استثناء أبداً
+    (مهم عشان صفحة الراوترات ما تطيح لو راوتر واحد وقع).
+    """
+    connection = None
+    try:
+        connection, api = _connect(router)
+        identity = api.get_resource('/system/identity').get()
+        name = identity[0].get('name', 'MikroTik') if identity else 'MikroTik'
+        return {'success': True, 'message': f'متصل - {name}'}
+    except Exception as e:
+        return {'success': False, 'message': str(e)}
+    finally:
+        if connection:
+            try:
+                connection.disconnect()
+            except Exception:
+                pass
 
-    def _read(self):
-        reply = []
-        while True:
-            sentence = []
-            while True:
-                length = self._read_len()
-                if length == 0:
-                    break
-                received = self.sock.recv(length).decode('utf-8', errors='ignore')
-                sentence.append(received)
-            if not sentence:
-                break
-            reply.append(sentence)
-            if sentence[0] == '!done':
-                break
-        return reply
 
-    def _read_len(self):
-        byte = self.sock.recv(1)
-        if not byte:
-            return 0
-        length = ord(byte)
-        if (length & 0x80) == 0x00:
-            return length
-        elif (length & 0xC0) == 0x80:
-            return ((length & 0x3F) << 8) + ord(self.sock.recv(1))
-        elif (length & 0xE0) == 0xC0:
-            return ((length & 0x1F) << 16) + (ord(self.sock.recv(1)) << 8) + ord(self.sock.recv(1))
-        elif (length & 0xF0) == 0xE0:
-            return ((length & 0x0F) << 24) + (ord(self.sock.recv(1)) << 16) + (ord(self.sock.recv(1)) << 8) + ord(self.sock.recv(1))
-        elif (length & 0xF8) == 0xF0:
-            return (ord(self.sock.recv(1)) << 24) + (ord(self.sock.recv(1)) << 16) + (ord(self.sock.recv(1)) << 8) + ord(self.sock.recv(1))
-        return 0
+def get_router_stats(router):
+    """
+    يرجع إحصائيات حية من راوتر واحد: عدد جلسات PPPoE النشطة،
+    عدد جلسات Hotspot النشطة، ونسبة استخدام المعالج.
+    عند أي خطأ (راوتر مقطوع، بيانات غلط...) بيرجع أصفار بدل ما يوقّع الموقع.
+    """
+    result = {
+        'online': False,
+        'ppp_active': 0,
+        'hotspot_active': 0,
+        'cpu_load': 0,
+        'uptime': '-',
+        'error': None,
+    }
+    connection = None
+    try:
+        connection, api = _connect(router)
 
-    def add_pppoe_user(self, username, password, profile):
+        # جلسات PPPoE النشطة
         try:
-            self.connect()
-            self.login()
-            self._write(['/ppp/secret/add', '=name=' + username, '=password=' + password, '=profile=' + profile])
-            self._read()
-            self.sock.close()
-        except Exception as e:
-            print(f"MikroTik Error: {e}")
+            ppp_active = api.get_resource('/ppp/active').get()
+            result['ppp_active'] = len(ppp_active)
+        except Exception:
+            pass
 
-    def remove_pppoe_user(self, username):
+        # جلسات Hotspot النشطة
         try:
-            self.connect()
-            self.login()
-            self._write(['/ppp/secret/print', '?.proplist=.id', '=name=' + username])
-            resp = self._read()
-            for sentence in resp:
-                if '!re' in sentence:
-                    for item in sentence:
-                        if item.startswith('=id='):
-                            uid = item.split('=')[1]
-                            self._write(['/ppp/secret/remove', '=.id=' + uid])
-                            self._read()
-            self.sock.close()
-        except Exception as e:
-            print(f"MikroTik Error: {e}")
+            hotspot_active = api.get_resource('/ip/hotspot/active').get()
+            result['hotspot_active'] = len(hotspot_active)
+        except Exception:
+            pass
+
+        # حمل المعالج والوقت التشغيلي
+        try:
+            resource = api.get_resource('/system/resource').get()
+            if resource:
+                result['cpu_load'] = resource[0].get('cpu-load', 0)
+                result['uptime'] = resource[0].get('uptime', '-')
+        except Exception:
+            pass
+
+        result['online'] = True
+    except Exception as e:
+        result['error'] = str(e)
+    finally:
+        if connection:
+            try:
+                connection.disconnect()
+            except Exception:
+                pass
+    return result
+
+
+def get_all_routers_stats(routers):
+    """
+    ياخد لستة من كائنات Router (من قاعدة البيانات) ويرجع إحصائيات
+    كل واحد فيهم + المجموع الكلي. هاي الدالة يلي منستخدمها بالداشبورد
+    لجمع بيانات كل الراوترات مع بعض.
+    """
+    per_router = []
+    totals = {'ppp_active': 0, 'hotspot_active': 0, 'online_count': 0}
+
+    for router in routers:
+        stats = get_router_stats(router)
+        stats['router_id'] = router.id
+        stats['router_name'] = router.name
+        per_router.append(stats)
+
+        if stats['online']:
+            totals['online_count'] += 1
+            totals['ppp_active'] += stats['ppp_active']
+            totals['hotspot_active'] += stats['hotspot_active']
+
+    return {'per_router': per_router, 'totals': totals}
+
+
+def disconnect_ppp_user(router, username):
+    """
+    يفصل مستخدم PPPoE معيّن فوراً من راوتر محدد (متل زر "قطع الاتصال").
+    """
+    connection = None
+    try:
+        connection, api = _connect(router)
+        active = api.get_resource('/ppp/active')
+        sessions = active.get(name=username)
+        for session in sessions:
+            active.remove(id=session['id'])
+        return {'success': True}
+    except Exception as e:
+        return {'success': False, 'message': str(e)}
+    finally:
+        if connection:
+            try:
+                connection.disconnect()
+            except Exception:
+                pass
