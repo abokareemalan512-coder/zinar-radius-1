@@ -69,9 +69,6 @@
             color: #38bdf8 !important;
             font-weight: 700;
         }
-        input[type="date"]::-webkit-calendar-picker-indicator {
-            filter: invert(1);
-        }
     </style>
 </head>
 <body>
@@ -96,6 +93,9 @@
                 <li>
                     <a href="/routers" class="nav-link"><i class="fa-solid fa-server ms-2 text-info"></i> سيرفرات الميكروتيك</a>
                 </li>
+                <li class="mt-2 border-top border-secondary pt-2">
+                    <a href="/admin_settings" class="nav-link"><i class="fa-solid fa-user-gear ms-2 text-warning"></i> إعدادات حساب المسؤول</a>
+                </li>
             </ul>
             <hr class="border-secondary my-3">
             <div class="px-2">
@@ -103,7 +103,6 @@
             </div>
         </div>
 
-        <!-- المحتوى الرئيسي -->
         <div class="main-content">
             {% block content %}{% endblock %}
         </div>
