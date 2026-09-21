@@ -14,8 +14,6 @@
             color: #ffffff !important;
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
         }
-        
-        /* القائمة الجانبية */
         .sidebar {
             width: 270px;
             background-color: #1e293b !important;
@@ -34,8 +32,6 @@
             color: #ffffff !important;
             background-color: #0284c7 !important;
         }
-        
-        /* المحتوى الرئيسي والكرت */
         .main-content {
             flex: 1;
             padding: 28px;
@@ -46,19 +42,12 @@
             border-radius: 12px;
             color: #ffffff !important;
         }
-
-        /* إصلاح التباين وضمان نص أبيض واضح في جميع العناصر */
         .text-muted {
-            color: #cbd5e1 !important; /* لون رمادي فاتح مقروء تماماً */
-        }
-        .text-light-sub {
-            color: #94a3b8 !important;
+            color: #cbd5e1 !important;
         }
         h1, h2, h3, h4, h5, h6, label, p, span, div, td, th {
             color: #ffffff;
         }
-
-        /* المدخلات والقوائم */
         .form-control, .form-select {
             background-color: #0f172a !important;
             border: 1px solid #475569 !important;
@@ -73,14 +62,15 @@
         .form-control::placeholder {
             color: #94a3b8 !important;
         }
-
-        /* الجداول */
         .table {
             color: #ffffff !important;
         }
         .table th {
             color: #38bdf8 !important;
             font-weight: 700;
+        }
+        input[type="date"]::-webkit-calendar-picker-indicator {
+            filter: invert(1);
         }
     </style>
 </head>
