@@ -9,7 +9,6 @@ from sqlalchemy import text
 app = Flask(__name__)
 app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', 'zinar-secret-key-123')
 
-# إعداد قاعدة البيانات
 database_url = os.environ.get('DATABASE_URL', 'sqlite:///zinar.db')
 if database_url and database_url.startswith('postgres://'):
     database_url = database_url.replace('postgres://', 'postgresql://', 1)
@@ -26,7 +25,6 @@ def t(key):
         'routers': 'الراوترات',
         'subscribers': 'المشتركين',
         'add_subscriber': 'إضافة مشترك',
-        'packages': 'الباقات',
         'login': 'تسجيل الدخول'
     }
     return translations.get(key, key)
@@ -34,6 +32,11 @@ def t(key):
 app.jinja_env.globals['t'] = t
 
 # نماذج قاعدة البيانات
+class Admin(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    username = db.Column(db.String(50), nullable=False, default='admin')
+    password = db.Column(db.String(100), nullable=False, default='admin')
+
 class Router(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     name = db.Column(db.String(100), nullable=False)
@@ -52,20 +55,15 @@ class Subscriber(db.Model):
     expiry_date = db.Column(db.String(50), nullable=True)
     status = db.Column(db.String(20), default='active')
 
-# التهيئة والتعديل التلقائي للجداول السابقة لمنع أخطاء Render
+# التهيئة والتأكد من وجود حساب Admin افتراضي
 with app.app_context():
     try:
         db.create_all()
-        with db.engine.connect() as conn:
-            try:
-                conn.execute(text("ALTER TABLE subscriber ADD COLUMN IF NOT EXISTS service_type VARCHAR(20) DEFAULT 'PPPoE'"))
-            except Exception:
-                pass
-            try:
-                conn.execute(text("ALTER TABLE router ADD COLUMN IF NOT EXISTS port INTEGER DEFAULT 8728"))
-            except Exception:
-                pass
-            conn.commit()
+        admin_account = Admin.query.first()
+        if not admin_account:
+            default_admin = Admin(username='admin', password='admin')
+            db.session.add(default_admin)
+            db.session.commit()
     except Exception as e:
         print(f"Database setup note: {e}")
 
@@ -73,38 +71,66 @@ def generate_random_str(length=6):
     chars = string.ascii_lowercase + string.digits
     return ''.join(random.choice(chars) for _ in range(length))
 
-# المسارات والخدمات
+# المسارات
 @app.route('/')
 def index():
     return redirect(url_for('dashboard'))
 
 @app.route('/login', methods=['GET', 'POST'])
 def login():
+    error = None
     if request.method == 'POST':
-        return redirect(url_for('dashboard'))
-    return render_template('login.html')
+        user_input = request.form.get('username')
+        pass_input = request.form.get('password')
+        admin_account = Admin.query.first()
+        if admin_account and user_input == admin_account.username and pass_input == admin_account.password:
+            return redirect(url_for('dashboard'))
+        else:
+            error = "اسم المستخدم أو كلمة المرور غير صحيحة"
+    return render_template('login.html', error=error)
+
+@app.route('/admin_settings', methods=['GET', 'POST'])
+def admin_settings():
+    admin_account = Admin.query.first()
+    if not admin_account:
+        admin_account = Admin(username='admin', password='admin')
+        db.session.add(admin_account)
+        db.session.commit()
+
+    message = None
+    error = None
+    if request.method == 'POST':
+        new_username = request.form.get('username')
+        new_password = request.form.get('password')
+        if new_username and new_password:
+            try:
+                admin_account.username = new_username
+                admin_account.password = new_password
+                db.session.commit()
+                message = "تم تعديل اسم المستخدم وكلمة المرور بنجاح!"
+            except Exception as e:
+                db.session.rollback()
+                error = "حدث خطأ أثناء تقيد البيانات."
+        else:
+            error = "جميع الحقول مطلوبة."
+
+    return render_template('admin_settings.html', admin=admin_account, message=message, error=error)
 
 @app.route('/dashboard')
 def dashboard():
-    routers_count = 0
-    sub_count = 0
-    active_subs = 0
-    subscribers = []
-    
-    try:
-        routers_count = Router.query.count()
-        sub_count = Subscriber.query.count()
-        active_subs = Subscriber.query.filter_by(status='active').count()
-        subscribers = Subscriber.query.order_by(Subscriber.id.desc()).all()
-    except Exception as e:
-        print(f"Dashboard query error: {e}")
+    routers_count = Router.query.count()
+    sub_count = Subscriber.query.count()
+    active_subs = Subscriber.query.filter_by(status='active').count()
+    subscribers = Subscriber.query.order_by(Subscriber.id.desc()).all()
+    admin_account = Admin.query.first()
 
     return render_template(
         'dashboard.html',
         routers_count=routers_count,
         sub_count=sub_count,
         active_subs=active_subs,
-        subscribers=subscribers
+        subscribers=subscribers,
+        admin_account=admin_account
     )
 
 @app.route('/routers', methods=['GET', 'POST'])
@@ -133,14 +159,9 @@ def routers():
                 db.session.commit()
             except Exception as e:
                 db.session.rollback()
-                print(f"Router add error: {e}")
         return redirect(url_for('routers'))
     
-    routers_list = []
-    try:
-        routers_list = Router.query.all()
-    except Exception as e:
-        print(f"Routers query error: {e}")
+    routers_list = Router.query.all()
     return render_template('routers.html', routers=routers_list)
 
 @app.route('/delete_router/<int:id>')
@@ -149,18 +170,13 @@ def delete_router(id):
         router = Router.query.get_or_404(id)
         db.session.delete(router)
         db.session.commit()
-    except Exception as e:
+    except Exception:
         db.session.rollback()
-        print(f"Delete router error: {e}")
     return redirect(url_for('routers'))
 
 @app.route('/subscribers')
 def subscribers():
-    subscribers_list = []
-    try:
-        subscribers_list = Subscriber.query.order_by(Subscriber.id.desc()).all()
-    except Exception as e:
-        print(f"Subscribers list error: {e}")
+    subscribers_list = Subscriber.query.order_by(Subscriber.id.desc()).all()
     return render_template('subscribers.html', subscribers=subscribers_list)
 
 @app.route('/add_subscriber', methods=['GET', 'POST'])
@@ -171,7 +187,6 @@ def add_subscriber():
         profile = request.form.get('profile', 'Default')
         expiry_date = request.form.get('expiry_date', '')
 
-        # احتساب شهر تلقائياً لـ PPPoE
         if not expiry_date and service_type == 'PPPoE':
             next_month = datetime.now() + timedelta(days=30)
             expiry_date = next_month.strftime('%Y-%m-%d')
@@ -192,9 +207,8 @@ def add_subscriber():
                     )
                     db.session.add(sub)
                     db.session.commit()
-                except Exception as e:
+                except Exception:
                     db.session.rollback()
-                    print(f"Add subscriber error: {e}")
 
         elif mode == 'bulk':
             try:
@@ -225,9 +239,8 @@ def add_subscriber():
                     pass
             try:
                 db.session.commit()
-            except Exception as e:
+            except Exception:
                 db.session.rollback()
-                print(f"Bulk generate error: {e}")
 
         return redirect(url_for('subscribers'))
 
@@ -246,9 +259,8 @@ def edit_subscriber(id):
             sub.expiry_date = request.form.get('expiry_date')
             sub.status = request.form.get('status', 'active')
             db.session.commit()
-        except Exception as e:
+        except Exception:
             db.session.rollback()
-            print(f"Edit subscriber error: {e}")
         return redirect(url_for('subscribers'))
     return render_template('edit_subscriber.html', subscriber=sub)
 
@@ -258,9 +270,8 @@ def delete_subscriber(id):
         sub = Subscriber.query.get_or_404(id)
         db.session.delete(sub)
         db.session.commit()
-    except Exception as e:
+    except Exception:
         db.session.rollback()
-        print(f"Delete subscriber error: {e}")
     return redirect(url_for('subscribers'))
 
 if __name__ == '__main__':
