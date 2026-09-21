@@ -3,6 +3,7 @@ import logging
 import traceback
 from flask import Flask, render_template, request, redirect, url_for, flash
 from flask_sqlalchemy import SQLAlchemy
+import mikrotik_api
 
 app = Flask(__name__)
 app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', 'zinar-secret-key-123')
@@ -72,26 +73,34 @@ def login():
 @app.route('/dashboard')
 def dashboard():
     try:
-        routers_count = Router.query.count()
+        routers_list = Router.query.all()
+        routers_count = len(routers_list)
         sub_count = Subscriber.query.count()
         active_subs = Subscriber.query.filter_by(status='active').count()
         subscribers = Subscriber.query.all()
     except Exception:
         logger.exception("فشل في جلب بيانات قاعدة البيانات لصفحة dashboard")
+        routers_list = []
         routers_count = 0
         sub_count = 0
         active_subs = 0
         subscribers = []
+
+    # الاتصال الحي بالراوترات - كل راوتر مستقل، لو واحد وقع ما بأثر عالباقي
+    live_stats = mikrotik_api.get_all_routers_stats(routers_list)
+    active_sessions = live_stats['totals']['ppp_active'] + live_stats['totals']['hotspot_active']
+    routers_online = live_stats['totals']['online_count']
 
     # هون كان الخطأ ممكن ينبلع بدون تفاصيل - هلق رح نطبعه كامل بالـ logs
     try:
         return render_template(
             'dashboard.html',
             routers_count=routers_count,
+            routers_online=routers_online,
             sub_count=sub_count,
             active_subs=active_subs,
             subscribers=subscribers,
-            active_sessions=0,
+            active_sessions=active_sessions,
             today_revenue=0,
             active_vouchers=0
         )
@@ -119,7 +128,13 @@ def routers():
     except Exception:
         logger.exception("فشل في جلب قائمة الراوترات")
         routers_list = []
-    return render_template('routers.html', routers=routers_list)
+
+    # اختبار اتصال حي لكل راوتر (متل ping بس عبر الـ API نفسه)
+    connection_status = {}
+    for r in routers_list:
+        connection_status[r.id] = mikrotik_api.test_connection(r)
+
+    return render_template('routers.html', routers=routers_list, connection_status=connection_status)
 
 @app.route('/packages')
 def packages():
