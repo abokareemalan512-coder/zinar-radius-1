@@ -1,54 +1,161 @@
 {% extends 'base.html' %}
-{% block title %}إضافة مشترك جديد{% endblock %}
+{% block title %}إضافة مشترك أو كروت{% endblock %}
 
 {% block content %}
-<div class="container-fluid" style="max-width: 800px;">
-    <div class="card card-custom p-4">
+<div class="container-fluid" style="max-width: 900px;">
+    
+    <div class="card card-custom p-4 mb-4">
         <div class="d-flex align-items-center gap-3 mb-4">
-            <div class="bg-primary bg-opacity-10 p-3 rounded-3 text-info">
-                <i class="fa-solid fa-user-plus fs-3"></i>
+            <div class="bg-info bg-opacity-10 p-3 rounded-3 text-info">
+                <i class="fa-solid fa-user-plus fs-2"></i>
             </div>
             <div>
-                <h3 class="fw-bold mb-1">إضافة مشترك جديد</h3>
-                <p class="text-muted m-0">الحساب سيعمل تلقائياً على كافة السيرفرات والراوترات المضافة (PPPoE & Hotspot)</p>
+                <h3 class="fw-bold mb-1 text-white">إضافة حسابات أو توليد كروت</h3>
+                <p class="text-light m-0 opacity-75">قم بإضافة حسابات فردية أو إنشاء مجموعة كروت دفعة واحدة لنواحي PPPoE أو Hotspot</p>
             </div>
         </div>
 
-        <form action="/add_subscriber" method="POST">
-            <div class="row g-3">
-                <div class="col-md-6">
-                    <label class="form-label text-light fw-semibold"><i class="fa-solid fa-user me-1 text-info"></i> اسم المستخدم (Username)</label>
-                    <input type="text" name="username" class="form-control" placeholder="أدخل اسم المستخدم" required>
-                </div>
+        <!-- تبويبات الاختيار بين فردي وجماعي -->
+        <ul class="nav nav-tabs mb-4" id="subscriberTab" role="tablist">
+            <li class="nav-item" role="presentation">
+                <button class="nav-link active px-4 py-2" id="single-tab" data-bs-toggle="tab" data-bs-target="#single" type="button" role="tab">
+                    <i class="fa-solid fa-user me-2"></i> إدخال حساب فردي
+                </button>
+            </li>
+            <li class="nav-item" role="presentation">
+                <button class="nav-link px-4 py-2" id="bulk-tab" data-bs-toggle="tab" data-bs-target="#bulk" type="button" role="tab">
+                    <i class="fa-solid fa-users-gear me-2"></i> توليد حسابات جماعية (كروت)
+                </button>
+            </li>
+        </ul>
 
-                <div class="col-md-6">
-                    <label class="form-label text-light fw-semibold"><i class="fa-solid fa-key me-1 text-info"></i> كلمة المرور (Password)</label>
-                    <input type="text" name="password" class="form-control" placeholder="أدخل كلمة المرور" required>
-                </div>
+        <div class="tab-content" id="subscriberTabContent">
+            
+            <!-- التبويب الأول: حساب فردي -->
+            <div class="tab-pane fade show active" id="single" role="tabpanel">
+                <form action="/add_subscriber" method="POST">
+                    <input type="hidden" name="mode" value="single">
+                    <div class="row g-3">
+                        <div class="col-md-6">
+                            <label class="form-label"><i class="fa-solid fa-network-wired text-info me-1"></i> نوع الخدمة</label>
+                            <select name="service_type" id="single_service_type" class="form-select" onchange="handleServiceTypeChange('single')">
+                                <option value="PPPoE">بيبي اوي (PPPoE - اشتراك شهر تلقائي)</option>
+                                <option value="Hotspot">هوتسبوت (Hotspot - تحكم يدوي)</option>
+                            </select>
+                        </div>
 
-                <div class="col-md-6">
-                    <label class="form-label text-light fw-semibold"><i class="fa-solid fa-box me-1 text-info"></i> الباقة / البروفايل</label>
-                    <input type="text" name="profile" class="form-control" placeholder="مثال: 5M_Default" value="Default">
-                </div>
+                        <div class="col-md-6">
+                            <label class="form-label"><i class="fa-solid fa-box text-info me-1"></i> الباقة / البروفايل</label>
+                            <input type="text" name="profile" class="form-control" placeholder="مثال: 5M_Default" value="Default" required>
+                        </div>
 
-                <div class="col-md-6">
-                    <label class="form-label text-light fw-semibold"><i class="fa-solid fa-phone me-1 text-info"></i> رقم الهاتف (اختياري)</label>
-                    <input type="text" name="phone" class="form-control" placeholder="09xxxxxxxx">
-                </div>
+                        <div class="col-md-6">
+                            <label class="form-label"><i class="fa-solid fa-user text-info me-1"></i> اسم المستخدم (Username)</label>
+                            <input type="text" name="username" class="form-control" placeholder="أدخل اسم المستخدم" required>
+                        </div>
 
-                <div class="col-md-12">
-                    <label class="form-label text-light fw-semibold"><i class="fa-solid fa-calendar me-1 text-info"></i> تاريخ الانتهاء</label>
-                    <input type="date" name="expiry_date" class="form-control">
-                </div>
+                        <div class="col-md-6">
+                            <label class="form-label"><i class="fa-solid fa-key text-info me-1"></i> كلمة المرور (Password)</label>
+                            <input type="text" name="password" class="form-control" placeholder="أدخل كلمة المرور" required>
+                        </div>
+
+                        <div class="col-md-6">
+                            <label class="form-label"><i class="fa-solid fa-phone text-info me-1"></i> رقم الهاتف (اختياري)</label>
+                            <input type="text" name="phone" class="form-control" placeholder="09xxxxxxxx">
+                        </div>
+
+                        <div class="col-md-6">
+                            <label class="form-label"><i class="fa-solid fa-calendar text-info me-1"></i> تاريخ الانتهاء</label>
+                            <input type="date" name="expiry_date" id="single_expiry_date" class="form-control" required>
+                            <small class="text-info d-block mt-1" id="single_expiry_hint">يتم التثبيت تلقائياً لمدة شهر كامل لحسابات PPPoE</small>
+                        </div>
+                    </div>
+
+                    <hr class="border-secondary my-4">
+
+                    <div class="d-flex justify-content-end gap-2">
+                        <a href="/subscribers" class="btn btn-outline-secondary px-4">إلغاء</a>
+                        <button type="submit" class="btn btn-info text-dark fw-bold px-4"><i class="fa-solid fa-check ms-1"></i> حفظ وتفعيل الحساب</button>
+                    </div>
+                </form>
             </div>
 
-            <hr class="border-secondary my-4">
+            <!-- التبويب الثاني: توليد جماعي -->
+            <div class="tab-pane fade" id="bulk" role="tabpanel">
+                <form action="/add_subscriber" method="POST">
+                    <input type="hidden" name="mode" value="bulk">
+                    <div class="row g-3">
+                        <div class="col-md-6">
+                            <label class="form-label"><i class="fa-solid fa-network-wired text-info me-1"></i> نوع الخدمة</label>
+                            <select name="service_type" id="bulk_service_type" class="form-select" onchange="handleServiceTypeChange('bulk')">
+                                <option value="PPPoE">بيبي اوي (PPPoE)</option>
+                                <option value="Hotspot" selected>هوتسبوت (Hotspot)</option>
+                            </select>
+                        </div>
 
-            <div class="d-flex justify-content-end gap-2">
-                <a href="/subscribers" class="btn btn-outline-secondary px-4">إلغاء</a>
-                <button type="submit" class="btn btn-info text-dark fw-bold px-4"><i class="fa-solid fa-check ms-1"></i> حفظ وتفعيل الحساب</button>
+                        <div class="col-md-6">
+                            <label class="form-label"><i class="fa-solid fa-list-ol text-info me-1"></i> عدد الحسابات / الكروت المطلوبة</label>
+                            <input type="number" name="count" class="form-control" value="10" min="1" max="500" required>
+                        </div>
+
+                        <div class="col-md-6">
+                            <label class="form-label"><i class="fa-solid fa-font text-info me-1"></i> بادئة اسم المستخدم (Prefix - اختياري)</label>
+                            <input type="text" name="prefix" class="form-control" placeholder="مثال: user_ أو card_">
+                        </div>
+
+                        <div class="col-md-6">
+                            <label class="form-label"><i class="fa-solid fa-box text-info me-1"></i> الباقة / البروفايل</label>
+                            <input type="text" name="profile" class="form-control" placeholder="Default" value="Default" required>
+                        </div>
+
+                        <div class="col-md-6">
+                            <label class="form-label"><i class="fa-solid fa-shield-halved text-info me-1"></i> طول كلمة المرور العشوائية</label>
+                            <input type="number" name="password_length" class="form-control" value="6" min="4" max="12">
+                        </div>
+
+                        <div class="col-md-6">
+                            <label class="form-label"><i class="fa-solid fa-calendar text-info me-1"></i> تاريخ الانتهاء</label>
+                            <input type="date" name="expiry_date" id="bulk_expiry_date" class="form-control">
+                        </div>
+                    </div>
+
+                    <hr class="border-secondary my-4">
+
+                    <div class="d-flex justify-content-end gap-2">
+                        <a href="/subscribers" class="btn btn-outline-secondary px-4">إلغاء</a>
+                        <button type="submit" class="btn btn-success fw-bold px-4"><i class="fa-solid fa-wand-magic-sparkles ms-1"></i> توليد الحسابات الآن</button>
+                    </div>
+                </form>
             </div>
-        </form>
+
+        </div>
     </div>
 </div>
+
+<script>
+function setOneMonthExpiry(inputId) {
+    let today = new Date();
+    today.setMonth(today.getMonth() + 1);
+    let yyyy = today.getFullYear();
+    let mm = String(today.getMonth() + 1).padStart(2, '0');
+    let dd = String(today.getDate()).padStart(2, '0');
+    document.getElementById(inputId).value = `${yyyy}-${mm}-${dd}`;
+}
+
+function handleServiceTypeChange(mode) {
+    let typeSelect = document.getElementById(mode + '_service_type').value;
+    let hint = document.getElementById(mode + '_expiry_hint');
+
+    if (typeSelect === 'PPPoE') {
+        setOneMonthExpiry(mode + '_expiry_date');
+        if (hint) hint.innerText = "تم التثبيت تلقائياً لشهر كامل من اليوم لخدمة PPPoE";
+    } else {
+        if (hint) hint.innerText = "يمكنك تحكّم تاريخ الانتهاء لخدمة Hotspot يدوياً";
+    }
+}
+
+document.addEventListener("DOMContentLoaded", function() {
+    setOneMonthExpiry('single_expiry_date');
+});
+</script>
 {% endblock %}
