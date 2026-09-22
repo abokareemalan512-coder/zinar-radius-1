@@ -1,106 +1,76 @@
-{% extends 'base.html' %}
-{% block title %}إدارة المشتركين والكروت{% endblock %}
-
+{% extends "base.html" %}
+{% block title %}المشتركون{% endblock %}
 {% block content %}
-<div class="container-fluid">
-    <div class="d-flex justify-content-between align-items-center mb-4">
-        <div>
-            <h3 class="fw-bold m-0 text-white"><i class="fa-solid fa-users text-info me-2"></i> إدارة المشتركين والكروت</h3>
-            <small class="text-light opacity-75">عرض وإدارة جميع حسابات PPPoE و Hotspot</small>
-        </div>
-        <a href="/add_subscriber" class="btn btn-info text-dark fw-bold"><i class="fa-solid fa-plus ms-1"></i> إضافة / توليد كروت</a>
-    </div>
-
-    <div class="card card-custom p-4">
-        <!-- شريط البحث الفوري والفلترة -->
-        <div class="row mb-3 g-2">
-            <div class="col-md-6">
-                <div class="input-group">
-                    <span class="input-group-text bg-dark border-secondary text-light"><i class="fa-solid fa-magnifying-glass"></i></span>
-                    <input type="text" id="searchInput" class="form-control" onkeyup="searchSubscribers()" placeholder="ابحث باسم المستخدم، كلمة المرور، أو الهاتف...">
-                </div>
-            </div>
-            <div class="col-md-3">
-                <select id="typeFilter" class="form-select" onchange="searchSubscribers()">
-                    <option value="">جميع أنواع الخدمات (الكل)</option>
-                    <option value="PPPoE">بيبي اوي (PPPoE)</option>
-                    <option value="Hotspot">هوتسبوت (Hotspot)</option>
-                </select>
-            </div>
-        </div>
-
-        <div class="table-responsive">
-            <table class="table table-dark table-hover align-middle m-0" id="subscribersTable">
-                <thead>
-                    <tr class="text-light border-secondary">
-                        <th>#</th>
-                        <th>اسم المستخدم</th>
-                        <th>كلمة المرور</th>
-                        <th>النوع</th>
-                        <th>الباقة</th>
-                        <th>الهاتف</th>
-                        <th>تاريخ الانتهاء</th>
-                        <th>الحالة</th>
-                        <th class="text-center">إجراءات</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    {% for sub in subscribers %}
-                    <tr class="border-secondary">
-                        <td>{{ sub.id }}</td>
-                        <td class="fw-bold text-info"><i class="fa-solid fa-user me-1 text-muted"></i>{{ sub.username }}</td>
-                        <td><code class="text-warning fs-6">{{ sub.password }}</code></td>
-                        <td>
-                            {% if sub.service_type == 'PPPoE' %}
-                            <span class="badge bg-primary px-2 py-1"><i class="fa-solid fa-network-wired me-1"></i>PPPoE</span>
-                            {% else %}
-                            <span class="badge bg-warning text-dark px-2 py-1"><i class="fa-solid fa-wifi me-1"></i>Hotspot</span>
-                            {% endif %}
-                        </td>
-                        <td><span class="badge bg-secondary">{{ sub.profile }}</span></td>
-                        <td>{{ sub.phone or '-' }}</td>
-                        <td>
-                            {% if sub.expiry_date %}
-                            <span class="text-light"><i class="fa-solid fa-calendar-days me-1 text-info"></i>{{ sub.expiry_date }}</span>
-                            {% else %}
-                            <span class="text-muted">-</span>
-                            {% endif %}
-                        </td>
-                        <td>
-                            {% if sub.status == 'disabled' %}
-                            <span class="badge bg-danger">معطل</span>
-                            {% else %}
-                            <span class="badge bg-success">نشط</span>
-                            {% endif %}
-                        </td>
-                        <td class="text-center">
-                            <a href="/edit_subscriber/{{ sub.id }}" class="btn btn-sm btn-outline-warning ms-1" title="تعديل"><i class="fa-solid fa-pen"></i></a>
-                            <a href="/delete_subscriber/{{ sub.id }}" class="btn btn-sm btn-outline-danger" onclick="return confirm('هل أنت تأكد من حذف هذا المشترك؟')" title="حذف"><i class="fa-solid fa-trash"></i></a>
-                        </td>
-                    </tr>
-                    {% else %}
-                    <tr>
-                        <td colspan="9" class="text-center py-4 text-light opacity-75">لا يوجد مشتركين أو كروت مضافين حالياً.</td>
-                    </tr>
-                    {% endfor %}
-                </tbody>
-            </table>
-        </div>
-    </div>
+<div class="d-flex justify-content-between align-items-center pt-3 pb-2 mb-3 border-bottom">
+    <h1 class="h2"><i class="fa-solid fa-users text-primary"></i> إدارة المشتركين (مباشر من الراوتر)</h1>
+    <a href="{{ url_for('add_subscriber') }}" class="btn btn-sm btn-primary">
+        <i class="fa-solid fa-user-plus"></i> إضافة مشترك جديد
+    </a>
 </div>
 
-<script>
-function searchSubscribers() {
-    let input = document.getElementById("searchInput").value.toLowerCase();
-    let typeFilter = document.getElementById("typeFilter").value.toLowerCase();
-    let rows = document.querySelectorAll("#subscribersTable tbody tr");
+{% if error_message %}
+<div class="alert alert-warning">
+    <i class="fa-solid fa-triangle-exclamation"></i> {{ error_message }}
+    {% if not has_master %}
+        <a href="{{ url_for('routers') }}" class="alert-link">روح لصفحة الراوترات</a>
+    {% endif %}
+</div>
+{% endif %}
 
-    rows.forEach(row => {
-        let text = row.innerText.toLowerCase();
-        let matchesSearch = text.includes(input);
-        let matchesType = typeFilter === "" || text.includes(typeFilter);
-        row.style.display = (matchesSearch && matchesType) ? "" : "none";
-    });
-}
-</script>
+<div class="card shadow-sm p-3 mb-3">
+    <form method="GET" class="d-flex gap-2">
+        <input type="text" name="q" class="form-control" placeholder="ابحث باسم المستخدم..." value="{{ search_query or '' }}">
+        <button type="submit" class="btn btn-primary">
+            <i class="fa-solid fa-magnifying-glass"></i> بحث
+        </button>
+        {% if search_query %}
+        <a href="{{ url_for('subscribers') }}" class="btn btn-outline-secondary">إلغاء</a>
+        {% endif %}
+    </form>
+</div>
+
+<div class="card shadow-sm p-3">
+    <table class="table table-striped mt-2">
+        <thead>
+            <tr>
+                <th>اسم المستخدم</th>
+                <th>الباقة</th>
+                <th>الحالة</th>
+                <th>إجراءات</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% if subscribers %}
+                {% for sub in subscribers %}
+                <tr>
+                    <td><strong>{{ sub.username }}</strong></td>
+                    <td><span class="badge bg-secondary">{{ sub.get('actual-profile', 'بدون باقة') }}</span></td>
+                    <td>
+                        {% if sub.get('disabled') == 'true' %}
+                            <span class="badge bg-danger">موقوف</span>
+                        {% else %}
+                            <span class="badge bg-success">نشط</span>
+                        {% endif %}
+                    </td>
+                    <td>
+                        <a href="{{ url_for('delete_subscriber', username=sub.username) }}" class="btn btn-sm btn-outline-danger" onclick="return confirm('هل أنت متأكد من الحذف؟')">
+                            <i class="fa-solid fa-trash"></i>
+                        </a>
+                    </td>
+                </tr>
+                {% endfor %}
+            {% else %}
+                <tr>
+                    <td colspan="4" class="text-center text-muted py-4">
+                        {% if search_query %}
+                            ما في نتائج مطابقة لـ "{{ search_query }}"
+                        {% else %}
+                            لا توجد أي اشتراكات مضافة حتى الآن.
+                        {% endif %}
+                    </td>
+                </tr>
+            {% endif %}
+        </tbody>
+    </table>
+</div>
 {% endblock %}
