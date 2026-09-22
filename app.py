@@ -2,7 +2,7 @@ import os
 import random
 import string
 from datetime import datetime, timedelta
-from flask import Flask, render_template, request, redirect, url_for, flash
+from flask import Flask, render_template, request, redirect, url_for
 from flask_sqlalchemy import SQLAlchemy
 import routeros_api
 
@@ -62,11 +62,19 @@ class Subscriber(db.Model):
     username = db.Column(db.String(100), unique=True, nullable=False)
     password = db.Column(db.String(100), nullable=False)
     service_type = db.Column(db.String(20), default='Hotspot')
-    package_name = db.Column(db.String(100), nullable=False, default='Default')
+    profile = db.Column(db.String(100), nullable=False, default='Default')
     phone = db.Column(db.String(30), nullable=True)
-    start_date = db.Column(db.String(50), nullable=True)
     expiry_date = db.Column(db.String(50), nullable=True)
     status = db.Column(db.String(20), default='active')
+
+    # خاصية متوافقة مع الاسمين لضمان عدم حدوث خطأ
+    @property
+    def package_name(self):
+        return self.profile
+
+    @package_name.setter
+    def package_name(self, value):
+        self.profile = value
 
 with app.app_context():
     try:
@@ -129,7 +137,7 @@ def sync_userman_full(username, password, profile_name="1M", action='add'):
         print(f"User Manager API Error: {e}")
         return False
 
-# --- المسارات (Routes) ---
+# --- المسارات ---
 
 @app.route('/')
 def index():
@@ -213,9 +221,7 @@ def add_subscriber():
         
         selected_pkg = Package.query.filter_by(name=package_name).first()
         valid_days = selected_pkg.validity_days if selected_pkg else 30
-        
-        start_date = datetime.now().strftime('%Y-%m-%d %H:%M')
-        expiry_date = (datetime.now() + timedelta(days=valid_days)).strftime('%Y-%m-%d %H:%M')
+        expiry_date = (datetime.now() + timedelta(days=valid_days)).strftime('%Y-%m-%d')
 
         if mode == 'single':
             username = request.form.get('username')
@@ -227,9 +233,8 @@ def add_subscriber():
                         username=username,
                         password=password,
                         service_type=service_type,
-                        package_name=package_name,
+                        profile=package_name,
                         phone=phone,
-                        start_date=start_date,
                         expiry_date=expiry_date
                     )
                     db.session.add(sub)
@@ -259,8 +264,7 @@ def add_subscriber():
                         username=uname,
                         password=p_rand,
                         service_type=service_type,
-                        package_name=package_name,
-                        start_date=start_date,
+                        profile=package_name,
                         expiry_date=expiry_date
                     )
                     db.session.add(sub)
