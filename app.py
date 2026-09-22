@@ -48,10 +48,9 @@ def init_db():
                 username TEXT NOT NULL UNIQUE,
                 password TEXT NOT NULL,
                 profile TEXT NOT NULL,
-                service_type TEXT DEFAULT 'pppoe',
+                service_type TEXT DEFAULT 'hotspot',
                 expiry_date TEXT,
-                status TEXT DEFAULT 'active',
-                router_id INTEGER
+                status TEXT DEFAULT 'active'
             )
         ''')
         
@@ -83,7 +82,7 @@ def internal_error(error):
     """, 500
 
 # ==========================================
-# دالة الاتصال بالمايكروتيك (لإرسال أوامر الفصل فقط)
+# دالة الاتصال بالمايكروتيك (لاختبار الاتصال بالسيرفرات)
 # ==========================================
 def connect_mikrotik(ip, username, password, port=8728):
     try:
@@ -217,7 +216,7 @@ def subscribers():
     subscribers_list = cursor.execute('SELECT * FROM subscribers ORDER BY id DESC').fetchall()
     return render_template('subscribers.html', subscribers=subscribers_list)
 
-# إضافة مشترك (حفظ في المنصة فقط - دون إضافته في المايكروتيك)
+# إضافة مشترك (حفظ في المنصة مركزيًا - يعمل أوتوماتيكيًا على جميع السيرفرات)
 @app.route('/add_subscriber', methods=['GET', 'POST'])
 def add_subscriber():
     db = get_db()
@@ -227,7 +226,7 @@ def add_subscriber():
         username = request.form.get('username', '').strip()
         password = request.form.get('password', '').strip()
         profile = request.form.get('profile', '').strip()
-        service_type = request.form.get('service_type', 'pppoe').strip().lower()
+        service_type = request.form.get('service_type', 'hotspot').strip().lower()
 
         if not username or not password or not profile:
             flash('الرجاء إدخال كافة بيانات المشترك واختيار الباقة!', 'danger')
@@ -240,20 +239,20 @@ def add_subscriber():
             )
             db.commit()
 
-            flash(f'تمت إضافة المشترك ({username}) بنجاح إلى المنصة المركبة! الحساب يعمل على السيرفرين.', 'success')
+            flash(f'تمت إضافة المشترك ({username}) بنجاح! يعمل الآن أوتوماتيكياً على جميع السيرفرات.', 'success')
             return redirect(url_for('subscribers'))
 
         except sqlite3.IntegrityError:
-            flash('اسم المستخدم موجود بالفعل بداخل المنصة، يرجى اختيار اسم آخر!', 'danger')
+            flash('اسم المستخدم موجود بالفعل في المنصة، اختر اسماً آخر!', 'danger')
             return redirect(url_for('add_subscriber'))
         except Exception as e:
-            flash(f"حدث خطأ أثناء حفظ المشترك بالمنصة: {str(e)}", "danger")
+            flash(f"حدث خطأ أثناء حفظ المشترك: {str(e)}", "danger")
             return redirect(url_for('add_subscriber'))
 
     packages_list = cursor.execute('SELECT * FROM packages').fetchall()
     return render_template('add_subscriber.html', packages=packages_list)
 
-# حذف المشترك من المنصة وتجريده من الاتصال
+# حذف المشترك من المنصة
 @app.route('/subscribers/delete/<int:subscriber_id>')
 def delete_subscriber(subscriber_id):
     db = get_db()
@@ -261,7 +260,6 @@ def delete_subscriber(subscriber_id):
     
     subscriber = cursor.execute('SELECT * FROM subscribers WHERE id = ?', (subscriber_id,)).fetchone()
     if subscriber:
-        # حذف المشترك من المنصة
         cursor.execute('DELETE FROM subscribers WHERE id = ?', (subscriber_id,))
         db.commit()
         flash(f'تم حذف المشترك ({subscriber["username"]}) بنجاح من المنصة.', 'success')
