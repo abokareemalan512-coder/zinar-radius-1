@@ -18,7 +18,6 @@ app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 
 db = SQLAlchemy(app)
 
-# --- الترجمات ---
 def t(key):
     translations = {
         'brand_sub': 'نظام إدارة المشتركين',
@@ -34,7 +33,7 @@ def t(key):
 
 app.jinja_env.globals['t'] = t
 
-# --- نماذج قاعدة البيانات (Database Models) ---
+# --- نماذج قاعدة البيانات ---
 
 class Admin(db.Model):
     id = db.Column(db.Integer, primary_key=True)
@@ -84,8 +83,6 @@ def generate_random_str(length=6):
     chars = string.ascii_lowercase + string.digits
     return ''.join(random.choice(chars) for _ in range(length))
 
-# --- دالة المزامنة الشاملة مع MikroTik User Manager ---
-
 def sync_userman_full(username, password, profile_name="1M", action='add'):
     main_router = Router.query.first()
     router_ip = main_router.ip_address if main_router else "198.145.118.146"
@@ -112,7 +109,6 @@ def sync_userman_full(username, password, profile_name="1M", action='add'):
                 user_id = existing[0]['.id']
                 userman_users.set(id=user_id, password=password)
 
-            # تفعيل البروفايل مباشرة لضمان ظهور Actual profile ومنع خطأ no valid profile found
             try:
                 userman_users.call('create-and-activate-profile', {
                     'customer': 'admin',
@@ -158,8 +154,6 @@ def dashboard():
         admin_account=admin_account
     )
 
-# --- إدارة الباقات (CRUD Packages) ---
-
 @app.route('/packages', methods=['GET', 'POST'])
 def packages():
     if request.method == 'POST':
@@ -189,23 +183,6 @@ def packages():
     all_packages = Package.query.order_by(Package.id.desc()).all()
     return render_template('packages.html', packages=all_packages)
 
-@app.route('/edit_package/<int:id>', methods=['GET', 'POST'])
-def edit_package(id):
-    pkg = Package.query.get_or_404(id)
-    if request.method == 'POST':
-        try:
-            pkg.name = request.form.get('name')
-            pkg.download_speed = request.form.get('download_speed')
-            pkg.upload_speed = request.form.get('upload_speed')
-            pkg.price = float(request.form.get('price', 0.0))
-            pkg.validity_days = int(request.form.get('validity_days', 30))
-            pkg.shared_users = int(request.form.get('shared_users', 1))
-            db.session.commit()
-        except Exception:
-            db.session.rollback()
-        return redirect(url_for('packages'))
-    return render_template('edit_package.html', package=pkg)
-
 @app.route('/delete_package/<int:id>')
 def delete_package(id):
     try:
@@ -215,8 +192,6 @@ def delete_package(id):
     except Exception:
         db.session.rollback()
     return redirect(url_for('packages'))
-
-# --- إدارة المشتركين (CRUD Subscribers) ---
 
 @app.route('/subscribers')
 def subscribers():
@@ -236,7 +211,6 @@ def add_subscriber():
         service_type = request.form.get('service_type', 'Hotspot')
         package_name = request.form.get('package_name', '1M')
         
-        # احتساب تاريخ الانتهاء بناءً على أيام الباقة المختارة
         selected_pkg = Package.query.filter_by(name=package_name).first()
         valid_days = selected_pkg.validity_days if selected_pkg else 30
         
@@ -299,28 +273,6 @@ def add_subscriber():
 
     return render_template('add_subscriber.html', packages=packages_list)
 
-@app.route('/edit_subscriber/<int:id>', methods=['GET', 'POST'])
-def edit_subscriber(id):
-    sub = Subscriber.query.get_or_404(id)
-    packages_list = Package.query.all()
-    if request.method == 'POST':
-        try:
-            old_username = sub.username
-            sub.username = request.form.get('username')
-            sub.password = request.form.get('password')
-            sub.service_type = request.form.get('service_type', 'Hotspot')
-            sub.package_name = request.form.get('package_name')
-            sub.phone = request.form.get('phone')
-            sub.status = request.form.get('status', 'active')
-            db.session.commit()
-
-            sync_userman_full(old_username, sub.password, action='delete')
-            sync_userman_full(sub.username, sub.password, profile_name=sub.package_name, action='add')
-        except Exception:
-            db.session.rollback()
-        return redirect(url_for('subscribers'))
-    return render_template('edit_subscriber.html', subscriber=sub, packages=packages_list)
-
 @app.route('/delete_subscriber/<int:id>')
 def delete_subscriber(id):
     try:
@@ -331,8 +283,6 @@ def delete_subscriber(id):
     except Exception:
         db.session.rollback()
     return redirect(url_for('subscribers'))
-
-# --- إدارة الراوترات والدخول ---
 
 @app.route('/routers', methods=['GET', 'POST'])
 def routers():
