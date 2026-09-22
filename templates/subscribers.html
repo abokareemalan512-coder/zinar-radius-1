@@ -1,4 +1,4 @@
-{% extends 'base.html' if bootstrap is defined else 'layout.html' %}
+{% extends 'base.html' %}
 
 {% block content %}
 <div class="container-fluid py-4" dir="rtl" style="color: #fff;">
@@ -38,7 +38,7 @@
                         {% for sub in subscribers %}
                         <tr>
                             <td class="fw-bold">{{ sub.username }}</td>
-                            <td><span class="badge bg-primary">{{ sub.package_name }}</span></td>
+                            <td><span class="badge bg-primary">{{ sub.profile }}</span></td>
                             <td>{{ sub.expiry_date if sub.expiry_date else 'غير محدد' }}</td>
                             <td>
                                 {% if sub.status == 'active' %}
