@@ -217,6 +217,7 @@ def subscribers():
     subscribers_list = cursor.execute('SELECT * FROM subscribers ORDER BY id DESC').fetchall()
     return render_template('subscribers.html', subscribers=subscribers_list)
 
+# 6. إضافة مشترك جديد (تم التعديل للتمييز بين Hotspot و PPPoE)
 @app.route('/add_subscriber', methods=['GET', 'POST'])
 def add_subscriber():
     db = get_db()
@@ -226,11 +227,11 @@ def add_subscriber():
         username = request.form.get('username', '').strip()
         password = request.form.get('password', '').strip()
         profile = request.form.get('profile', '').strip()
-        service_type = request.form.get('service_type', 'pppoe')
+        service_type = request.form.get('service_type', 'pppoe').strip().lower()
         router_id = request.form.get('router_id')
 
         if not username or not password or not profile or not router_id:
-            flash('الرجاء إدخال كافة بيانات المشترك واختيار الراوتر!', 'danger')
+            flash('الرجاء إدخال كافة بيانات المشترك واختيار الراوتر والبروفايل!', 'danger')
             return redirect(url_for('add_subscriber'))
 
         router = cursor.execute('SELECT * FROM routers WHERE id = ?', (router_id,)).fetchone()
@@ -251,13 +252,23 @@ def add_subscriber():
             return redirect(url_for('add_subscriber'))
 
         try:
-            ppp_secret = api.get_resource('/ppp/secret')
-            ppp_secret.add(
-                name=str(username),
-                password=str(password),
-                profile=str(profile),
-                service=str(service_type)
-            )
+            # إضافة المشترك حسب نوع الخدمة
+            if service_type == 'hotspot':
+                hotspot_user = api.get_resource('/ip/hotspot/user')
+                hotspot_user.add(
+                    name=str(username),
+                    password=str(password),
+                    profile=str(profile)
+                )
+            else:
+                ppp_secret = api.get_resource('/ppp/secret')
+                valid_ppp_service = service_type if service_type in ['pppoe', 'any', 'l2tp', 'pptp', 'sstp'] else 'any'
+                ppp_secret.add(
+                    name=str(username),
+                    password=str(password),
+                    profile=str(profile),
+                    service=valid_ppp_service
+                )
 
             cursor.execute(
                 'INSERT INTO subscribers (username, password, profile, service_type, router_id, status) VALUES (?, ?, ?, ?, ?, ?)',
@@ -265,7 +276,7 @@ def add_subscriber():
             )
             db.commit()
 
-            flash('تمت إضافة المشترك إلى المايكروتيك وقاعدة البيانات بنجاح!', 'success')
+            flash(f'تمت إضافة المشترك ({username}) بنجاح إلى المايكروتيك وقاعدة البيانات!', 'success')
             return redirect(url_for('subscribers'))
 
         except Exception as e:
@@ -282,7 +293,6 @@ def add_subscriber():
     packages_list = cursor.execute('SELECT * FROM packages').fetchall()
     return render_template('add_subscriber.html', routers=routers_list, packages=packages_list)
 
-# 7. إدارة الباقات (تم تصحيح الحقول والمعالجة الوقائية)
 @app.route('/packages', methods=['GET', 'POST'])
 def packages():
     db = get_db()
@@ -293,7 +303,6 @@ def packages():
         rate_limit = request.form.get('rate_limit', '').strip()
         price = request.form.get('price', 0)
 
-        # التحقق من وجود القيم قبل الإدخال
         if not name or not rate_limit:
             flash('يرجى كتابة اسم الباقة والسرعة بشكل صحيح!', 'danger')
             return redirect(url_for('packages'))
