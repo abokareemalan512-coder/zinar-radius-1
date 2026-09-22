@@ -209,47 +209,56 @@ def add_subscriber():
             return redirect(url_for('add_subscriber'))
 
         try:
-            cursor.execute(
-                'INSERT INTO subscribers (username, password, profile, service_type, status) VALUES (?, ?, ?, ?, ?)',
-                (username, password, profile, service_type, 'active')
-            )
+            try:
+                cursor.execute(
+                    'INSERT INTO subscribers (username, password, profile, service_type, status) VALUES (?, ?, ?, ?, ?)',
+                    (username, password, profile, service_type, 'active')
+                )
+            except sqlite3.OperationalError:
+                cursor.execute(
+                    'INSERT INTO subscribers (username, password, profile, service_type, status, router_id) VALUES (?, ?, ?, ?, ?, NULL)',
+                    (username, password, profile, service_type, 'active')
+                )
             db.commit()
 
             routers_list = cursor.execute('SELECT * FROM routers').fetchall()
             success_count = 0
             fail_routers = []
 
-            for router in routers_list:
-                api, connection, error = connect_mikrotik(
-                    router['ip_address'], router['username'], router['password'], router['port']
-                )
-                if api and not error:
-                    try:
-                        if service_type == 'hotspot':
-                            users_resource = api.get_resource('/ip/hotspot/user')
-                            existing = users_resource.get(name=username)
-                            if not existing:
-                                users_resource.add(name=username, password=password, profile=profile)
-                        else:
-                            secret_resource = api.get_resource('/ppp/secret')
-                            existing = secret_resource.get(name=username)
-                            if not existing:
-                                secret_resource.add(name=username, password=password, profile=profile, service='pppoe')
-                        success_count += 1
-                    except Exception:
+            if routers_list:
+                for router in routers_list:
+                    api, connection, error = connect_mikrotik(
+                        router['ip_address'], router['username'], router['password'], router['port']
+                    )
+                    if api and not error:
+                        try:
+                            if service_type == 'hotspot':
+                                users_resource = api.get_resource('/ip/hotspot/user')
+                                existing = users_resource.get(name=username)
+                                if not existing:
+                                    users_resource.add(name=str(username), password=str(password), profile=str(profile))
+                            else:
+                                secret_resource = api.get_resource('/ppp/secret')
+                                existing = secret_resource.get(name=username)
+                                if not existing:
+                                    secret_resource.add(name=str(username), password=str(password), profile=str(profile), service=str(service_type))
+                            success_count += 1
+                        except Exception:
+                            fail_routers.append(router['name'])
+                        finally:
+                            if connection:
+                                try: connection.disconnect()
+                                except: pass
+                    else:
                         fail_routers.append(router['name'])
-                    finally:
-                        if connection:
-                            try: connection.disconnect()
-                            except: pass
-                else:
-                    fail_routers.append(router['name'])
 
-            if fail_routers:
-                flash(f'تمت إضافة المشترك في المنصة ونجح على ({success_count}) سيرفرات، وتعذر الاتصال بـ: {", ".join(fail_routers)}', 'warning')
+                if fail_routers:
+                    flash(f'تم حفظ المشترك بالمنصة ونجح على ({success_count}) سيرفر، وتعذر على: {", ".join(fail_routers)}', 'warning')
+                else:
+                    flash(f'تمت إضافة المشترك ({username}) بنجاح وتعميمه أوتوماتيكياً على جميع السيرفرات!', 'success')
             else:
-                flash(f'تمت إضافة المشترك ({username}) بنجاح وتعميمه أوتوماتيكياً على جميع السيرفرات!', 'success')
-                
+                flash(f'تم حفظ المشترك ({username}) في المنصة بنجاح! (تنبيه: لا توجد سيرفرات مضافة حالياً)', 'info')
+
             return redirect(url_for('subscribers'))
 
         except sqlite3.IntegrityError:
