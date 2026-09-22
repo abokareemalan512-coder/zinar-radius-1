@@ -1,152 +1,125 @@
-{% extends "base.html" %}
-{% block title %}الراوترات{% endblock %}
-{% block content %}
-
-<div class="topline">
-    <h1><i class="fa-solid fa-server" style="color:var(--signal)"></i> إدارة سيرفرات الميكروتيك</h1>
-</div>
-
-<style>
-    .rt-grid { display: grid; grid-template-columns: 340px 1fr; gap: 16px; align-items: start; }
-    .rt-form-group { margin-bottom: 16px; }
-    .rt-form-group label {
-        display: block; font-size: 12.5px; color: var(--muted);
-        margin-bottom: 6px; font-weight: 500;
-    }
-    .rt-input {
-        width: 100%; background: var(--panel-2); border: 1px solid var(--border);
-        color: var(--text); padding: 9px 12px; border-radius: 8px; font-size: 14px;
-        font-family: 'Tajawal', sans-serif;
-    }
-    .rt-input:focus {
-        outline: none; border-color: var(--signal);
-        box-shadow: 0 0 0 3px var(--signal-dim);
-    }
-    .rt-check-row {
-        display: flex; align-items: center; gap: 9px;
-        background: var(--signal-dim); border: 1px solid rgba(34,211,238,0.25);
-        padding: 10px 12px; border-radius: 8px; margin-bottom: 18px;
-    }
-    .rt-check-row input { accent-color: var(--signal); width: 16px; height: 16px; }
-    .rt-check-row label { font-size: 13px; color: var(--text); margin: 0; cursor: pointer; }
-    .rt-submit {
-        width: 100%; background: var(--signal); color: #04141A; border: none;
-        padding: 11px; border-radius: 9px; font-weight: 700; font-size: 14.5px;
-        cursor: pointer; transition: background 0.15s;
-    }
-    .rt-submit:hover { background: #4DE0F5; }
-
-    table.rt-table { width: 100%; border-collapse: collapse; font-size: 13.5px; }
-    table.rt-table th {
-        text-align: right; padding: 12px 18px; color: var(--muted);
-        font-weight: 500; font-size: 12px; border-bottom: 1px solid var(--border);
-    }
-    table.rt-table td { padding: 13px 18px; border-bottom: 1px solid var(--border); }
-    table.rt-table tr:last-child td { border-bottom: none; }
-    .rt-badge {
-        display: inline-flex; align-items: center; gap: 6px;
-        padding: 4px 11px; border-radius: 999px; font-size: 11.5px; font-weight: 700;
-    }
-    .rt-badge-ok { background: rgba(52,211,153,0.1); color: var(--ok); }
-    .rt-badge-bad { background: rgba(248,113,113,0.1); color: var(--danger); }
-    .rt-badge-master { background: var(--signal-dim); color: var(--signal); }
-    .rt-dot { width: 6px; height: 6px; border-radius: 50%; background: currentColor; }
-    .rt-master-btn {
-        color: var(--muted); font-size: 12.5px; border: 1px solid var(--border);
-        padding: 4px 11px; border-radius: 999px; background: none;
-    }
-    .rt-master-btn:hover { color: var(--signal); border-color: var(--signal); }
-    .rt-empty { padding: 50px 20px; text-align: center; color: var(--muted); }
-
-    @media (max-width: 900px) {
-        .rt-grid { grid-template-columns: 1fr; }
-    }
-</style>
-
-<div class="rt-grid">
-    <div class="card" style="padding:22px;">
-        <h2 style="font-size:15.5px; font-weight:700; margin:0 0 18px;">
-            <i class="fa-solid fa-plus" style="color:var(--signal)"></i> إضافة راوتر جديد
-        </h2>
-        <form method="POST">
-            <div class="rt-form-group">
-                <label>اسم الراوتر</label>
-                <input type="text" name="name" class="rt-input" required placeholder="مثال: راوتر البرج الرئيسي">
-            </div>
-            <div class="rt-form-group">
-                <label>عنوان الآيباد (IP Address)</label>
-                <input type="text" name="ip" class="rt-input" required placeholder="192.168.88.1">
-            </div>
-            <div class="rt-form-group">
-                <label>اسم المستخدم (API User)</label>
-                <input type="text" name="username" class="rt-input" required value="admin">
-            </div>
-            <div class="rt-form-group">
-                <label>كلمة المرور</label>
-                <input type="password" name="password" class="rt-input" required>
-            </div>
-            <div class="rt-form-group">
-                <label>منفذ الـ API</label>
-                <input type="number" name="port" class="rt-input" value="8728">
-            </div>
-            <div class="rt-check-row">
-                <input type="checkbox" name="is_master" id="isMaster">
-                <label for="isMaster">هاد سيرفر User Manager الرئيسي (RADIUS)</label>
-            </div>
-            <button type="submit" class="rt-submit">حفظ وربط الراوتر</button>
-        </form>
-    </div>
-
-    <div class="card">
-        <div class="panel-head">
-            <h2><i class="fa-solid fa-list" style="color:var(--signal)"></i> الراوترات المرتبطة حالياً</h2>
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>إدارة سيرفرات الميكروتيك - زينار</title>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.rtl.min.css">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.5/font/bootstrap-icons.css">
+    <style>
+        body { background-color: #0f172a; color: #f8fafc; font-family: system-ui, -apple-system, sans-serif; }
+        .sidebar { min-height: 100vh; background-color: #1e293b; border-left: 1px solid #334155; }
+        .nav-link { color: #94a3b8; padding: 12px 20px; border-radius: 8px; margin-bottom: 4px; display: flex; align-items: center; gap: 10px; }
+        .nav-link:hover, .nav-link.active { color: #0284c7; background-color: #0f172a; }
+        .btn-cyan { background-color: #0284c7; border: none; color: #fff; }
+        .btn-cyan:hover { background-color: #0369a1; color: #fff; }
+        .card-custom { background-color: #1e293b; border: 1px solid #334155; border-radius: 12px; }
+    </style>
+</head>
+<body>
+<div class="container-fluid">
+    <div class="row">
+        <!-- القائمة الجانبية -->
+        <div class="col-md-3 col-lg-2 sidebar p-3">
+            <h4 class="text-white mb-1 fw-bold">زينار</h4>
+            <p class="text-muted small mb-4">نظام إدارة المشتركين</p>
+            <nav class="nav flex-column">
+                <a class="nav-link" href="{{ url_for('dashboard') }}"><i class="bi bi-speedometer2"></i> لوحة التحكم</a>
+                <a class="nav-link" href="{{ url_for('subscribers') }}"><i class="bi bi-people"></i> المشتركون</a>
+                <a class="nav-link" href="{{ url_for('packages') }}"><i class="bi bi-box-seam"></i> الباقات</a>
+                <a class="nav-link active" href="{{ url_for('routers') }}"><i class="bi bi-router"></i> الراوترات</a>
+            </nav>
+            <a href="{{ url_for('add_subscriber') }}" class="btn btn-cyan w-100 mt-4 py-2"><i class="bi bi-person-plus-fill"></i> إضافة مشترك</a>
         </div>
-        {% if routers %}
-        <table class="rt-table">
-            <thead>
-                <tr>
-                    <th>الاسم</th>
-                    <th>الآيباد (IP)</th>
-                    <th>المستخدم</th>
-                    <th>المنفذ</th>
-                    <th>الحالة</th>
-                    <th>User Manager</th>
-                </tr>
-            </thead>
-            <tbody>
-                {% for r in routers %}
-                <tr>
-                    <td><strong>{{ r.name }}</strong></td>
-                    <td class="mono">{{ r.ip_address }}</td>
-                    <td class="mono">{{ r.username }}</td>
-                    <td class="mono">{{ r.port }}</td>
-                    <td>
-                        {% set status = connection_status.get(r.id) if connection_status else None %}
-                        {% if status and status.success %}
-                            <span class="rt-badge rt-badge-ok"><span class="rt-dot"></span>{{ status.message }}</span>
-                        {% elif status %}
-                            <span class="rt-badge rt-badge-bad" title="{{ status.message }}"><span class="rt-dot"></span>غير متصل</span>
-                        {% else %}
-                            <span class="rt-badge" style="background:rgba(255,255,255,0.05); color:var(--muted);">غير معروف</span>
-                        {% endif %}
-                    </td>
-                    <td>
-                        {% if r.is_master %}
-                            <span class="rt-badge rt-badge-master"><i class="fa-solid fa-star"></i> رئيسي</span>
-                        {% else %}
-                            <a href="{{ url_for('set_master_router', id=r.id) }}" class="rt-master-btn">استخدم كرئيسي</a>
-                        {% endif %}
-                    </td>
-                </tr>
+
+        <!-- المحتوى الرئيسي -->
+        <div class="col-md-9 col-lg-10 p-4">
+            <h2 class="mb-4"><i class="bi bi-router text-info"></i> إدارة سيرفرات الميكروتيك</h2>
+
+            {% with messages = get_flashed_messages(with_categories=true) %}
+              {% if messages %}
+                {% for category, message in messages %}
+                  <div class="alert alert-{{ 'success' if category == 'success' else 'danger' }} alert-dismissible fade show" role="alert">
+                    {{ message }}
+                    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                  </div>
                 {% endfor %}
-            </tbody>
-        </table>
-        {% else %}
-        <div class="rt-empty">
-            <i class="fa-solid fa-server" style="font-size:26px; margin-bottom:10px; display:block; color:var(--border);"></i>
-            لا توجد راوترات مسجلة حتى الآن. أضف راوترك الأول!
+              {% endif %}
+            {% endwith %}
+
+            <div class="row g-4">
+                <!-- قائمة الراوترات المرتبطة -->
+                <div class="col-md-7">
+                    <div class="card card-custom p-3">
+                        <h5 class="mb-3"><i class="bi bi-list-task"></i> الراوترات المرتبطة حالياً</h5>
+                        {% if routers %}
+                        <div class="table-responsive">
+                            <table class="table table-dark table-hover text-center align-middle mb-0">
+                                <thead>
+                                    <tr>
+                                        <th>اسم الراوتر</th>
+                                        <th>عنوان IP</th>
+                                        <th>المستخدم</th>
+                                        <th>المنفذ</th>
+                                        <th>الإجراءات</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for r in routers %}
+                                    <tr>
+                                        <td>{{ r.name }}</td>
+                                        <td><code>{{ r.ip_address }}</code></td>
+                                        <td>{{ r.username }}</td>
+                                        <td>{{ r.port }}</td>
+                                        <td>
+                                            <a href="{{ url_for('delete_router', id=r.id) }}" class="btn btn-sm btn-outline-danger" onclick="return confirm('حذف هذا الراوتر؟')">حذف</a>
+                                        </td>
+                                    </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                        {% else %}
+                        <div class="text-center py-5">
+                            <p class="text-muted mb-0">لا توجد راوترات مسجلة حتى الآن. أضف راوترك الأول!</p>
+                        </div>
+                        {% endif %}
+                    </div>
+                </div>
+
+                <!-- نموذج إضافة راوتر جديد -->
+                <div class="col-md-5">
+                    <div class="card card-custom p-3">
+                        <h5 class="mb-3 text-info"><i class="bi bi-plus-circle"></i> إضافة راوتر جديد</h5>
+                        <form action="{{ url_for('routers') }}" method="POST">
+                            <div class="mb-3">
+                                <label class="form-label">اسم الراوتر</label>
+                                <input type="text" name="name" class="form-control bg-dark text-white border-secondary" placeholder="مثال: راوتر البرج الرئيسي" required>
+                            </div>
+                            <div class="mb-3">
+                                <label class="form-label">عنوان الآيباد (IP Address)</label>
+                                <input type="text" name="ip_address" class="form-control bg-dark text-white border-secondary" placeholder="192.168.88.1" required>
+                            </div>
+                            <div class="mb-3">
+                                <label class="form-label">اسم المستخدم (API User)</label>
+                                <input type="text" name="username" class="form-control bg-dark text-white border-secondary" value="admin" required>
+                            </div>
+                            <div class="mb-3">
+                                <label class="form-label">كلمة المرور</label>
+                                <input type="password" name="password" class="form-control bg-dark text-white border-secondary">
+                            </div>
+                            <div class="mb-3">
+                                <label class="form-label">منفذ الـ API</label>
+                                <input type="number" name="port" class="form-control bg-dark text-white border-secondary" value="8728" required>
+                            </div>
+                            <button type="submit" class="btn btn-cyan w-100 py-2 mt-2"><i class="bi bi-save"></i> حفظ الراوتر</button>
+                        </form>
+                    </div>
+                </div>
+            </div>
         </div>
-        {% endif %}
     </div>
 </div>
-{% endblock %}
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>
