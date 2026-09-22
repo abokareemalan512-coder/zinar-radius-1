@@ -66,21 +66,30 @@ def init_db():
         ''')
         db.commit()
 
-# إنشاء الجداول عند التشغيل
 init_db()
+
+# ==========================================
+# معالج الأخطاء العالمي (إظهار تفاصيل الخطأ مباشرة على الشاشة)
+# ==========================================
+@app.errorhandler(500)
+def internal_error(error):
+    err_msg = traceback.format_exc()
+    return f"""
+    <div dir="rtl" style="padding: 20px; background-color: #f8d7da; color: #721c24; font-family: sans-serif; border-radius: 8px; margin: 20px;">
+        <h2>حدث خطأ برمجي داخل الخادم (500 Error):</h2>
+        <p>التفاصيل التقنية للخطأ:</p>
+        <pre style="background: #1e1e1e; color: #00ff00; padding: 15px; border-radius: 5px; overflow-x: auto; text-align: left; direction: ltr;">{err_msg}</pre>
+    </div>
+    """, 500
 
 # ==========================================
 # دالة الاتصال بالمايكروتيك (MikroTik API)
 # ==========================================
 def connect_mikrotik(ip, username, password, port=8728):
-    """
-    دالة موحدة ومضمونة للاتصال بالمايكروتيك
-    """
     try:
         clean_ip = str(ip).replace('http://', '').replace('https://', '').strip()
         clean_port = int(port) if port else 8728
 
-        # الاتصال المباشر المتوافق مع جميع إصدارات المكتبة
         connection = routeros_api.RouterOsApiPool(
             clean_ip,
             username=str(username).strip(),
@@ -92,16 +101,12 @@ def connect_mikrotik(ip, username, password, port=8728):
         api = connection.get_api()
         return api, connection, None
     except Exception as e:
-        error_msg = str(e)
-        print("=== MIKROTIK CONNECTION ERROR ===")
-        print(traceback.format_exc())
-        return None, None, error_msg
+        return None, None, str(e)
 
 # ==========================================
 # المسارات الرئيسية (Routes)
 # ==========================================
 
-# 1. لوحة التحكم
 @app.route('/')
 @app.route('/dashboard')
 def dashboard():
@@ -124,7 +129,6 @@ def dashboard():
         subscribers=subscribers
     )
 
-# 2. إدارة الراوترات
 @app.route('/routers', methods=['GET', 'POST'])
 def routers():
     db = get_db()
@@ -148,7 +152,6 @@ def routers():
     routers_list = cursor.execute('SELECT * FROM routers').fetchall()
     return render_template('routers.html', routers=routers_list)
 
-# 3. اختبار الاتصال بالمايكروتيك
 @app.route('/routers/test/<int:router_id>')
 def test_router(router_id):
     db = get_db()
@@ -190,7 +193,6 @@ def test_router(router_id):
 
     return redirect(url_for('routers'))
 
-# 4. حذف راوتر
 @app.route('/routers/delete/<int:router_id>')
 def delete_router(router_id):
     db = get_db()
@@ -200,7 +202,6 @@ def delete_router(router_id):
     flash('تم حذف الراوتر بنجاح.', 'success')
     return redirect(url_for('routers'))
 
-# 5. إدارة المشتركين
 @app.route('/subscribers')
 def subscribers():
     db = get_db()
@@ -208,7 +209,6 @@ def subscribers():
     subscribers_list = cursor.execute('SELECT * FROM subscribers ORDER BY id DESC').fetchall()
     return render_template('subscribers.html', subscribers=subscribers_list)
 
-# 6. إضافة مشترك جديد للشبكة والمايكروتيك
 @app.route('/add_subscriber', methods=['GET', 'POST'])
 def add_subscriber():
     db = get_db()
@@ -270,7 +270,6 @@ def add_subscriber():
     packages_list = cursor.execute('SELECT * FROM packages').fetchall()
     return render_template('add_subscriber.html', routers=routers_list, packages=packages_list)
 
-# 7. إدارة الباقات
 @app.route('/packages', methods=['GET', 'POST'])
 def packages():
     db = get_db()
