@@ -15,6 +15,8 @@
         .btn-cyan:hover { background-color: #0369a1; color: #fff; }
         .card-custom { background-color: #1e293b; border: 1px solid #334155; border-radius: 12px; }
         .text-custom-muted { color: #94a3b8 !important; }
+        .form-control, .form-select { background-color: #0f172a; border: 1px solid #334155; color: #fff; }
+        .form-control:focus, .form-select:focus { background-color: #0f172a; color: #fff; border-color: #38bdf8; box-shadow: none; }
     </style>
 </head>
 <body class="notranslate" translate="no">
@@ -28,13 +30,16 @@
                 <a class="nav-link" href="{{ url_for('dashboard') }}"><i class="bi bi-speedometer2"></i> لوحة التحكم</a>
                 <a class="nav-link active" href="{{ url_for('subscribers') }}"><i class="bi bi-people"></i> المشتركون</a>
                 <a class="nav-link" href="{{ url_for('packages') }}"><i class="bi bi-box-seam"></i> الباقات</a>
-                <a class="nav-link" href="{{ url_for('routers') }}"><i class="bi bi-router"></i> الراوترات</a>
+                <a class="nav-link" href="{{ url_for('routers') }}"><i class="bi bi-router"></i> السيرفرات والراوترات</a>
             </nav>
         </div>
 
         <!-- المحتوى الرئيسي -->
         <div class="col-md-9 col-lg-10 p-4">
-            <h2 class="mb-4 text-white"><i class="bi bi-person-plus text-info"></i> إضافة مشترك جديد</h2>
+            <div class="d-flex justify-content-between align-items-center mb-4">
+                <h2 class="text-white mb-0"><i class="bi bi-person-plus text-info"></i> إضافة مشترك جديد (مركزي)</h2>
+                <a href="{{ url_for('subscribers') }}" class="btn btn-outline-secondary"><i class="bi bi-arrow-right"></i> إلغاء ورجوع</a>
+            </div>
 
             {% with messages = get_flashed_messages(with_categories=true) %}
               {% if messages %}
@@ -50,60 +55,39 @@
             <div class="card card-custom p-4">
                 <form action="{{ url_for('add_subscriber') }}" method="POST">
                     <div class="row g-3">
-                        <!-- اختيار الراوتر / السيرفر -->
                         <div class="col-md-6">
-                            <label class="form-label text-custom-muted">اختيار الراوتر / السيرفر <span class="text-danger">*</span></label>
-                            <select name="router_id" class="form-select bg-dark text-white border-secondary" required>
-                                <option value="" disabled selected>-- اختر الراوتر --</option>
-                                {% for r in routers %}
-                                    <option value="{{ r.id }}">{{ r.name }} ({{ r.ip_address }})</option>
-                                {% endfor %}
-                            </select>
-                            {% if not routers %}
-                                <small class="text-warning d-block mt-1">لا توجد راوترات! قم بـ <a href="{{ url_for('routers') }}" class="text-info">إضافة راوتر أولاً</a>.</small>
-                            {% endif %}
+                            <label class="form-label text-white">اسم المستخدم (Username) <span class="text-danger">*</span></label>
+                            <input type="text" name="username" class="form-control" placeholder="أدخل اسم المستخدم" required>
                         </div>
 
-                        <!-- اختيار الباقة / البروفايل -->
                         <div class="col-md-6">
-                            <label class="form-label text-custom-muted">الباقة / البروفايل (Profile) <span class="text-danger">*</span></label>
-                            <select name="profile" class="form-select bg-dark text-white border-secondary" required>
+                            <label class="form-label text-white">كلمة المرور (Password) <span class="text-danger">*</span></label>
+                            <input type="text" name="password" class="form-control" placeholder="أدخل كلمة المرور" required>
+                        </div>
+
+                        <div class="col-md-6">
+                            <label class="form-label text-white">الباقة / البروفايل (Profile) <span class="text-danger">*</span></label>
+                            <select name="profile" class="form-select" required>
                                 <option value="" disabled selected>-- اختر الباقة --</option>
-                                {% for p in packages %}
-                                    <option value="{{ p.name }}">{{ p.name }} - ({{ p.rate_limit }})</option>
+                                {% for pkg in packages %}
+                                    <option value="{{ pkg.name }}">{{ pkg.name }} ({{ pkg.rate_limit }})</option>
+                                {% else %}
+                                    <option value="1M">1M - بروفايل افتراضي</option>
                                 {% endfor %}
                             </select>
-                            {% if not packages %}
-                                <small class="text-warning d-block mt-1">لا توجد باقات! قم بـ <a href="{{ url_for('packages') }}" class="text-info">إضافة باقة أولاً</a>.</small>
-                            {% endif %}
                         </div>
 
-                        <!-- اسم المستخدم -->
                         <div class="col-md-6">
-                            <label class="form-label text-custom-muted">اسم المستخدم (Username) <span class="text-danger">*</span></label>
-                            <input type="text" name="username" class="form-control bg-dark text-white border-secondary" placeholder="مثال: user123" required>
-                        </div>
-
-                        <!-- كلمة المرور -->
-                        <div class="col-md-6">
-                            <label class="form-label text-custom-muted">كلمة المرور (Password) <span class="text-danger">*</span></label>
-                            <input type="text" name="password" class="form-control bg-dark text-white border-secondary" placeholder="123456" required>
-                        </div>
-
-                        <!-- نوع الخدمة -->
-                        <div class="col-md-6">
-                            <label class="form-label text-custom-muted">نوع الخدمة</label>
-                            <select name="service_type" class="form-select bg-dark text-white border-secondary">
-                                <option value="pppoe" selected>PPPoE</option>
-                                <option value="hotspot">Hotspot</option>
-                                <option value="any">Any</option>
+                            <label class="form-label text-white">نوع الخدمة</label>
+                            <select name="service_type" class="form-select">
+                                <option value="hotspot" selected>Hotspot (شبكة كروت / كافيهات)</option>
+                                <option value="pppoe">PPPoE (اشتراكات منزلية)</option>
                             </select>
                         </div>
-                    </div>
 
-                    <div class="mt-4 text-start">
-                        <button type="submit" class="btn btn-cyan px-4"><i class="bi bi-check-circle"></i> إضافة المشترك</button>
-                        <a href="{{ url_for('subscribers') }}" class="btn btn-outline-secondary ms-2">إلغاء</a>
+                        <div class="col-12 mt-4 text-start">
+                            <button type="submit" class="btn btn-cyan px-4 py-2"><i class="bi bi-check-circle"></i> إضافة المشترك للمنصة</button>
+                        </div>
                     </div>
                 </form>
             </div>
