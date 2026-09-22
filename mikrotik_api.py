@@ -136,7 +136,64 @@ def get_all_routers_stats(routers):
     return {'per_router': per_router, 'totals': totals}
 
 
-def disconnect_ppp_user(router, username):
+def get_userman_users(router):
+    """
+    يجرب يقرأ مستخدمي User Manager عبر RouterOS API (مش عبر Terminal).
+    بيرجع dict فيه success/error والبيانات الخام، مفيدة للتشخيص ولإعادة الاستخدام لاحقاً.
+    """
+    connection = None
+    try:
+        connection, api = _connect(router)
+        users = api.get_resource('/tool/user-manager/user').get()
+        return {'success': True, 'count': len(users), 'raw': users}
+    except Exception as e:
+        return {'success': False, 'error': str(e)}
+    finally:
+        if connection:
+            try:
+                connection.disconnect()
+            except Exception:
+                pass
+
+
+def get_userman_profiles(router):
+    """نفس الفكرة بس للبروفايلات (الباقات) المعرّفة بـ User Manager."""
+    connection = None
+    try:
+        connection, api = _connect(router)
+        profiles = api.get_resource('/tool/user-manager/profile').get()
+        return {'success': True, 'count': len(profiles), 'raw': profiles}
+    except Exception as e:
+        return {'success': False, 'error': str(e)}
+    finally:
+        if connection:
+            try:
+                connection.disconnect()
+            except Exception:
+                pass
+
+
+def add_userman_user(router, username, password, profile=None):
+    """
+    يضيف مستخدم جديد لـ User Manager مباشرة عبر API.
+    profile اختياري - إذا انحط، بينربط المستخدم بباقة معينة مباشرة.
+    """
+    connection = None
+    try:
+        connection, api = _connect(router)
+        params = {'customer': 'admin', 'username': username, 'password': password}
+        if profile:
+            params['actual-profile'] = profile
+        api.get_resource('/tool/user-manager/user').add(**params)
+        return {'success': True}
+    except Exception as e:
+        return {'success': False, 'error': str(e)}
+    finally:
+        if connection:
+            try:
+                connection.disconnect()
+            except Exception:
+                pass
     """
     يفصل مستخدم PPPoE معيّن فوراً من راوتر محدد (متل زر "قطع الاتصال").
     """
