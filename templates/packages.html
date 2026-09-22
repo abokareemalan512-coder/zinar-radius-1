@@ -1,25 +1,98 @@
-{% extends "base.html" %}
-{% block content %}
-<div class="d-flex justify-content-between align-items-center pt-3 pb-2 mb-3 border-bottom">
-    <h1 class="h2"><i class="fa-solid fa-box text-primary"></i> الباقات المتاحة</h1>
-</div>
+{% extends 'base.html' if bootstrap is defined else 'layout.html' %}
 
-<div class="row">
-    {% if packages %}
-        {% for pkg in packages %}
-        <div class="col-md-4 mb-4">
-            <div class="card shadow-sm p-3">
-                <h5 class="fw-bold">{{ pkg.name }}</h5>
-                <p class="text-muted">{{ pkg.speed }} - {{ pkg.price }}</p>
+{% block content %}
+<div class="container-fluid py-4" dir="rtl" style="color: #fff;">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h2><i class="bi bi-box-seam text-cyan"></i> إدارة الباقات المتاحة</h2>
+        <button class="btn btn-cyan text-white" data-bs-toggle="modal" data-bs-target="#addPackageModal">
+            <i class="bi bi-plus-lg"></i> إضافة باقة جديدة
+        </button>
+    </div>
+
+    <!-- نموذج إضافة باقة Modal -->
+    <div class="modal fade" id="addPackageModal" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content style-card bg-dark border-cyan text-white">
+                <div class="modal-header border-bottom border-secondary">
+                    <h5 class="modal-title">إضافة باقة جديدة</h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                </div>
+                <form action="{{ url_for('packages') }}" method="POST">
+                    <div class="modal-body">
+                        <div class="mb-3">
+                            <label class="form-label">اسم الباقة (يجب أن يطابق اسم Profile في الميكروتيك)</label>
+                            <input type="text" name="name" class="form-control bg-secondary text-white" placeholder="مثال: 1M أو Speed_2M" required>
+                        </div>
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label">سرعة التحميل (Download)</label>
+                                <input type="text" name="download_speed" class="form-control bg-secondary text-white" value="1M">
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label">سرعة الرفع (Upload)</label>
+                                <input type="text" name="upload_speed" class="form-control bg-secondary text-white" value="1M">
+                            </div>
+                        </div>
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label">السعر ($)</label>
+                                <input type="number" step="0.1" name="price" class="form-control bg-secondary text-white" value="10">
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label">مدة الصلاحية (بالأيام)</label>
+                                <input type="number" name="validity_days" class="form-control bg-secondary text-white" value="30">
+                            </div>
+                        </div>
+                    </div>
+                    <div class="modal-footer border-top border-secondary">
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">إلغاء</button>
+                        <button type="submit" class="btn btn-cyan text-white">حفظ الباقة</button>
+                    </div>
+                </form>
             </div>
         </div>
-        {% endfor %}
-    {% else %}
-        <div class="col-12">
-            <div class="alert alert-info text-center">
-                لا توجد باقات مضافة حتى الآن.
+    </div>
+
+    <!-- جدول عرض الباقات -->
+    <div class="card bg-dark border-secondary">
+        <div class="card-body p-0">
+            {% if packages %}
+            <div class="table-responsive">
+                <table class="table table-dark table-hover mb-0 text-center align-middle">
+                    <thead>
+                        <tr>
+                            <th>#</th>
+                            <th>اسم الباقة (Profile)</th>
+                            <th>السرعة (تحميل/رفع)</th>
+                            <th>الصلاحية</th>
+                            <th>السعر</th>
+                            <th>الإجراءات</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for pkg in packages %}
+                        <tr>
+                            <td>{{ pkg.id }}</td>
+                            <td><span class="badge bg-info text-dark">{{ pkg.name }}</span></td>
+                            <td>{{ pkg.download_speed }} / {{ pkg.upload_speed }}</td>
+                            <td>{{ pkg.validity_days }} يوم</td>
+                            <td>${{ pkg.price }}</td>
+                            <td>
+                                <a href="{{ url_for('delete_package', id=pkg.id) }}" class="btn btn-sm btn-outline-danger" onclick="return confirm('هل أنت تأكد من حذف هذه الباقة؟')">
+                                    <i class="bi bi-trash"></i> حذف
+                                </a>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
             </div>
+            {% else %}
+            <div class="text-center py-5">
+                <p class="text-muted mb-0">لا توجد باقات مضافة حتى الآن.</p>
+            </div>
+            {% endif %}
         </div>
-    {% endif %}
+    </div>
 </div>
 {% endblock %}
