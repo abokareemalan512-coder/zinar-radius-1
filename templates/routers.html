@@ -1,9 +1,10 @@
 <!DOCTYPE html>
-<html lang="ar" dir="rtl">
+<html lang="ar" dir="rtl" class="notranslate" translate="no">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>إدارة سيرفرات الميكروتيك - زينار</title>
+    <meta name="google" content="notranslate">
+    <title>إدارة الراوترات - زينار</title>
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.rtl.min.css">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.5/font/bootstrap-icons.css">
     <style>
@@ -14,16 +15,10 @@
         .btn-cyan { background-color: #0284c7; border: none; color: #fff; }
         .btn-cyan:hover { background-color: #0369a1; color: #fff; }
         .card-custom { background-color: #1e293b; border: 1px solid #334155; border-radius: 12px; }
-        
-        /* إصلاح ألوان النصوص والحقول لتبدو واضحة جداً */
-        .form-label { color: #f1f5f9 !important; font-weight: 600; margin-bottom: 6px; }
         .text-custom-muted { color: #94a3b8 !important; }
-        .form-control { background-color: #0f172a !important; color: #ffffff !important; border: 1px solid #475569 !important; }
-        .form-control::placeholder { color: #64748b !important; }
-        .form-control:focus { border-color: #38bdf8 !important; box-shadow: 0 0 0 0.25rem rgba(56, 189, 248, 0.25) !important; }
     </style>
 </head>
-<body>
+<body class="notranslate" translate="no">
 <div class="container-fluid">
     <div class="row">
         <!-- القائمة الجانبية -->
@@ -36,17 +31,16 @@
                 <a class="nav-link" href="{{ url_for('packages') }}"><i class="bi bi-box-seam"></i> الباقات</a>
                 <a class="nav-link active" href="{{ url_for('routers') }}"><i class="bi bi-router"></i> الراوترات</a>
             </nav>
-            <a href="{{ url_for('add_subscriber') }}" class="btn btn-cyan w-100 mt-4 py-2"><i class="bi bi-person-plus-fill"></i> إضافة مشترك</a>
         </div>
 
         <!-- المحتوى الرئيسي -->
         <div class="col-md-9 col-lg-10 p-4">
-            <h2 class="mb-4 text-white"><i class="bi bi-router text-info"></i> إدارة سيرفرات الميكروتيك</h2>
+            <h2 class="mb-4 text-white"><i class="bi bi-router text-info"></i> إدارة الراوترات</h2>
 
             {% with messages = get_flashed_messages(with_categories=true) %}
               {% if messages %}
                 {% for category, message in messages %}
-                  <div class="alert alert-{{ 'success' if category == 'success' else 'danger' }} alert-dismissible fade show" role="alert">
+                  <div class="alert alert-{{ category if category != 'danger' else 'danger' }} alert-dismissible fade show" role="alert">
                     {{ message }}
                     <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
                   </div>
@@ -54,76 +48,84 @@
               {% endif %}
             {% endwith %}
 
-            <div class="row g-4">
-                <!-- قائمة الراوترات المرتبطة -->
-                <div class="col-md-7">
-                    <div class="card card-custom p-3">
-                        <h5 class="mb-3 text-white"><i class="bi bi-list-task"></i> الراوترات المرتبطة حالياً</h5>
-                        {% if routers %}
-                        <div class="table-responsive">
-                            <table class="table table-dark table-hover text-center align-middle mb-0">
-                                <thead>
-                                    <tr>
-                                        <th>اسم الراوتر</th>
-                                        <th>عنوان IP</th>
-                                        <th>المستخدم</th>
-                                        <th>المنفذ</th>
-                                        <th>الإجراءات</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    {% for r in routers %}
-                                    <tr>
-                                        <td>{{ r.name }}</td>
-                                        <td><code>{{ r.ip_address }}</code></td>
-                                        <td>{{ r.username }}</td>
-                                        <td>{{ r.port }}</td>
-                                        <td>
-                                            <a href="{{ url_for('delete_router', id=r.id) }}" class="btn btn-sm btn-outline-danger" onclick="return confirm('حذف هذا الراوتر؟')">حذف</a>
-                                        </td>
-                                    </tr>
-                                    {% endfor %}
-                                </tbody>
-                            </table>
+            <!-- نموذج إضافة راوتر جديد -->
+            <div class="card card-custom p-4 mb-4">
+                <h5 class="text-white mb-3"><i class="bi bi-plus-circle text-info"></i> إضافة راوتر جديد</h5>
+                <form action="{{ url_for('routers') }}" method="POST">
+                    <div class="row g-3">
+                        <div class="col-md-3">
+                            <label class="form-label text-custom-muted">اسم الراوتر</label>
+                            <input type="text" name="name" class="form-control bg-dark text-white border-secondary" placeholder="مثال: الراوتر الرئيسي" required>
                         </div>
-                        {% else %}
-                        <div class="text-center py-5">
-                            <p class="text-custom-muted mb-0">لا توجد راوترات مسجلة حتى الآن. أضف راوترك الأول!</p>
+                        <div class="col-md-3">
+                            <label class="form-label text-custom-muted">عنوان IP الخارجي</label>
+                            <input type="text" name="ip_address" class="form-control bg-dark text-white border-secondary" placeholder="198.145.118.146" required>
                         </div>
-                        {% endif %}
+                        <div class="col-md-2">
+                            <label class="form-label text-custom-muted">اسم المستخدم</label>
+                            <input type="text" name="username" class="form-control bg-dark text-white border-secondary" placeholder="admin" required>
+                        </div>
+                        <div class="col-md-2">
+                            <label class="form-label text-custom-muted">كلمة المرور</label>
+                            <input type="password" name="password" class="form-control bg-dark text-white border-secondary">
+                        </div>
+                        <div class="col-md-2">
+                            <label class="form-label text-custom-muted">منفذ API</label>
+                            <input type="number" name="port" class="form-control bg-dark text-white border-secondary" value="8728" required>
+                        </div>
                     </div>
-                </div>
-
-                <!-- نموذج إضافة راوتر جديد -->
-                <div class="col-md-5">
-                    <div class="card card-custom p-3">
-                        <h5 class="mb-3 text-info"><i class="bi bi-plus-circle"></i> إضافة راوتر جديد</h5>
-                        <form action="{{ url_for('routers') }}" method="POST">
-                            <div class="mb-3">
-                                <label class="form-label">اسم الراوتر</label>
-                                <input type="text" name="name" class="form-control" placeholder="مثال: راوتر البرج الرئيسي" required>
-                            </div>
-                            <div class="mb-3">
-                                <label class="form-label">عنوان IP (IP Address)</label>
-                                <input type="text" name="ip_address" class="form-control" placeholder="192.168.88.1" required>
-                            </div>
-                            <div class="mb-3">
-                                <label class="form-label">اسم المستخدم (API User)</label>
-                                <input type="text" name="username" class="form-control" value="admin" required>
-                            </div>
-                            <div class="mb-3">
-                                <label class="form-label">كلمة المرور</label>
-                                <input type="password" name="password" class="form-control">
-                            </div>
-                            <div class="mb-3">
-                                <label class="form-label">منفذ الـ API</label>
-                                <input type="number" name="port" class="form-control" value="8728" required>
-                            </div>
-                            <button type="submit" class="btn btn-cyan w-100 py-2 mt-2"><i class="bi bi-save"></i> حفظ الراوتر</button>
-                        </form>
-                    </div>
-                </div>
+                    <button type="submit" class="btn btn-cyan mt-3"><i class="bi bi-save"></i> حفظ الراوتر</button>
+                </form>
             </div>
+
+            <!-- جدول الراوترات المضافة -->
+            <div class="card card-custom p-3">
+                <h5 class="text-white mb-3"><i class="bi bi-list-task text-info"></i> قائمة الراوترات</h5>
+                {% if routers %}
+                <div class="table-responsive">
+                    <table class="table table-dark table-hover text-center align-middle mb-0">
+                        <thead>
+                            <tr>
+                                <th>#</th>
+                                <th>اسم الراوتر</th>
+                                <th>عنوان IP</th>
+                                <th>اسم المستخدم</th>
+                                <th>المنفذ</th>
+                                <th>حالة الاتصال</th>
+                                <th>الإجراءات</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for router in routers %}
+                            <tr>
+                                <td>{{ router.id }}</td>
+                                <td class="fw-bold text-info">{{ router.name }}</td>
+                                <td><code>{{ router.ip_address }}</code></td>
+                                <td>{{ router.username }}</td>
+                                <td>{{ router.port }}</td>
+                                <td>
+                                    {% if router.status == 'connected' %}
+                                        <span class="badge bg-success">متصل</span>
+                                    {% else %}
+                                        <span class="badge bg-danger">غير متصل</span>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    <a href="{{ url_for('test_router', router_id=router.id) }}" class="btn btn-sm btn-outline-info me-1"><i class="bi bi-arrow-repeat"></i> اختبار الاتصال</a>
+                                    <a href="{{ url_for('delete_router', router_id=router.id) }}" class="btn btn-sm btn-outline-danger" onclick="return confirm('هل أنت تأكد من حذف هذا الراوتر؟');"><i class="bi bi-trash"></i> حذف</a>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+                {% else %}
+                <div class="text-center py-4">
+                    <p class="text-custom-muted mb-0">لا يوجد راوترات مضافة حتى الآن.</p>
+                </div>
+                {% endif %}
+            </div>
+
         </div>
     </div>
 </div>
