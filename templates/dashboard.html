@@ -1,155 +1,178 @@
-{% extends 'base.html' %}
-{% block title %}لوحة التحكم الرئيسية{% endblock %}
-
+{% extends "base.html" %}
+{% block title %}لوحة التحكم{% endblock %}
 {% block content %}
-<div class="container-fluid">
-    <div class="d-flex justify-content-between align-items-center mb-4 flex-wrap gap-2">
-        <div>
-            <h3 class="fw-bold m-0 text-white"><i class="fa-solid fa-gauge-high text-info me-2"></i> لوحة التحكم الرئيسية</h3>
-            <span class="text-muted fs-6">مراقبة وإدارة جميع خدمات الشبكة والمشتركين</span>
-        </div>
-        <div>
-            <span class="badge bg-success bg-opacity-20 text-success border border-success px-3 py-2 fs-6 fw-bold">
-                <i class="fa-solid fa-circle-check me-1"></i> النظام يعمل بشكل طبيعي
-            </span>
-        </div>
+
+<div class="topline">
+    <h1><i class="fa-solid fa-gauge-high" style="color:var(--signal)"></i> لوحة التحكم الرئيسية</h1>
+    <div class="status-pill"><span class="status-dot"></span> النظام يعمل بشكل طبيعي</div>
+</div>
+
+<style>
+    .stat-grid {
+        display: grid;
+        grid-template-columns: repeat(4, 1fr);
+        gap: 16px;
+        margin-bottom: 16px;
+    }
+    .stat-card {
+        padding: 20px 20px 18px;
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+        position: relative;
+        overflow: hidden;
+    }
+    .stat-card .icon-badge {
+        width: 34px; height: 34px;
+        border-radius: 8px;
+        display: flex; align-items: center; justify-content: center;
+        font-size: 14px;
+    }
+    .stat-card .label { color: var(--muted); font-size: 13px; font-weight: 500; }
+    .stat-card .value { font-size: 30px; font-weight: 900; font-family: 'Tajawal', sans-serif; direction: ltr; text-align: right; }
+    .stat-card.hero {
+        grid-column: span 1;
+        background: linear-gradient(160deg, var(--panel) 60%, var(--signal-dim));
+        border-color: rgba(34,211,238,0.35);
+    }
+    .stat-card.hero .value { color: var(--signal); font-size: 34px; }
+
+    .mid-grid { display: grid; grid-template-columns: 2fr 1fr; gap: 16px; margin-top: 18px; }
+
+    .panel-head {
+        display: flex; align-items: center; justify-content: space-between;
+        padding: 16px 20px;
+        border-bottom: 1px solid var(--border);
+    }
+    .panel-head h2 { font-size: 15.5px; font-weight: 700; margin: 0; display: flex; align-items: center; gap: 8px; }
+
+    table.sub-table { width: 100%; border-collapse: collapse; font-size: 13.5px; }
+    table.sub-table th {
+        text-align: right; padding: 11px 20px; color: var(--muted);
+        font-weight: 500; font-size: 12.5px; border-bottom: 1px solid var(--border);
+    }
+    table.sub-table td { padding: 12px 20px; border-bottom: 1px solid var(--border); }
+    table.sub-table tr:last-child td { border-bottom: none; }
+    .mono { font-family: 'Courier New', monospace; direction: ltr; text-align: right; unicode-bidi: bidi-override; }
+    .badge {
+        display: inline-block; padding: 3px 10px; border-radius: 999px;
+        font-size: 11.5px; font-weight: 700;
+    }
+    .badge-ok { background: rgba(52,211,153,0.12); color: var(--ok); }
+    .badge-profile { background: rgba(255,255,255,0.06); color: var(--text); }
+    .row-action { color: var(--muted); }
+    .row-action:hover { color: var(--danger); }
+
+    .empty-state { padding: 50px 20px; text-align: center; color: var(--muted); }
+    .empty-state i { font-size: 26px; margin-bottom: 10px; display: block; color: var(--border); }
+
+    .side-panel-item {
+        display: flex; align-items: center; justify-content: space-between;
+        padding: 14px 20px; border-bottom: 1px solid var(--border);
+        font-size: 13.5px;
+    }
+    .side-panel-item:last-child { border-bottom: none; }
+    .side-panel-item .name { color: var(--muted); }
+    .side-panel-item .num { font-weight: 700; direction: ltr; }
+
+    @media (max-width: 1100px) {
+        .stat-grid { grid-template-columns: repeat(2, 1fr); }
+        .mid-grid { grid-template-columns: 1fr; }
+    }
+</style>
+
+<!-- بطاقات الإحصائيات -->
+<div class="stat-grid">
+    <div class="card stat-card hero">
+        <div class="icon-badge" style="background:var(--signal-dim); color:var(--signal);"><i class="fa-solid fa-users"></i></div>
+        <div class="label">إجمالي المشتركين</div>
+        <div class="value">{{ sub_count | default(0) }}</div>
     </div>
-
-    <!-- بطاقات الإحصائيات -->
-    <div class="row g-3 mb-4">
-        <div class="col-md-3">
-            <div class="card card-custom p-3">
-                <div class="d-flex align-items-center justify-content-between">
-                    <div>
-                        <span class="text-muted d-block fw-semibold mb-1">إجمالي المشتركين</span>
-                        <h2 class="fw-bold m-0 text-white">{{ sub_count }}</h2>
-                    </div>
-                    <div class="bg-primary bg-opacity-20 p-3 rounded-3 text-info fs-3">
-                        <i class="fa-solid fa-users"></i>
-                    </div>
-                </div>
-            </div>
-        </div>
-
-        <div class="col-md-3">
-            <div class="card card-custom p-3">
-                <div class="d-flex align-items-center justify-content-between">
-                    <div>
-                        <span class="text-muted d-block fw-semibold mb-1">المشتركون النشطون</span>
-                        <h2 class="fw-bold m-0 text-success">{{ active_subs }}</h2>
-                    </div>
-                    <div class="bg-success bg-opacity-20 p-3 rounded-3 text-success fs-3">
-                        <i class="fa-solid fa-user-check"></i>
-                    </div>
-                </div>
-            </div>
-        </div>
-
-        <div class="col-md-3">
-            <div class="card card-custom p-3">
-                <div class="d-flex align-items-center justify-content-between">
-                    <div>
-                        <span class="text-muted d-block fw-semibold mb-1">الراوترات المضافة</span>
-                        <h2 class="fw-bold m-0 text-info">{{ routers_count }}</h2>
-                    </div>
-                    <div class="bg-info bg-opacity-20 p-3 rounded-3 text-info fs-3">
-                        <i class="fa-solid fa-server"></i>
-                    </div>
-                </div>
-            </div>
-        </div>
-
-        <div class="col-md-3">
-            <div class="card card-custom p-3">
-                <div class="d-flex align-items-center justify-content-between">
-                    <div>
-                        <span class="text-muted d-block fw-semibold mb-1">الجلسات الحية الآن</span>
-                        <h2 class="fw-bold m-0 text-warning">0</h2>
-                    </div>
-                    <div class="bg-warning bg-opacity-20 p-3 rounded-3 text-warning fs-3">
-                        <i class="fa-solid fa-network-wired"></i>
-                    </div>
-                </div>
-            </div>
-        </div>
+    <div class="card stat-card">
+        <div class="icon-badge" style="background:rgba(52,211,153,0.1); color:var(--ok);"><i class="fa-solid fa-signal"></i></div>
+        <div class="label">المشتركون النشطون</div>
+        <div class="value">{{ active_subs | default(0) }}</div>
     </div>
+    <div class="card stat-card">
+        <div class="icon-badge" style="background:rgba(245,158,11,0.1); color:var(--warn);"><i class="fa-solid fa-server"></i></div>
+        <div class="label">الراوترات المضافة</div>
+        <div class="value">{{ routers_count | default(0) }}</div>
+    </div>
+    <div class="card stat-card">
+        <div class="icon-badge" style="background:rgba(248,113,113,0.1); color:var(--danger);"><i class="fa-solid fa-ticket"></i></div>
+        <div class="label">الكروت النشطة</div>
+        <div class="value">{{ active_vouchers | default(0) }}</div>
+    </div>
+</div>
 
-    <div class="row g-3">
-        <div class="col-lg-8">
-            <div class="card card-custom p-4">
-                <div class="d-flex justify-content-between align-items-center mb-3">
-                    <h5 class="fw-bold m-0 text-white"><i class="fa-solid fa-clock-rotate-left text-info me-2"></i> آخر المشتركين المضافين</h5>
-                    <a href="/add_subscriber" class="btn btn-sm btn-info text-dark fw-bold"><i class="fa-solid fa-user-plus me-1"></i> إضافة / توليد جديد</a>
-                </div>
-
-                <div class="table-responsive">
-                    <table class="table table-dark table-hover align-middle m-0">
-                        <thead>
-                            <tr class="border-secondary">
-                                <th>اسم المستخدم</th>
-                                <th>كلمة المرور</th>
-                                <th>النوع</th>
-                                <th>الباقة</th>
-                                <th>تاريخ الانتهاء</th>
-                                <th>الحالة</th>
-                                <th class="text-center">إجراءات الحساب</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            {% for sub in subscribers[:5] %}
-                            <tr class="border-secondary">
-                                <td class="fw-bold text-info"><i class="fa-solid fa-user me-2 text-muted"></i>{{ sub.username }}</td>
-                                <td><code class="text-warning fs-6">{{ sub.password }}</code></td>
-                                <td>
-                                    {% if sub.service_type == 'PPPoE' %}
-                                    <span class="badge bg-primary px-2 py-1"><i class="fa-solid fa-network-wired me-1"></i>PPPoE</span>
-                                    {% else %}
-                                    <span class="badge bg-warning text-dark px-2 py-1"><i class="fa-solid fa-wifi me-1"></i>Hotspot</span>
-                                    {% endif %}
-                                </td>
-                                <td><span class="badge bg-secondary">{{ sub.profile }}</span></td>
-                                <td>{{ sub.expiry_date or '-' }}</td>
-                                <td><span class="badge bg-success">نشط</span></td>
-                                <td class="text-center">
-                                    <a href="/edit_subscriber/{{ sub.id }}" class="btn btn-sm btn-outline-warning ms-1" title="تعديل الحساب"><i class="fa-solid fa-user-pen"></i></a>
-                                    <a href="/delete_subscriber/{{ sub.id }}" class="btn btn-sm btn-outline-danger" onclick="return confirm('تأكيد حذف الحساب؟')" title="حذف الحساب"><i class="fa-solid fa-trash"></i></a>
-                                </td>
-                            </tr>
-                            {% else %}
-                            <tr>
-                                <td colspan="7" class="text-center py-4 text-muted">لا يوجد مشتركين أو كروت حالياً.</td>
-                            </tr>
-                            {% endfor %}
-                        </tbody>
-                    </table>
-                </div>
-            </div>
+<div class="mid-grid">
+    <!-- جدول آخر المشتركين -->
+    <div class="card">
+        <div class="panel-head">
+            <h2><i class="fa-solid fa-clock-rotate-left" style="color:var(--signal)"></i> آخر المشتركين المضافين</h2>
+            <a href="{{ url_for('add_subscriber') }}" style="color:var(--signal); font-size:13px; font-weight:600;">
+                إضافة مشترك <i class="fa-solid fa-arrow-left"></i>
+            </a>
         </div>
-
-        <div class="col-lg-4">
-            <div class="card card-custom p-4">
-                <h5 class="fw-bold mb-3 text-white"><i class="fa-solid fa-sliders text-info me-2"></i> خيارات وإعدادات النظام</h5>
-                <ul class="list-group list-group-flush bg-transparent">
-                    <li class="list-group-item bg-transparent text-white border-secondary d-flex justify-content-between align-items-center px-0 py-3">
-                        <span><i class="fa-solid fa-plug text-warning me-2"></i> اتصال السيرفرات</span>
-                        <span class="badge bg-success">متصل</span>
-                    </li>
-                    <li class="list-group-item bg-transparent text-white border-secondary d-flex justify-content-between align-items-center px-0 py-3">
-                        <span><i class="fa-solid fa-shield-halved text-info me-2"></i> محرك RADIUS</span>
-                        <span class="badge bg-info text-dark fw-bold">Active</span>
-                    </li>
-                    <!-- زر تعديل حساب الأدمن الشغال -->
-                    <li class="list-group-item bg-transparent text-white border-0 d-flex justify-content-between align-items-center px-0 py-3">
-                        <span><i class="fa-solid fa-user-gear text-success me-2"></i> صلاحيات الدخول</span>
-                        <a href="/admin_settings" class="btn btn-sm btn-outline-info fw-bold">
-                            <i class="fa-solid fa-user-pen me-1"></i> {{ admin_account.username if admin_account else 'Admin' }} (تعديل)
+        {% if subscribers %}
+        <table class="sub-table">
+            <thead>
+                <tr>
+                    <th>اسم المستخدم</th>
+                    <th>الباقة</th>
+                    <th>الهاتف</th>
+                    <th>الانتهاء</th>
+                    <th>الحالة</th>
+                    <th></th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for sub in subscribers %}
+                <tr>
+                    <td class="mono">{{ sub.username }}</td>
+                    <td><span class="badge badge-profile">{{ sub.get('actual-profile', '—') }}</span></td>
+                    <td class="mono">—</td>
+                    <td>—</td>
+                    <td><span class="badge badge-ok">نشط</span></td>
+                    <td>
+                        <a href="{{ url_for('delete_subscriber', username=sub.username) }}" class="row-action" onclick="return confirm('هل أنت متأكد من الحذف؟')">
+                            <i class="fa-solid fa-trash"></i>
                         </a>
-                    </li>
-                </ul>
-                <hr class="border-secondary my-2">
-                <a href="/add_subscriber" class="btn btn-outline-info w-100 my-2"><i class="fa-solid fa-wand-magic-sparkles me-1"></i> توليد مجموعة كروت هوتسبوت</a>
-            </div>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+        {% else %}
+        <div class="empty-state">
+            <i class="fa-solid fa-inbox"></i>
+            لا يوجد أي مشتركين مضافين حتى الآن
+        </div>
+        {% endif %}
+    </div>
+
+    <!-- لمحة سريعة -->
+    <div class="card">
+        <div class="panel-head">
+            <h2><i class="fa-solid fa-chart-simple" style="color:var(--signal)"></i> لمحة سريعة</h2>
+        </div>
+        <div class="side-panel-item">
+            <span class="name">إيرادات اليوم</span>
+            <span class="num">{{ today_revenue | default('$0') }}</span>
+        </div>
+        <div class="side-panel-item">
+            <span class="name">الجلسات الحية الآن</span>
+            <span class="num">{{ active_sessions | default(0) }}</span>
+        </div>
+        <div class="side-panel-item">
+            <span class="name">الراوترات المتصلة</span>
+            <span class="num">{{ routers_count | default(0) }}</span>
+        </div>
+        <div class="side-panel-item">
+            <span class="name">إجمالي الحسابات</span>
+            <span class="num">{{ sub_count | default(0) }}</span>
         </div>
     </div>
 </div>
+
 {% endblock %}
