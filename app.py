@@ -1,161 +1,121 @@
-import os
-import random
-import string
-from datetime import datetime, timedelta
-from flask import Flask, render_template, request, redirect, url_for, flash
-from flask_sqlalchemy import SQLAlchemy
+import sqlite3
+import traceback
+from flask import Flask, render_template, request, redirect, url_for, flash, g
 import routeros_api
 
 app = Flask(__name__)
-app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', 'zinar-secret-key-123')
+app.secret_key = "zenar_secret_key_safe_123"
+DATABASE = 'zinar.db'
 
-# ربط قاعدة البيانات بـ PostgreSQL إذا توفرت في البيئة
-database_url = os.environ.get('DATABASE_URL', 'sqlite:///zinar.db')
-if database_url and database_url.startswith('postgres://'):
-    database_url = database_url.replace('postgres://', 'postgresql://', 1)
+# ==========================================
+# إدارة قاعدة البيانات (SQLite)
+# ==========================================
+def get_db():
+    db = getattr(g, '_database', None)
+    if db is None:
+        db = g._database = sqlite3.connect(DATABASE)
+        db.row_factory = sqlite3.Row
+    return db
 
-app.config['SQLALCHEMY_DATABASE_URI'] = database_url
-app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
+@app.teardown_appcontext
+def close_connection(exception):
+    db = getattr(g, '_database', None)
+    if db is not None:
+        db.close()
 
-db = SQLAlchemy(app)
+def init_db():
+    with app.app_context():
+        db = get_db()
+        cursor = db.cursor()
+        
+        # جدول الراوترات
+        cursor.execute('''
+            CREATE TABLE IF NOT EXISTS routers (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                name TEXT NOT NULL,
+                ip_address TEXT NOT NULL,
+                username TEXT NOT NULL,
+                password TEXT NOT NULL,
+                port INTEGER DEFAULT 8728,
+                status TEXT DEFAULT 'disconnected'
+            )
+        ''')
+        
+        # جدول المشتركين
+        cursor.execute('''
+            CREATE TABLE IF NOT EXISTS subscribers (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                username TEXT NOT NULL,
+                password TEXT NOT NULL,
+                profile TEXT NOT NULL,
+                service_type TEXT DEFAULT 'pppoe',
+                expiry_date TEXT,
+                status TEXT DEFAULT 'active',
+                router_id INTEGER
+            )
+        ''')
+        
+        # جدول الباقات
+        cursor.execute('''
+            CREATE TABLE IF NOT EXISTS packages (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                name TEXT NOT NULL,
+                rate_limit TEXT NOT NULL,
+                price REAL
+            )
+        ''')
+        db.commit()
 
-# --- الترجمات والقيم العامة ---
-def t(key):
-    translations = {
-        'brand_sub': 'نظام إدارة المشتركين',
-        'dashboard': 'لوحة التحكم',
-        'routers': 'الراوترات',
-        'subscribers': 'المشتركين',
-        'add_subscriber': 'إضافة مشترك',
-        'packages': 'الباقات',
-        'add_package': 'إضافة باقة',
-        'login': 'تسجيل الدخول'
-    }
-    return translations.get(key, key)
+# إنشاء الجداول عند تشغيل السيرفر لأول مرة
+init_db()
 
-app.jinja_env.globals['t'] = t
-
-# --- نماذج قاعدة البيانات (Database Models) ---
-
-class Admin(db.Model):
-    id = db.Column(db.Integer, primary_key=True)
-    username = db.Column(db.String(50), nullable=False, default='admin')
-    password = db.Column(db.String(100), nullable=False, default='admin')
-
-class Router(db.Model):
-    id = db.Column(db.Integer, primary_key=True)
-    name = db.Column(db.String(100), nullable=False)
-    ip_address = db.Column(db.String(50), nullable=False)
-    username = db.Column(db.String(50), nullable=False)
-    password = db.Column(db.String(50), nullable=True)
-    port = db.Column(db.Integer, default=8728)
-
-class Package(db.Model):
-    id = db.Column(db.Integer, primary_key=True)
-    name = db.Column(db.String(100), unique=True, nullable=False)
-    download_speed = db.Column(db.String(20), nullable=False, default='1M')
-    upload_speed = db.Column(db.String(20), nullable=False, default='1M')
-    price = db.Column(db.Float, nullable=False, default=0.0)
-    validity_days = db.Column(db.Integer, nullable=False, default=30)
-
-class Subscriber(db.Model):
-    id = db.Column(db.Integer, primary_key=True)
-    username = db.Column(db.String(100), unique=True, nullable=False)
-    password = db.Column(db.String(100), nullable=False)
-    service_type = db.Column(db.String(20), default='Hotspot')
-    profile = db.Column(db.String(100), nullable=False, default='1M')
-    phone = db.Column(db.String(30), nullable=True)
-    expiry_date = db.Column(db.String(50), nullable=True)
-    status = db.Column(db.String(20), default='active')
-
-    @property
-    def package_name(self):
-        return self.profile
-
-    @package_name.setter
-    def package_name(self, value):
-        self.profile = value
-
-with app.app_context():
+# ==========================================
+# دالة الاتصال بالمايكروتيك (MikroTik API)
+# ==========================================
+def connect_mikrotik(ip, username, password, port=8728):
+    """
+    دالة آمنة ومصححة للاتصال بالمايكروتيك
+    """
     try:
-        db.create_all()
-        admin_account = Admin.query.first()
-        if not admin_account:
-            default_admin = Admin(username='admin', password='admin')
-            db.session.add(default_admin)
-            db.session.commit()
-    except Exception as e:
-        print(f"Database init note: {e}")
+        # تنظيف الـ IP من أي زيادات أو مسافات
+        clean_ip = str(ip).replace('http://', '').replace('https://', '').strip()
+        clean_port = int(port)
 
-# --- المساعدات والربط مع الميكروتيك ---
-
-def generate_random_str(length=6):
-    chars = string.ascii_lowercase + string.digits
-    return ''.join(random.choice(chars) for _ in range(length))
-
-def sync_userman(username, password, profile_name="1M", action='add'):
-    try:
-        main_router = Router.query.first()
-        if not main_router:
-            return False
-
-        router_ip = main_router.ip_address
-        api_user = main_router.username
-        api_pass = main_router.password or ""
-        api_port = main_router.port or 8728
-
+        # استخدام المعامل الصحيح host
         connection = routeros_api.RouterOsApiPool(
-            router_ip,
-            username=api_user,
-            password=api_pass,
-            port=api_port,
-            plaintext_login=True
+            host=clean_ip,
+            username=username,
+            password=password,
+            port=clean_port,
+            plaintext_login=True,
+            use_ssl=False
         )
         api = connection.get_api()
-        userman_users = api.get_resource('/tool/user-manager/user')
-
-        if action in ['add', 'update']:
-            existing = userman_users.get(username=username)
-            if not existing:
-                userman_users.add(customer='admin', username=username, password=password)
-            else:
-                user_id = existing[0]['.id']
-                userman_users.set(id=user_id, password=password)
-
-            try:
-                userman_users.call('create-and-activate-profile', {
-                    'customer': 'admin',
-                    'numbers': username,
-                    'profile': profile_name
-                })
-            except Exception as pe:
-                print(f"Profile Activation Note: {pe}")
-
-        elif action == 'delete':
-            existing = userman_users.get(username=username)
-            if existing:
-                userman_users.remove(id=existing[0]['.id'])
-
-        connection.disconnect()
-        return True
+        return api, connection, None
     except Exception as e:
-        print(f"User Manager API Error: {e}")
-        return False
+        error_msg = str(e)
+        return None, None, error_msg
 
-# --- المسارات (Routes) ---
+# ==========================================
+# المسارات الرئيسية (Routes)
+# ==========================================
 
+# 1. لوحة التحكم
 @app.route('/')
-def index():
-    return redirect(url_for('dashboard'))
-
 @app.route('/dashboard')
 def dashboard():
-    routers_count = Router.query.count()
-    packages_count = Package.query.count()
-    sub_count = Subscriber.query.count()
-    active_subs = Subscriber.query.filter_by(status='active').count()
-    subscribers = Subscriber.query.order_by(Subscriber.id.desc()).limit(10).all()
-
+    db = get_db()
+    cursor = db.cursor()
+    
+    # حساب الإحصائيات
+    routers_count = cursor.execute('SELECT COUNT(*) FROM routers').fetchone()[0]
+    packages_count = cursor.execute('SELECT COUNT(*) FROM packages').fetchone()[0]
+    sub_count = cursor.execute('SELECT COUNT(*) FROM subscribers').fetchone()[0]
+    active_subs = cursor.execute("SELECT COUNT(*) FROM subscribers WHERE status='active'").fetchone()[0]
+    
+    # جلب أحدث المشتركين
+    subscribers = cursor.execute('SELECT * FROM subscribers ORDER BY id DESC LIMIT 10').fetchall()
+    
     return render_template(
         'dashboard.html',
         routers_count=routers_count,
@@ -165,200 +125,169 @@ def dashboard():
         subscribers=subscribers
     )
 
-@app.route('/packages', methods=['GET', 'POST'])
-def packages():
-    if request.method == 'POST':
-        name = request.form.get('name')
-        download_speed = request.form.get('download_speed', '1M')
-        upload_speed = request.form.get('upload_speed', '1M')
-        price = float(request.form.get('price', 0.0) or 0.0)
-        validity_days = int(request.form.get('validity_days', 30) or 30)
-
-        if name:
-            try:
-                new_pkg = Package(
-                    name=name,
-                    download_speed=download_speed,
-                    upload_speed=upload_speed,
-                    price=price,
-                    validity_days=validity_days
-                )
-                db.session.add(new_pkg)
-                db.session.commit()
-                flash('تمت إضافة الباقة بنجاح!', 'success')
-            except Exception as e:
-                db.session.rollback()
-                flash(f'حدث خطأ أثناء إضافة الباقة: {e}', 'error')
-        return redirect(url_for('packages'))
-
-    all_packages = Package.query.order_by(Package.id.desc()).all()
-    return render_template('packages.html', packages=all_packages)
-
-@app.route('/delete_package/<int:id>')
-def delete_package(id):
-    try:
-        pkg = Package.query.get_or_404(id)
-        db.session.delete(pkg)
-        db.session.commit()
-        flash('تم حذف الباقة بنجاح!', 'success')
-    except Exception as e:
-        db.session.rollback()
-        flash(f'حدث خطأ أثناء حذف الباقة: {e}', 'error')
-    return redirect(url_for('packages'))
-
-@app.route('/subscribers')
-def subscribers():
-    search_query = request.args.get('search', '')
-    if search_query:
-        subscribers_list = Subscriber.query.filter(Subscriber.username.contains(search_query)).order_by(Subscriber.id.desc()).all()
-    else:
-        subscribers_list = Subscriber.query.order_by(Subscriber.id.desc()).all()
-    return render_template('subscribers.html', subscribers=subscribers_list)
-
-@app.route('/add_subscriber', methods=['GET', 'POST'])
-def add_subscriber():
-    packages_list = Package.query.all()
-    if request.method == 'POST':
-        mode = request.form.get('mode', 'single')
-        service_type = request.form.get('service_type', 'Hotspot')
-        package_name = request.form.get('package_name', '1M')
-        
-        selected_pkg = Package.query.filter_by(name=package_name).first()
-        valid_days = selected_pkg.validity_days if selected_pkg else 30
-        expiry_date = (datetime.now() + timedelta(days=valid_days)).strftime('%Y-%m-%d')
-
-        if mode == 'single':
-            username = request.form.get('username')
-            password = request.form.get('password')
-            phone = request.form.get('phone', '')
-            if username and password:
-                try:
-                    sub = Subscriber(
-                        username=username,
-                        password=password,
-                        service_type=service_type,
-                        profile=package_name,
-                        phone=phone,
-                        expiry_date=expiry_date
-                    )
-                    db.session.add(sub)
-                    db.session.commit()
-                    sync_userman(username, password, profile_name=package_name, action='add')
-                    flash('تمت إضافة المشترك بنجاح!', 'success')
-                except Exception as e:
-                    db.session.rollback()
-                    flash(f'حدث خطأ أثناء إضافة المشترك: {e}', 'error')
-
-        elif mode == 'bulk':
-            try:
-                count = int(request.form.get('count', 10))
-            except ValueError:
-                count = 10
-            
-            prefix = request.form.get('prefix', '')
-            try:
-                pass_len = int(request.form.get('password_length', 6))
-            except ValueError:
-                pass_len = 6
-
-            for _ in range(count):
-                u_rand = generate_random_str(5)
-                p_rand = generate_random_str(pass_len)
-                uname = f"{prefix}{u_rand}"
-                try:
-                    sub = Subscriber(
-                        username=uname,
-                        password=p_rand,
-                        service_type=service_type,
-                        profile=package_name,
-                        expiry_date=expiry_date
-                    )
-                    db.session.add(sub)
-                    db.session.commit()
-                    sync_userman(uname, p_rand, profile_name=package_name, action='add')
-                except Exception:
-                    db.session.rollback()
-            flash(f'تم توليد {count} اشتراك بنجاح!', 'success')
-
-        return redirect(url_for('subscribers'))
-
-    return render_template('add_subscriber.html', packages=packages_list)
-
-@app.route('/delete_subscriber/<int:id>')
-def delete_subscriber(id):
-    try:
-        sub = Subscriber.query.get_or_404(id)
-        sync_userman(sub.username, sub.password, action='delete')
-        db.session.delete(sub)
-        db.session.commit()
-        flash('تم حذف المشترك بنجاح!', 'success')
-    except Exception as e:
-        db.session.rollback()
-        flash(f'حدث خطأ: {e}', 'error')
-    return redirect(url_for('subscribers'))
-
+# 2. إدارة الراوترات
 @app.route('/routers', methods=['GET', 'POST'])
 def routers():
+    db = get_db()
+    cursor = db.cursor()
+    
     if request.method == 'POST':
         name = request.form.get('name')
         ip_address = request.form.get('ip_address')
         username = request.form.get('username')
-        password = request.form.get('password', '')
-        port_val = request.form.get('port', 8728)
-        
-        try:
-            port_num = int(port_val) if port_val else 8728
-        except ValueError:
-            port_num = 8728
+        password = request.form.get('password')
+        port = request.form.get('port', 8728)
 
-        if name and ip_address and username:
-            try:
-                new_router = Router(
-                    name=name,
-                    ip_address=ip_address,
-                    username=username,
-                    password=password,
-                    port=port_num
-                )
-                db.session.add(new_router)
-                db.session.commit()
-                flash('تم حفظ بيانات الراوتر بنجاح!', 'success')
-            except Exception as e:
-                db.session.rollback()
-                flash(f'تعذر الحفظ: {str(e)}', 'error')
-        else:
-            flash('يرجى ملء جميع الخانات المطلوبة.', 'error')
-            
+        cursor.execute(
+            'INSERT INTO routers (name, ip_address, username, password, port) VALUES (?, ?, ?, ?, ?)',
+            (name, ip_address, username, password, port)
+        )
+        db.commit()
+        flash('تمت إضافة الراوتر بنجاح!', 'success')
         return redirect(url_for('routers'))
-    
-    routers_list = Router.query.all()
+        
+    routers_list = cursor.execute('SELECT * FROM routers').fetchall()
     return render_template('routers.html', routers=routers_list)
 
-@app.route('/delete_router/<int:id>')
-def delete_router(id):
-    try:
-        router = Router.query.get_or_404(id)
-        db.session.delete(router)
-        db.session.commit()
-        flash('تم حذف الراوتر بنجاح!', 'success')
-    except Exception as e:
-        db.session.rollback()
-        flash(f'حدث خطأ: {e}', 'error')
+# 3. اختبار الاتصال بالمايكروتيك
+@app.route('/routers/test/<int:router_id>')
+def test_router(router_id):
+    db = get_db()
+    cursor = db.cursor()
+    router = cursor.execute('SELECT * FROM routers WHERE id = ?', (router_id,)).fetchone()
+    
+    if not router:
+        flash('الراوتر غير موجود!', 'danger')
+        return redirect(url_for('routers'))
+
+    api, connection, error = connect_mikrotik(
+        router['ip_address'],
+        router['username'],
+        router['password'],
+        router['port']
+    )
+
+    if error:
+        cursor.execute("UPDATE routers SET status='disconnected' WHERE id=?", (router_id,))
+        db.commit()
+        flash(f"فشل الاتصال بالمايكروتيك ({router['name']})! السبب: {error}", "danger")
+    else:
+        try:
+            # قراءة الموارد لتأكيد صحة الربط
+            resource_api = api.get_resource('/system/resource')
+            resource_api.get()
+            connection.disconnect()
+            
+            cursor.execute("UPDATE routers SET status='connected' WHERE id=?", (router_id,))
+            db.commit()
+            flash(f"تم الاتصال بنجاح بالمايكروتيك ({router['name']})!", "success")
+        except Exception as e:
+            if connection:
+                connection.disconnect()
+            cursor.execute("UPDATE routers SET status='disconnected' WHERE id=?", (router_id,))
+            db.commit()
+            flash(f"فشل أثناء قراءة بيانات المايكروتيك: {str(e)}", "danger")
+
     return redirect(url_for('routers'))
 
-@app.route('/login', methods=['GET', 'POST'])
-def login():
-    error = None
+# 4. حذف راوتر
+@app.route('/routers/delete/<int:router_id>')
+def delete_router(router_id):
+    db = get_db()
+    cursor = db.cursor()
+    cursor.execute('DELETE FROM routers WHERE id = ?', (router_id,))
+    db.commit()
+    flash('تم حذف الراوتر بنجاح.', 'success')
+    return redirect(url_for('routers'))
+
+# 5. إدارة المشتركين
+@app.route('/subscribers')
+def subscribers():
+    db = get_db()
+    cursor = db.cursor()
+    subscribers_list = cursor.execute('SELECT * FROM subscribers ORDER BY id DESC').fetchall()
+    return render_template('subscribers.html', subscribers=subscribers_list)
+
+# 6. إضافة مشترك جديد للشبكة والمايكروتيك
+@app.route('/add_subscriber', methods=['GET', 'POST'])
+def add_subscriber():
+    db = get_db()
+    cursor = db.cursor()
+    
     if request.method == 'POST':
-        user_input = request.form.get('username')
-        pass_input = request.form.get('password')
-        admin_account = Admin.query.first()
-        if admin_account and user_input == admin_account.username and pass_input == admin_account.password:
-            return redirect(url_for('dashboard'))
-        else:
-            error = "اسم المستخدم أو كلمة المرور غير صحيحة"
-    return render_template('login.html', error=error)
+        username = request.form.get('username')
+        password = request.form.get('password')
+        profile = request.form.get('profile')
+        service_type = request.form.get('service_type', 'pppoe')
+        router_id = request.form.get('router_id')
+
+        # جلب معلومات الراوتر المختار
+        router = cursor.execute('SELECT * FROM routers WHERE id = ?', (router_id,)).fetchone()
+        
+        if not router:
+            flash('الرجاء اختيار راوتر صالح!', 'danger')
+            return redirect(url_for('add_subscriber'))
+
+        # إرسال المستخدم إلى المايكروتيك عبر الـ API
+        api, connection, error = connect_mikrotik(
+            router['ip_address'],
+            router['username'],
+            router['password'],
+            router['port']
+        )
+
+        if error:
+            flash(f"لم يتم حفظ المشترك! فشل الاتصال بالمايكروتيك: {error}", "danger")
+            return redirect(url_for('add_subscriber'))
+
+        try:
+            ppp_secret = api.get_resource('/ppp/secret')
+            ppp_secret.add(
+                name=username,
+                password=password,
+                profile=profile,
+                service=service_type
+            )
+            connection.disconnect()
+
+            # حفظ المشترك في قاعدة البيانات المحلية بعد نجاح الإضافة للمايكروتيك
+            cursor.execute(
+                'INSERT INTO subscribers (username, password, profile, service_type, router_id, status) VALUES (?, ?, ?, ?, ?, ?)',
+                (username, password, profile, service_type, router_id, 'active')
+            )
+            db.commit()
+
+            flash('تمت إضافة المشترك إلى المايكروتيك وقاعدة البيانات بنجاح!', 'success')
+            return redirect(url_for('subscribers'))
+
+        except Exception as e:
+            if connection:
+                connection.disconnect()
+            flash(f"فشل إضافة المشترك داخل المايكروتيك: {str(e)}", "danger")
+            return redirect(url_for('add_subscriber'))
+
+    routers_list = cursor.execute('SELECT * FROM routers').fetchall()
+    packages_list = cursor.execute('SELECT * FROM packages').fetchall()
+    return render_template('add_subscriber.html', routers=routers_list, packages=packages_list)
+
+# 7. إدارة الباقات
+@app.route('/packages', methods=['GET', 'POST'])
+def packages():
+    db = get_db()
+    cursor = db.cursor()
+    
+    if request.method == 'POST':
+        name = request.form.get('name')
+        rate_limit = request.form.get('rate_limit')
+        price = request.form.get('price', 0)
+
+        cursor.execute('INSERT INTO packages (name, rate_limit, price) VALUES (?, ?, ?)', (name, rate_limit, price))
+        db.commit()
+        flash('تمت إضافة الباقة بنجاح!', 'success')
+        return redirect(url_for('packages'))
+
+    packages_list = cursor.execute('SELECT * FROM packages').fetchall()
+    return render_template('packages.html', packages=packages_list)
 
 if __name__ == '__main__':
-    port = int(os.environ.get('ZINAR_PORT', 1892))
-    app.run(debug=False, host='0.0.0.0', port=port)
+    app.run(host='0.0.0.0', port=5000, debug=True)
