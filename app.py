@@ -18,21 +18,6 @@ app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 
 db = SQLAlchemy(app)
 
-def t(key):
-    translations = {
-        'brand_sub': 'نظام إدارة المشتركين',
-        'dashboard': 'لوحة التحكم',
-        'routers': 'الراوترات',
-        'subscribers': 'المشتركين',
-        'add_subscriber': 'إضافة مشترك',
-        'packages': 'الباقات',
-        'add_package': 'إضافة باقة',
-        'login': 'تسجيل الدخول'
-    }
-    return translations.get(key, key)
-
-app.jinja_env.globals['t'] = t
-
 # --- نماذج قاعدة البيانات ---
 
 class Admin(db.Model):
@@ -55,26 +40,16 @@ class Package(db.Model):
     upload_speed = db.Column(db.String(20), nullable=False, default='1M')
     price = db.Column(db.Float, nullable=False, default=0.0)
     validity_days = db.Column(db.Integer, nullable=False, default=30)
-    shared_users = db.Column(db.Integer, default=1)
 
 class Subscriber(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     username = db.Column(db.String(100), unique=True, nullable=False)
     password = db.Column(db.String(100), nullable=False)
     service_type = db.Column(db.String(20), default='Hotspot')
-    profile = db.Column(db.String(100), nullable=False, default='Default')
+    profile = db.Column(db.String(100), nullable=False, default='1M')
     phone = db.Column(db.String(30), nullable=True)
     expiry_date = db.Column(db.String(50), nullable=True)
     status = db.Column(db.String(20), default='active')
-
-    # خاصية متوافقة مع الاسمين لضمان عدم حدوث خطأ
-    @property
-    def package_name(self):
-        return self.profile
-
-    @package_name.setter
-    def package_name(self, value):
-        self.profile = value
 
 with app.app_context():
     try:
@@ -85,20 +60,20 @@ with app.app_context():
             db.session.add(default_admin)
             db.session.commit()
     except Exception as e:
-        print(f"Database setup note: {e}")
+        print(f"Database init note: {e}")
 
 def generate_random_str(length=6):
     chars = string.ascii_lowercase + string.digits
     return ''.join(random.choice(chars) for _ in range(length))
 
-def sync_userman_full(username, password, profile_name="1M", action='add'):
-    main_router = Router.query.first()
-    router_ip = main_router.ip_address if main_router else "198.145.118.146"
-    api_user = main_router.username if main_router else "admin"
-    api_pass = main_router.password if (main_router and main_router.password) else ""
-    api_port = main_router.port if main_router else 8728
-
+def sync_userman(username, password, profile_name="1M", action='add'):
     try:
+        main_router = Router.query.first()
+        router_ip = main_router.ip_address if main_router else "198.145.118.146"
+        api_user = main_router.username if main_router else "admin"
+        api_pass = main_router.password if (main_router and main_router.password) else ""
+        api_port = main_router.port if main_router else 8728
+
         connection = routeros_api.RouterOsApiPool(
             router_ip,
             username=api_user,
@@ -150,7 +125,6 @@ def dashboard():
     sub_count = Subscriber.query.count()
     active_subs = Subscriber.query.filter_by(status='active').count()
     subscribers = Subscriber.query.order_by(Subscriber.id.desc()).limit(10).all()
-    admin_account = Admin.query.first()
 
     return render_template(
         'dashboard.html',
@@ -158,8 +132,7 @@ def dashboard():
         packages_count=packages_count,
         sub_count=sub_count,
         active_subs=active_subs,
-        subscribers=subscribers,
-        admin_account=admin_account
+        subscribers=subscribers
     )
 
 @app.route('/packages', methods=['GET', 'POST'])
@@ -168,9 +141,8 @@ def packages():
         name = request.form.get('name')
         download_speed = request.form.get('download_speed', '1M')
         upload_speed = request.form.get('upload_speed', '1M')
-        price = float(request.form.get('price', 0.0))
-        validity_days = int(request.form.get('validity_days', 30))
-        shared_users = int(request.form.get('shared_users', 1))
+        price = float(request.form.get('price', 0.0) or 0.0)
+        validity_days = int(request.form.get('validity_days', 30) or 30)
 
         if name:
             try:
@@ -179,8 +151,7 @@ def packages():
                     download_speed=download_speed,
                     upload_speed=upload_speed,
                     price=price,
-                    validity_days=validity_days,
-                    shared_users=shared_users
+                    validity_days=validity_days
                 )
                 db.session.add(new_pkg)
                 db.session.commit()
@@ -213,7 +184,6 @@ def subscribers():
 @app.route('/add_subscriber', methods=['GET', 'POST'])
 def add_subscriber():
     packages_list = Package.query.all()
-    
     if request.method == 'POST':
         mode = request.form.get('mode', 'single')
         service_type = request.form.get('service_type', 'Hotspot')
@@ -239,7 +209,7 @@ def add_subscriber():
                     )
                     db.session.add(sub)
                     db.session.commit()
-                    sync_userman_full(username, password, profile_name=package_name, action='add')
+                    sync_userman(username, password, profile_name=package_name, action='add')
                 except Exception:
                     db.session.rollback()
 
@@ -269,7 +239,7 @@ def add_subscriber():
                     )
                     db.session.add(sub)
                     db.session.commit()
-                    sync_userman_full(uname, p_rand, profile_name=package_name, action='add')
+                    sync_userman(uname, p_rand, profile_name=package_name, action='add')
                 except Exception:
                     db.session.rollback()
 
@@ -281,7 +251,7 @@ def add_subscriber():
 def delete_subscriber(id):
     try:
         sub = Subscriber.query.get_or_404(id)
-        sync_userman_full(sub.username, sub.password, action='delete')
+        sync_userman(sub.username, sub.password, action='delete')
         db.session.delete(sub)
         db.session.commit()
     except Exception:
