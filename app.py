@@ -61,7 +61,7 @@ def init_db():
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 name TEXT NOT NULL,
                 rate_limit TEXT NOT NULL,
-                price REAL
+                price REAL DEFAULT 0
             )
         ''')
         db.commit()
@@ -69,15 +69,15 @@ def init_db():
 init_db()
 
 # ==========================================
-# معالج الأخطاء العالمي (إظهار تفاصيل الخطأ مباشرة على الشاشة)
+# معالج الأخطاء العالمي
 # ==========================================
 @app.errorhandler(500)
 def internal_error(error):
     err_msg = traceback.format_exc()
     return f"""
     <div dir="rtl" style="padding: 20px; background-color: #f8d7da; color: #721c24; font-family: sans-serif; border-radius: 8px; margin: 20px;">
-        <h2>حدث خطأ برمجي داخل الخادم (500 Error):</h2>
-        <p>التفاصيل التقنية للخطأ:</p>
+        <h2>حدث خطأ غير متوقع في الخادم (500 Error):</h2>
+        <p>تفاصيل الخطأ البرمجي:</p>
         <pre style="background: #1e1e1e; color: #00ff00; padding: 15px; border-radius: 5px; overflow-x: auto; text-align: left; direction: ltr;">{err_msg}</pre>
     </div>
     """, 500
@@ -135,18 +135,26 @@ def routers():
     cursor = db.cursor()
     
     if request.method == 'POST':
-        name = request.form.get('name')
-        ip_address = request.form.get('ip_address')
-        username = request.form.get('username')
-        password = request.form.get('password')
+        name = request.form.get('name', '').strip()
+        ip_address = request.form.get('ip_address', '').strip()
+        username = request.form.get('username', '').strip()
+        password = request.form.get('password', '').strip()
         port = request.form.get('port', 8728)
 
-        cursor.execute(
-            'INSERT INTO routers (name, ip_address, username, password, port) VALUES (?, ?, ?, ?, ?)',
-            (name, ip_address, username, password, port)
-        )
-        db.commit()
-        flash('تمت إضافة الراوتر بنجاح!', 'success')
+        if not name or not ip_address or not username:
+            flash('يرجى إدخال جميع الحقول المطلوبة (اسم الراوتر، عنوان IP، واسم المستخدم)', 'danger')
+            return redirect(url_for('routers'))
+
+        try:
+            cursor.execute(
+                'INSERT INTO routers (name, ip_address, username, password, port) VALUES (?, ?, ?, ?, ?)',
+                (name, ip_address, username, password, port)
+            )
+            db.commit()
+            flash('تمت إضافة الراوتر بنجاح!', 'success')
+        except Exception as e:
+            flash(f'فشل حفظ الراوتر: {str(e)}', 'danger')
+
         return redirect(url_for('routers'))
         
     routers_list = cursor.execute('SELECT * FROM routers').fetchall()
@@ -215,11 +223,15 @@ def add_subscriber():
     cursor = db.cursor()
     
     if request.method == 'POST':
-        username = request.form.get('username')
-        password = request.form.get('password')
-        profile = request.form.get('profile')
+        username = request.form.get('username', '').strip()
+        password = request.form.get('password', '').strip()
+        profile = request.form.get('profile', '').strip()
         service_type = request.form.get('service_type', 'pppoe')
         router_id = request.form.get('router_id')
+
+        if not username or not password or not profile or not router_id:
+            flash('الرجاء إدخال كافة بيانات المشترك واختيار الراوتر!', 'danger')
+            return redirect(url_for('add_subscriber'))
 
         router = cursor.execute('SELECT * FROM routers WHERE id = ?', (router_id,)).fetchone()
         
@@ -270,19 +282,29 @@ def add_subscriber():
     packages_list = cursor.execute('SELECT * FROM packages').fetchall()
     return render_template('add_subscriber.html', routers=routers_list, packages=packages_list)
 
+# 7. إدارة الباقات (تم تصحيح الحقول والمعالجة الوقائية)
 @app.route('/packages', methods=['GET', 'POST'])
 def packages():
     db = get_db()
     cursor = db.cursor()
     
     if request.method == 'POST':
-        name = request.form.get('name')
-        rate_limit = request.form.get('rate_limit')
+        name = request.form.get('name', '').strip()
+        rate_limit = request.form.get('rate_limit', '').strip()
         price = request.form.get('price', 0)
 
-        cursor.execute('INSERT INTO packages (name, rate_limit, price) VALUES (?, ?, ?)', (name, rate_limit, price))
-        db.commit()
-        flash('تمت إضافة الباقة بنجاح!', 'success')
+        # التحقق من وجود القيم قبل الإدخال
+        if not name or not rate_limit:
+            flash('يرجى كتابة اسم الباقة والسرعة بشكل صحيح!', 'danger')
+            return redirect(url_for('packages'))
+
+        try:
+            cursor.execute('INSERT INTO packages (name, rate_limit, price) VALUES (?, ?, ?)', (name, rate_limit, price))
+            db.commit()
+            flash('تمت إضافة الباقة بنجاح!', 'success')
+        except Exception as e:
+            flash(f'حدث خطأ أثناء حفظ الباقة: {str(e)}', 'danger')
+
         return redirect(url_for('packages'))
 
     packages_list = cursor.execute('SELECT * FROM packages').fetchall()
