@@ -1,76 +1,66 @@
-{% extends "base.html" %}
-{% block title %}المشتركون{% endblock %}
+{% extends 'base.html' if bootstrap is defined else 'layout.html' %}
+
 {% block content %}
-<div class="d-flex justify-content-between align-items-center pt-3 pb-2 mb-3 border-bottom">
-    <h1 class="h2"><i class="fa-solid fa-users text-primary"></i> إدارة المشتركين (مباشر من الراوتر)</h1>
-    <a href="{{ url_for('add_subscriber') }}" class="btn btn-sm btn-primary">
-        <i class="fa-solid fa-user-plus"></i> إضافة مشترك جديد
-    </a>
-</div>
+<div class="container-fluid py-4" dir="rtl" style="color: #fff;">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h2><i class="bi bi-people text-cyan"></i> إدارة المشتركين (مباشر من الراوتر)</h2>
+        <a href="{{ url_for('add_subscriber') }}" class="btn btn-cyan text-white">
+            <i class="bi bi-person-plus-fill"></i> إضافة مشترك جديد
+        </a>
+    </div>
 
-{% if error_message %}
-<div class="alert alert-warning">
-    <i class="fa-solid fa-triangle-exclamation"></i> {{ error_message }}
-    {% if not has_master %}
-        <a href="{{ url_for('routers') }}" class="alert-link">روح لصفحة الراوترات</a>
-    {% endif %}
-</div>
-{% endif %}
+    <!-- شريط البحث -->
+    <div class="card bg-dark border-secondary mb-4">
+        <div class="card-body">
+            <form action="{{ url_for('subscribers') }}" method="GET" class="d-flex gap-2">
+                <input type="text" name="search" class="form-control bg-secondary text-white" placeholder="ابحث باسم المستخدم..." value="{{ request.args.get('search', '') }}">
+                <button type="submit" class="btn btn-outline-light">بحث</button>
+            </form>
+        </div>
+    </div>
 
-<div class="card shadow-sm p-3 mb-3">
-    <form method="GET" class="d-flex gap-2">
-        <input type="text" name="q" class="form-control" placeholder="ابحث باسم المستخدم..." value="{{ search_query or '' }}">
-        <button type="submit" class="btn btn-primary">
-            <i class="fa-solid fa-magnifying-glass"></i> بحث
-        </button>
-        {% if search_query %}
-        <a href="{{ url_for('subscribers') }}" class="btn btn-outline-secondary">إلغاء</a>
-        {% endif %}
-    </form>
-</div>
-
-<div class="card shadow-sm p-3">
-    <table class="table table-striped mt-2">
-        <thead>
-            <tr>
-                <th>اسم المستخدم</th>
-                <th>الباقة</th>
-                <th>الحالة</th>
-                <th>إجراءات</th>
-            </tr>
-        </thead>
-        <tbody>
+    <!-- جدول المشتركين -->
+    <div class="card bg-dark border-secondary">
+        <div class="card-body p-0">
             {% if subscribers %}
-                {% for sub in subscribers %}
-                <tr>
-                    <td><strong>{{ sub.username }}</strong></td>
-                    <td><span class="badge bg-secondary">{{ sub.get('actual-profile', 'بدون باقة') }}</span></td>
-                    <td>
-                        {% if sub.get('disabled') == 'true' %}
-                            <span class="badge bg-danger">موقوف</span>
-                        {% else %}
-                            <span class="badge bg-success">نشط</span>
-                        {% endif %}
-                    </td>
-                    <td>
-                        <a href="{{ url_for('delete_subscriber', username=sub.username) }}" class="btn btn-sm btn-outline-danger" onclick="return confirm('هل أنت متأكد من الحذف؟')">
-                            <i class="fa-solid fa-trash"></i>
-                        </a>
-                    </td>
-                </tr>
-                {% endfor %}
+            <div class="table-responsive">
+                <table class="table table-dark table-hover mb-0 text-center align-middle">
+                    <thead>
+                        <tr>
+                            <th>اسم المستخدم</th>
+                            <th>الباقة</th>
+                            <th>تاريخ الانتهاء</th>
+                            <th>الحالة</th>
+                            <th>الإجراءات</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for sub in subscribers %}
+                        <tr>
+                            <td class="fw-bold">{{ sub.username }}</td>
+                            <td><span class="badge bg-primary">{{ sub.package_name }}</span></td>
+                            <td>{{ sub.expiry_date if sub.expiry_date else 'غير محدد' }}</td>
+                            <td>
+                                {% if sub.status == 'active' %}
+                                <span class="badge bg-success">نشط</span>
+                                {% else %}
+                                <span class="badge bg-danger">منتهي</span>
+                                {% endif %}
+                            </td>
+                            <td>
+                                <a href="{{ url_for('delete_subscriber', id=sub.id) }}" class="btn btn-sm btn-outline-danger" onclick="return confirm('حذف المشترك نهائياً؟')">حذف</a>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
             {% else %}
-                <tr>
-                    <td colspan="4" class="text-center text-muted py-4">
-                        {% if search_query %}
-                            ما في نتائج مطابقة لـ "{{ search_query }}"
-                        {% else %}
-                            لا توجد أي اشتراكات مضافة حتى الآن.
-                        {% endif %}
-                    </td>
-                </tr>
+            <div class="text-center py-5">
+                <p class="text-muted mb-0">لا توجد أي اشتراكات مضافة حتى الآن.</p>
+            </div>
             {% endif %}
-        </tbody>
-    </table>
+        </div>
+    </div>
 </div>
 {% endblock %}
