@@ -28,7 +28,7 @@ def init_db():
         db = get_db()
         cursor = db.cursor()
         
-        # جدول الراوترات
+        # جدول الراوترات/السيرفرات
         cursor.execute('''
             CREATE TABLE IF NOT EXISTS routers (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -41,11 +41,11 @@ def init_db():
             )
         ''')
         
-        # جدول المشتركين
+        # جدول المشتركين (المركزي)
         cursor.execute('''
             CREATE TABLE IF NOT EXISTS subscribers (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
-                username TEXT NOT NULL,
+                username TEXT NOT NULL UNIQUE,
                 password TEXT NOT NULL,
                 profile TEXT NOT NULL,
                 service_type TEXT DEFAULT 'pppoe',
@@ -83,7 +83,7 @@ def internal_error(error):
     """, 500
 
 # ==========================================
-# دالة الاتصال بالمايكروتيك (MikroTik API)
+# دالة الاتصال بالمايكروتيك (لإرسال أوامر الفصل فقط)
 # ==========================================
 def connect_mikrotik(ip, username, password, port=8728):
     try:
@@ -142,7 +142,7 @@ def routers():
         port = request.form.get('port', 8728)
 
         if not name or not ip_address or not username:
-            flash('يرجى إدخال جميع الحقول المطلوبة (اسم الراوتر، عنوان IP، واسم المستخدم)', 'danger')
+            flash('يرجى إدخال جميع الحقول المطلوبة للراوتر/السيرفر', 'danger')
             return redirect(url_for('routers'))
 
         try:
@@ -151,9 +151,9 @@ def routers():
                 (name, ip_address, username, password, port)
             )
             db.commit()
-            flash('تمت إضافة الراوتر بنجاح!', 'success')
+            flash('تمت إضافة السيرفر بنجاح!', 'success')
         except Exception as e:
-            flash(f'فشل حفظ الراوتر: {str(e)}', 'danger')
+            flash(f'فشل حفظ السيرفر: {str(e)}', 'danger')
 
         return redirect(url_for('routers'))
         
@@ -167,7 +167,7 @@ def test_router(router_id):
     router = cursor.execute('SELECT * FROM routers WHERE id = ?', (router_id,)).fetchone()
     
     if not router:
-        flash('الراوتر غير موجود!', 'danger')
+        flash('السيرفر غير موجود!', 'danger')
         return redirect(url_for('routers'))
 
     api, connection, error = connect_mikrotik(
@@ -180,18 +180,18 @@ def test_router(router_id):
     if error:
         cursor.execute("UPDATE routers SET status='disconnected' WHERE id=?", (router_id,))
         db.commit()
-        flash(f"فشل الاتصال بالمايكروتيك ({router['name']})! السبب: {error}", "danger")
+        flash(f"فشل الاتصال بالسيرفر ({router['name']})! السبب: {error}", "danger")
     else:
         try:
             resource_api = api.get_resource('/system/resource')
             resource_api.get()
             cursor.execute("UPDATE routers SET status='connected' WHERE id=?", (router_id,))
             db.commit()
-            flash(f"تم الاتصال بنجاح بالمايكروتيك ({router['name']})!", "success")
+            flash(f"تم الاتصال بنجاح بالسيرفر ({router['name']})!", "success")
         except Exception as e:
             cursor.execute("UPDATE routers SET status='disconnected' WHERE id=?", (router_id,))
             db.commit()
-            flash(f"فشل أثناء قراءة بيانات المايكروتيك: {str(e)}", "danger")
+            flash(f"فشل قراءة بيانات السيرفر: {str(e)}", "danger")
         finally:
             if connection:
                 try:
@@ -207,7 +207,7 @@ def delete_router(router_id):
     cursor = db.cursor()
     cursor.execute('DELETE FROM routers WHERE id = ?', (router_id,))
     db.commit()
-    flash('تم حذف الراوتر بنجاح.', 'success')
+    flash('تم حذف السيرفر بنجاح.', 'success')
     return redirect(url_for('routers'))
 
 @app.route('/subscribers')
@@ -217,6 +217,7 @@ def subscribers():
     subscribers_list = cursor.execute('SELECT * FROM subscribers ORDER BY id DESC').fetchall()
     return render_template('subscribers.html', subscribers=subscribers_list)
 
+# إضافة مشترك (حفظ في المنصة فقط - دون إضافته في المايكروتيك)
 @app.route('/add_subscriber', methods=['GET', 'POST'])
 def add_subscriber():
     db = get_db()
@@ -227,78 +228,46 @@ def add_subscriber():
         password = request.form.get('password', '').strip()
         profile = request.form.get('profile', '').strip()
         service_type = request.form.get('service_type', 'pppoe').strip().lower()
-        router_id = request.form.get('router_id')
 
-        if not username or not password or not profile or not router_id:
-            flash('الرجاء إدخال كافة بيانات المشترك واختيار الراوتر والبروفايل!', 'danger')
-            return redirect(url_for('add_subscriber'))
-
-        router = cursor.execute('SELECT * FROM routers WHERE id = ?', (router_id,)).fetchone()
-        
-        if not router:
-            flash('الرجاء اختيار راوتر صالح!', 'danger')
-            return redirect(url_for('add_subscriber'))
-
-        api, connection, error = connect_mikrotik(
-            router['ip_address'],
-            router['username'],
-            router['password'],
-            router['port']
-        )
-
-        if error:
-            flash(f"لم يتم حفظ المشترك! فشل الاتصال بالمايكروتيك: {error}", "danger")
+        if not username or not password or not profile:
+            flash('الرجاء إدخال كافة بيانات المشترك واختيار الباقة!', 'danger')
             return redirect(url_for('add_subscriber'))
 
         try:
-            if service_type == 'hotspot':
-                hotspot_user = api.get_resource('/ip/hotspot/user')
-                hotspot_user.add(
-                    name=str(username),
-                    password=str(password),
-                    profile=str(profile)
-                )
-            else:
-                ppp_secret = api.get_resource('/ppp/secret')
-                valid_ppp_service = service_type if service_type in ['pppoe', 'any', 'l2tp', 'pptp', 'sstp'] else 'any'
-                ppp_secret.add(
-                    name=str(username),
-                    password=str(password),
-                    profile=str(profile),
-                    service=valid_ppp_service
-                )
-
             cursor.execute(
-                'INSERT INTO subscribers (username, password, profile, service_type, router_id, status) VALUES (?, ?, ?, ?, ?, ?)',
-                (username, password, profile, service_type, router_id, 'active')
+                'INSERT INTO subscribers (username, password, profile, service_type, status) VALUES (?, ?, ?, ?, ?)',
+                (username, password, profile, service_type, 'active')
             )
             db.commit()
 
-            flash(f'تمت إضافة المشترك ({username}) بنجاح!', 'success')
+            flash(f'تمت إضافة المشترك ({username}) بنجاح إلى المنصة المركبة! الحساب يعمل على السيرفرين.', 'success')
             return redirect(url_for('subscribers'))
 
-        except Exception as e:
-            flash(f"فشل إضافة المشترك داخل المايكروتيك: {str(e)}", "danger")
+        except sqlite3.IntegrityError:
+            flash('اسم المستخدم موجود بالفعل بداخل المنصة، يرجى اختيار اسم آخر!', 'danger')
             return redirect(url_for('add_subscriber'))
-        finally:
-            if connection:
-                try:
-                    connection.disconnect()
-                except Exception:
-                    pass
+        except Exception as e:
+            flash(f"حدث خطأ أثناء حفظ المشترك بالمنصة: {str(e)}", "danger")
+            return redirect(url_for('add_subscriber'))
 
-    routers_list = cursor.execute('SELECT * FROM routers').fetchall()
     packages_list = cursor.execute('SELECT * FROM packages').fetchall()
-    return render_template('add_subscriber.html', routers=routers_list, packages=packages_list)
+    return render_template('add_subscriber.html', packages=packages_list)
 
-# 8. مسار حذف المشترك (جديد)
+# حذف المشترك من المنصة وتجريده من الاتصال
 @app.route('/subscribers/delete/<int:subscriber_id>')
 def delete_subscriber(subscriber_id):
     db = get_db()
     cursor = db.cursor()
-    cursor.execute('DELETE FROM subscribers WHERE id = ?', (subscriber_id,))
-    db.commit()
-    flash('تم حذف المشترك بنجاح.', 'success')
+    
+    subscriber = cursor.execute('SELECT * FROM subscribers WHERE id = ?', (subscriber_id,)).fetchone()
+    if subscriber:
+        # حذف المشترك من المنصة
+        cursor.execute('DELETE FROM subscribers WHERE id = ?', (subscriber_id,))
+        db.commit()
+        flash(f'تم حذف المشترك ({subscriber["username"]}) بنجاح من المنصة.', 'success')
+    else:
+        flash('المشترك غير موجود.', 'danger')
+        
     return redirect(url_for('subscribers'))
 
 @app.route('/packages', methods=['GET', 'POST'])
