@@ -1,47 +1,174 @@
-{% extends "base.html" %}
-{% block title %}إضافة مشترك{% endblock %}
-{% block content %}
-<div class="d-flex justify-content-between align-items-center pt-3 pb-2 mb-3 border-bottom">
-    <h1 class="h2"><i class="fa-solid fa-user-plus text-primary"></i> إضافة مشترك جديد</h1>
-</div>
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>إضافة مشترك - زينار</title>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.rtl.min.css">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.5/font/bootstrap-icons.css">
+    <style>
+        body { background-color: #0f172a; color: #f8fafc; font-family: system-ui, -apple-system, sans-serif; }
+        .sidebar { min-height: 100vh; background-color: #1e293b; border-left: 1px solid #334155; }
+        .nav-link { color: #94a3b8; padding: 12px 20px; border-radius: 8px; margin-bottom: 4px; display: flex; align-items: center; gap: 10px; }
+        .nav-link:hover, .nav-link.active { color: #38bdf8; background-color: #0f172a; }
+        .btn-cyan { background-color: #0284c7; border: none; color: #fff; }
+        .btn-cyan:hover { background-color: #0369a1; color: #fff; }
+        .card-custom { background-color: #1e293b; border: 1px solid #334155; border-radius: 12px; }
+        
+        /* إصلاح ألوان النصوص والحقول لتبدو واضحة جداً */
+        .form-label { color: #f1f5f9 !important; font-weight: 600; margin-bottom: 6px; }
+        .text-custom-muted { color: #94a3b8 !important; }
+        .form-control, .form-select { background-color: #0f172a !important; color: #ffffff !important; border: 1px solid #475569 !important; }
+        .form-control::placeholder { color: #64748b !important; }
+        .form-control:focus, .form-select:focus { border-color: #38bdf8 !important; box-shadow: 0 0 0 0.25rem rgba(56, 189, 248, 0.25) !important; }
+        
+        .nav-tabs .nav-link { color: #94a3b8; border: none; border-bottom: 2px solid transparent; font-weight: 600; }
+        .nav-tabs .nav-link.active { color: #38bdf8; background-color: transparent; border-bottom: 2px solid #38bdf8; }
+    </style>
+</head>
+<body>
+<div class="container-fluid">
+    <div class="row">
+        <!-- القائمة الجانبية -->
+        <div class="col-md-3 col-lg-2 sidebar p-3">
+            <h4 class="text-white mb-1 fw-bold">زينار</h4>
+            <p class="text-custom-muted small mb-4">نظام إدارة المشتركين</p>
+            <nav class="nav flex-column">
+                <a class="nav-link" href="{{ url_for('dashboard') }}"><i class="bi bi-speedometer2"></i> لوحة التحكم</a>
+                <a class="nav-link" href="{{ url_for('subscribers') }}"><i class="bi bi-people"></i> المشتركون</a>
+                <a class="nav-link" href="{{ url_for('packages') }}"><i class="bi bi-box-seam"></i> الباقات</a>
+                <a class="nav-link" href="{{ url_for('routers') }}"><i class="bi bi-router"></i> الراوترات</a>
+            </nav>
+            <a href="{{ url_for('add_subscriber') }}" class="btn btn-cyan w-100 mt-4 py-2"><i class="bi bi-person-plus-fill"></i> إضافة مشترك</a>
+        </div>
 
-{% if not has_master %}
-<div class="alert alert-warning">
-    لازم تحدد راوتر كـ "سيرفر رئيسي" أولاً.
-    <a href="{{ url_for('routers') }}" class="alert-link">روح لصفحة الراوترات</a>
-</div>
-{% endif %}
+        <!-- المحتوى الرئيسي -->
+        <div class="col-md-9 col-lg-10 p-4">
+            <h2 class="mb-4 text-white"><i class="bi bi-person-plus text-info"></i> إضافة مشترك جديد</h2>
 
-<div class="row">
-    <div class="col-md-6">
-        <div class="card shadow-sm p-4">
-            <form method="POST">
-                <div class="mb-3">
-                    <label class="form-label">اسم المستخدم (Username)</label>
-                    <input type="text" name="username" class="form-control" required {{ 'disabled' if not has_master }}>
+            {% with messages = get_flashed_messages(with_categories=true) %}
+              {% if messages %}
+                {% for category, message in messages %}
+                  <div class="alert alert-{{ 'success' if category == 'success' else 'danger' }} alert-dismissible fade show" role="alert">
+                    {{ message }}
+                    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                  </div>
+                {% endfor %}
+              {% endif %}
+            {% endwith %}
+
+            <div class="row justify-content-center">
+                <div class="col-md-8 col-lg-6">
+                    <div class="card card-custom p-4">
+                        <!-- تبويبات الاختيار: مشترك واحد أو توليد جماعي -->
+                        <ul class="nav nav-tabs mb-4" id="subscriberTab" role="tablist">
+                            <li class="nav-item" role="presentation">
+                                <button class="nav-link active" id="single-tab" data-bs-toggle="tab" data-bs-target="#single" type="button" role="tab"><i class="bi bi-person"></i> مشترك واحد</button>
+                            </li>
+                            <li class="nav-item" role="presentation">
+                                <button class="nav-link" id="bulk-tab" data-bs-toggle="tab" data-bs-target="#bulk" type="button" role="tab"><i class="bi bi-people"></i> توليد كروت (جماعي)</button>
+                            </li>
+                        </ul>
+
+                        <div class="tab-content" id="subscriberTabContent">
+                            <!-- نمط مشترك واحد -->
+                            <div class="tab-pane fade show active" id="single" role="tabpanel">
+                                <form action="{{ url_for('add_subscriber') }}" method="POST">
+                                    <input type="hidden" name="mode" value="single">
+                                    
+                                    <div class="mb-3">
+                                        <label class="form-label">اسم المستخدم (Username)</label>
+                                        <input type="text" name="username" class="form-control" placeholder="مثال: user123" required>
+                                    </div>
+
+                                    <div class="mb-3">
+                                        <label class="form-label">كلمة المرور (Password)</label>
+                                        <input type="text" name="password" class="form-control" placeholder="مثال: 123456" required>
+                                    </div>
+
+                                    <div class="mb-3">
+                                        <label class="form-label">رقم الهاتف (اختياري)</label>
+                                        <input type="text" name="phone" class="form-control" placeholder="09xxxxxxxx">
+                                    </div>
+
+                                    <div class="mb-3">
+                                        <label class="form-label">نوع الخدمة</label>
+                                        <select name="service_type" class="form-select">
+                                            <option value="Hotspot" selected>Hotspot</option>
+                                            <option value="PPPoE">PPPoE</option>
+                                        </select>
+                                    </div>
+
+                                    <div class="mb-3">
+                                        <label class="form-label">اختر الباقة</label>
+                                        <select name="package_name" class="form-select" required>
+                                            {% if packages %}
+                                                {% for pkg in packages %}
+                                                    <option value="{{ pkg.name }}">{{ pkg.name }} (سرعة: {{ pkg.download_speed }}/{{ pkg.upload_speed }})</option>
+                                                {% endfor %}
+                                            {% else %}
+                                                <option value="1M">افتراضي (1M)</option>
+                                            {% endif %}
+                                        </select>
+                                    </div>
+
+                                    <button type="submit" class="btn btn-cyan w-100 py-2 mt-3"><i class="bi bi-check-circle"></i> إضافة المشترك</button>
+                                </form>
+                            </div>
+
+                            <!-- نمط التوليد الجماعي -->
+                            <div class="tab-pane fade" id="bulk" role="tabpanel">
+                                <form action="{{ url_for('add_subscriber') }}" method="POST">
+                                    <input type="hidden" name="mode" value="bulk">
+
+                                    <div class="mb-3">
+                                        <label class="form-label">عدد الكروت المطلوب توليدها</label>
+                                        <input type="number" name="count" class="form-control" value="10" min="1" max="500" required>
+                                    </div>
+
+                                    <div class="mb-3">
+                                        <label class="form-label">بادئة اسم المستخدم (Prefix - اختياري)</label>
+                                        <input type="text" name="prefix" class="form-control" placeholder="مثال: card_">
+                                    </div>
+
+                                    <div class="mb-3">
+                                        <label class="form-label">طول كلمة المرور العشوائية</label>
+                                        <input type="number" name="password_length" class="form-control" value="6" min="4" max="16" required>
+                                    </div>
+
+                                    <div class="mb-3">
+                                        <label class="form-label">نوع الخدمة</label>
+                                        <select name="service_type" class="form-select">
+                                            <option value="Hotspot" selected>Hotspot</option>
+                                            <option value="PPPoE">PPPoE</option>
+                                        </select>
+                                    </div>
+
+                                    <div class="mb-3">
+                                        <label class="form-label">اختر الباقة</label>
+                                        <select name="package_name" class="form-select" required>
+                                            {% if packages %}
+                                                {% for pkg in packages %}
+                                                    <option value="{{ pkg.name }}">{{ pkg.name }} (سرعة: {{ pkg.download_speed }}/{{ pkg.upload_speed }})</option>
+                                                {% endfor %}
+                                            {% else %}
+                                                <option value="1M">افتراضي (1M)</option>
+                                            {% endif %}
+                                        </select>
+                                    </div>
+
+                                    <button type="submit" class="btn btn-cyan w-100 py-2 mt-3"><i class="bi bi-gear"></i> توليد الكروت الآن</button>
+                                </form>
+                            </div>
+                        </div>
+
+                    </div>
                 </div>
-                <div class="mb-3">
-                    <label class="form-label">كلمة المرور (Password)</label>
-                    <input type="text" name="password" class="form-control" required {{ 'disabled' if not has_master }}>
-                </div>
-                <div class="mb-3">
-                    <label class="form-label">الباقة (Profile)</label>
-                    {% if profiles %}
-                    <select name="profile" class="form-control" {{ 'disabled' if not has_master }}>
-                        <option value="">بدون باقة</option>
-                        {% for p in profiles %}
-                        <option value="{{ p.name }}">{{ p.name }}</option>
-                        {% endfor %}
-                    </select>
-                    {% else %}
-                    <input type="text" name="profile" class="form-control" placeholder="مثال: 5M" {{ 'disabled' if not has_master }}>
-                    {% endif %}
-                </div>
-                <button type="submit" class="btn btn-primary w-100" {{ 'disabled' if not has_master }}>
-                    حفظ وتفعيل المشترك على الراوتر مباشرة
-                </button>
-            </form>
+            </div>
+
         </div>
     </div>
 </div>
-{% endblock %}
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>
