@@ -2,13 +2,14 @@ import os
 import random
 import string
 from datetime import datetime, timedelta
-from flask import Flask, render_template, request, redirect, url_for
+from flask import Flask, render_template, request, redirect, url_for, flash
 from flask_sqlalchemy import SQLAlchemy
 import routeros_api
 
 app = Flask(__name__)
 app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', 'zinar-secret-key-123')
 
+# ربط قاعدة البيانات بـ PostgreSQL إذا توفرت في البيئة
 database_url = os.environ.get('DATABASE_URL', 'sqlite:///zinar.db')
 if database_url and database_url.startswith('postgres://'):
     database_url = database_url.replace('postgres://', 'postgresql://', 1)
@@ -18,7 +19,23 @@ app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 
 db = SQLAlchemy(app)
 
-# --- نماذج قاعدة البيانات ---
+# --- الترجمات والقيم العامة ---
+def t(key):
+    translations = {
+        'brand_sub': 'نظام إدارة المشتركين',
+        'dashboard': 'لوحة التحكم',
+        'routers': 'الراوترات',
+        'subscribers': 'المشتركين',
+        'add_subscriber': 'إضافة مشترك',
+        'packages': 'الباقات',
+        'add_package': 'إضافة باقة',
+        'login': 'تسجيل الدخول'
+    }
+    return translations.get(key, key)
+
+app.jinja_env.globals['t'] = t
+
+# --- نماذج قاعدة البيانات (Database Models) ---
 
 class Admin(db.Model):
     id = db.Column(db.Integer, primary_key=True)
@@ -51,6 +68,14 @@ class Subscriber(db.Model):
     expiry_date = db.Column(db.String(50), nullable=True)
     status = db.Column(db.String(20), default='active')
 
+    @property
+    def package_name(self):
+        return self.profile
+
+    @package_name.setter
+    def package_name(self, value):
+        self.profile = value
+
 with app.app_context():
     try:
         db.create_all()
@@ -62,6 +87,8 @@ with app.app_context():
     except Exception as e:
         print(f"Database init note: {e}")
 
+# --- المساعدات والربط مع الميكروتيك ---
+
 def generate_random_str(length=6):
     chars = string.ascii_lowercase + string.digits
     return ''.join(random.choice(chars) for _ in range(length))
@@ -69,10 +96,13 @@ def generate_random_str(length=6):
 def sync_userman(username, password, profile_name="1M", action='add'):
     try:
         main_router = Router.query.first()
-        router_ip = main_router.ip_address if main_router else "198.145.118.146"
-        api_user = main_router.username if main_router else "admin"
-        api_pass = main_router.password if (main_router and main_router.password) else ""
-        api_port = main_router.port if main_router else 8728
+        if not main_router:
+            return False
+
+        router_ip = main_router.ip_address
+        api_user = main_router.username
+        api_pass = main_router.password or ""
+        api_port = main_router.port or 8728
 
         connection = routeros_api.RouterOsApiPool(
             router_ip,
@@ -112,7 +142,7 @@ def sync_userman(username, password, profile_name="1M", action='add'):
         print(f"User Manager API Error: {e}")
         return False
 
-# --- المسارات ---
+# --- المسارات (Routes) ---
 
 @app.route('/')
 def index():
@@ -155,8 +185,10 @@ def packages():
                 )
                 db.session.add(new_pkg)
                 db.session.commit()
-            except Exception:
+                flash('تمت إضافة الباقة بنجاح!', 'success')
+            except Exception as e:
                 db.session.rollback()
+                flash(f'حدث خطأ أثناء إضافة الباقة: {e}', 'error')
         return redirect(url_for('packages'))
 
     all_packages = Package.query.order_by(Package.id.desc()).all()
@@ -168,8 +200,10 @@ def delete_package(id):
         pkg = Package.query.get_or_404(id)
         db.session.delete(pkg)
         db.session.commit()
-    except Exception:
+        flash('تم حذف الباقة بنجاح!', 'success')
+    except Exception as e:
         db.session.rollback()
+        flash(f'حدث خطأ أثناء حذف الباقة: {e}', 'error')
     return redirect(url_for('packages'))
 
 @app.route('/subscribers')
@@ -210,8 +244,10 @@ def add_subscriber():
                     db.session.add(sub)
                     db.session.commit()
                     sync_userman(username, password, profile_name=package_name, action='add')
-                except Exception:
+                    flash('تمت إضافة المشترك بنجاح!', 'success')
+                except Exception as e:
                     db.session.rollback()
+                    flash(f'حدث خطأ أثناء إضافة المشترك: {e}', 'error')
 
         elif mode == 'bulk':
             try:
@@ -242,6 +278,7 @@ def add_subscriber():
                     sync_userman(uname, p_rand, profile_name=package_name, action='add')
                 except Exception:
                     db.session.rollback()
+            flash(f'تم توليد {count} اشتراك بنجاح!', 'success')
 
         return redirect(url_for('subscribers'))
 
@@ -254,8 +291,10 @@ def delete_subscriber(id):
         sync_userman(sub.username, sub.password, action='delete')
         db.session.delete(sub)
         db.session.commit()
-    except Exception:
+        flash('تم حذف المشترك بنجاح!', 'success')
+    except Exception as e:
         db.session.rollback()
+        flash(f'حدث خطأ: {e}', 'error')
     return redirect(url_for('subscribers'))
 
 @app.route('/routers', methods=['GET', 'POST'])
@@ -266,12 +305,13 @@ def routers():
         username = request.form.get('username')
         password = request.form.get('password', '')
         port_val = request.form.get('port', 8728)
+        
         try:
             port_num = int(port_val) if port_val else 8728
         except ValueError:
             port_num = 8728
 
-        if name and ip_address:
+        if name and ip_address and username:
             try:
                 new_router = Router(
                     name=name,
@@ -282,8 +322,13 @@ def routers():
                 )
                 db.session.add(new_router)
                 db.session.commit()
-            except Exception:
+                flash('تم حفظ بيانات الراوتر بنجاح!', 'success')
+            except Exception as e:
                 db.session.rollback()
+                flash(f'تعذر الحفظ: {str(e)}', 'error')
+        else:
+            flash('يرجى ملء جميع الخانات المطلوبة.', 'error')
+            
         return redirect(url_for('routers'))
     
     routers_list = Router.query.all()
@@ -295,8 +340,10 @@ def delete_router(id):
         router = Router.query.get_or_404(id)
         db.session.delete(router)
         db.session.commit()
-    except Exception:
+        flash('تم حذف الراوتر بنجاح!', 'success')
+    except Exception as e:
         db.session.rollback()
+        flash(f'حدث خطأ: {e}', 'error')
     return redirect(url_for('routers'))
 
 @app.route('/login', methods=['GET', 'POST'])
