@@ -1,14 +1,18 @@
 import os
-import random
-import string
-from datetime import datetime, timedelta
-from flask import Flask, render_template, request, redirect, url_for
+import logging
+import traceback
+from flask import Flask, render_template, request, redirect, url_for, flash
 from flask_sqlalchemy import SQLAlchemy
-import routeros_api
+import mikrotik_api
 
 app = Flask(__name__)
 app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', 'zinar-secret-key-123')
 
+# --- لوجينغ أوضح على Render ---
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
+
+# إعداد قاعدة البيانات
 database_url = os.environ.get('DATABASE_URL', 'sqlite:///zinar.db')
 if database_url and database_url.startswith('postgres://'):
     database_url = database_url.replace('postgres://', 'postgresql://', 1)
@@ -18,6 +22,7 @@ app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 
 db = SQLAlchemy(app)
 
+# تعريف دالة الترجمة وجعلها متاحة عالمياً لجميع القوالب
 def t(key):
     translations = {
         'brand_sub': 'نظام إدارة المشتركين',
@@ -25,293 +30,211 @@ def t(key):
         'routers': 'الراوترات',
         'subscribers': 'المشتركين',
         'add_subscriber': 'إضافة مشترك',
+        'packages': 'الباقات',
         'login': 'تسجيل الدخول'
     }
     return translations.get(key, key)
 
 app.jinja_env.globals['t'] = t
+app.jinja_env.filters['t'] = t
 
-class Admin(db.Model):
-    id = db.Column(db.Integer, primary_key=True)
-    username = db.Column(db.String(50), nullable=False, default='admin')
-    password = db.Column(db.String(100), nullable=False, default='admin')
-
+# ----------------- نماذج قاعدة البيانات -----------------
 class Router(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     name = db.Column(db.String(100), nullable=False)
     ip_address = db.Column(db.String(50), nullable=False)
     username = db.Column(db.String(50), nullable=False)
-    password = db.Column(db.String(50), nullable=True)
+    password = db.Column(db.String(50), nullable=False)
     port = db.Column(db.Integer, default=8728)
 
 class Subscriber(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     username = db.Column(db.String(100), unique=True, nullable=False)
     password = db.Column(db.String(100), nullable=False)
-    service_type = db.Column(db.String(20), default='PPPoE')
-    profile = db.Column(db.String(50), nullable=False, default='Default')
+    profile = db.Column(db.String(50), nullable=False)
     phone = db.Column(db.String(30), nullable=True)
     expiry_date = db.Column(db.String(50), nullable=True)
     status = db.Column(db.String(20), default='active')
+    router_id = db.Column(db.Integer, db.ForeignKey('router.id'), nullable=True)
+    router = db.relationship('Router', backref='subscribers')
 
+# إنشاء الجداول عند البدء
 with app.app_context():
-    try:
-        db.create_all()
-        admin_account = Admin.query.first()
-        if not admin_account:
-            default_admin = Admin(username='admin', password='admin')
-            db.session.add(default_admin)
-            db.session.commit()
-    except Exception as e:
-        print(f"Database setup note: {e}")
+    db.create_all()
 
-def generate_random_str(length=6):
-    chars = string.ascii_lowercase + string.digits
-    return ''.join(random.choice(chars) for _ in range(length))
-
-# دالة الربط المباشر مع User Manager في الميكروتيك
-def sync_userman(username, password, action='add'):
-    main_router = Router.query.first()
-    router_ip = main_router.ip_address if main_router else "198.145.118.146"
-    api_user = main_router.username if main_router else "admin"
-    api_pass = main_router.password if (main_router and main_router.password) else ""
-    api_port = main_router.port if main_router else 8728
-
-    try:
-        connection = routeros_api.RouterOsApiPool(
-            router_ip,
-            username=api_user,
-            password=api_pass,
-            port=api_port,
-            plaintext_login=True
-        )
-        api = connection.get_api()
-        
-        # الاتصال المباشر بمسار User Manager
-        userman_users = api.get_resource('/tool/user-manager/user')
-
-        if action == 'add':
-            existing = userman_users.get(username=username)
-            if not existing:
-                # إضافة المستخدم داخل User Manager مع العميل الافتراضي admin
-                userman_users.add(customer='admin', username=username, password=password)
-        elif action == 'delete':
-            existing = userman_users.get(username=username)
-            if existing:
-                userman_users.remove(id=existing[0]['.id'])
-
-        connection.disconnect()
-        return True
-    except Exception as e:
-        print(f"User Manager API Error: {e}")
-        return False
-
+# ----------------- المسارات -----------------
 @app.route('/')
 def index():
     return redirect(url_for('dashboard'))
 
 @app.route('/login', methods=['GET', 'POST'])
 def login():
-    error = None
     if request.method == 'POST':
-        user_input = request.form.get('username')
-        pass_input = request.form.get('password')
-        admin_account = Admin.query.first()
-        if admin_account and user_input == admin_account.username and pass_input == admin_account.password:
-            return redirect(url_for('dashboard'))
-        else:
-            error = "اسم المستخدم أو كلمة المرور غير صحيحة"
-    return render_template('login.html', error=error)
-
-@app.route('/admin_settings', methods=['GET', 'POST'])
-def admin_settings():
-    admin_account = Admin.query.first()
-    if not admin_account:
-        admin_account = Admin(username='admin', password='admin')
-        db.session.add(admin_account)
-        db.session.commit()
-
-    message = None
-    error = None
-    if request.method == 'POST':
-        new_username = request.form.get('username')
-        new_password = request.form.get('password')
-        if new_username and new_password:
-            try:
-                admin_account.username = new_username
-                admin_account.password = new_password
-                db.session.commit()
-                message = "تم تعديل حساب المسؤول بنجاح!"
-            except Exception as e:
-                db.session.rollback()
-                error = "حدث خطأ أثناء حفظ البيانات."
-        else:
-            error = "جميع الحقول مطلوبة."
-
-    return render_template('admin_settings.html', admin=admin_account, message=message, error=error)
+        return redirect(url_for('dashboard'))
+    return render_template('login.html') if os.path.exists('templates/login.html') else redirect(url_for('dashboard'))
 
 @app.route('/dashboard')
 def dashboard():
-    routers_count = Router.query.count()
-    sub_count = Subscriber.query.count()
-    active_subs = Subscriber.query.filter_by(status='active').count()
-    subscribers = Subscriber.query.order_by(Subscriber.id.desc()).all()
-    admin_account = Admin.query.first()
+    try:
+        routers_list = Router.query.all()
+        routers_count = len(routers_list)
+        sub_count = Subscriber.query.count()
+        active_subs = Subscriber.query.filter_by(status='active').count()
+        subscribers = Subscriber.query.all()
+    except Exception:
+        logger.exception("فشل في جلب بيانات قاعدة البيانات لصفحة dashboard")
+        routers_list = []
+        routers_count = 0
+        sub_count = 0
+        active_subs = 0
+        subscribers = []
 
-    return render_template(
-        'dashboard.html',
-        routers_count=routers_count,
-        sub_count=sub_count,
-        active_subs=active_subs,
-        subscribers=subscribers,
-        admin_account=admin_account
-    )
+    # الاتصال الحي بالراوترات - كل راوتر مستقل، لو واحد وقع ما بأثر عالباقي
+    live_stats = mikrotik_api.get_all_routers_stats(routers_list)
+    active_sessions = live_stats['totals']['ppp_active'] + live_stats['totals']['hotspot_active']
+    routers_online = live_stats['totals']['online_count']
+
+    # هون كان الخطأ ممكن ينبلع بدون تفاصيل - هلق رح نطبعه كامل بالـ logs
+    try:
+        return render_template(
+            'dashboard.html',
+            routers_count=routers_count,
+            routers_online=routers_online,
+            sub_count=sub_count,
+            active_subs=active_subs,
+            subscribers=subscribers,
+            active_sessions=active_sessions,
+            today_revenue=0,
+            active_vouchers=0
+        )
+    except Exception as e:
+        logger.error("فشل في عرض dashboard.html: %s", e)
+        logger.error(traceback.format_exc())
+        # رجّع رسالة واضحة بدل الكراش العام، وبتنعرض تفاصيلها بالـ logs
+        return f"<h2>خطأ في عرض لوحة التحكم</h2><pre>{traceback.format_exc()}</pre>", 500
 
 @app.route('/routers', methods=['GET', 'POST'])
 def routers():
     if request.method == 'POST':
         name = request.form.get('name')
-        ip_address = request.form.get('ip_address')
+        ip_address = request.form.get('ip') or request.form.get('ip_address')
         username = request.form.get('username')
-        password = request.form.get('password', '')
-        port_val = request.form.get('port', 8728)
+        password = request.form.get('password')
+        port = request.form.get('port', 8728)
         try:
-            port_num = int(port_val) if port_val else 8728
-        except ValueError:
-            port_num = 8728
+            port = int(port)
+        except (TypeError, ValueError):
+            port = 8728
 
         if name and ip_address:
-            try:
-                new_router = Router(
-                    name=name,
-                    ip_address=ip_address,
-                    username=username,
-                    password=password,
-                    port=port_num
-                )
-                db.session.add(new_router)
-                db.session.commit()
-            except Exception:
-                db.session.rollback()
+            new_router = Router(name=name, ip_address=ip_address, username=username, password=password, port=port)
+            db.session.add(new_router)
+            db.session.commit()
+            flash('تمت إضافة الراوتر بنجاح', 'success')
+        else:
+            flash('لازم تعبي اسم الراوتر وعنوان الآيباد على الأقل', 'danger')
         return redirect(url_for('routers'))
-    
-    routers_list = Router.query.all()
-    return render_template('routers.html', routers=routers_list)
 
-@app.route('/delete_router/<int:id>')
-def delete_router(id):
     try:
-        router = Router.query.get_or_404(id)
-        db.session.delete(router)
-        db.session.commit()
+        routers_list = Router.query.all()
     except Exception:
-        db.session.rollback()
-    return redirect(url_for('routers'))
+        logger.exception("فشل في جلب قائمة الراوترات")
+        routers_list = []
+
+    # اختبار اتصال حي لكل راوتر (متل ping بس عبر الـ API نفسه)
+    connection_status = {}
+    for r in routers_list:
+        connection_status[r.id] = mikrotik_api.test_connection(r)
+
+    return render_template('routers.html', routers=routers_list, connection_status=connection_status)
+
+@app.route('/packages')
+def packages():
+    return render_template('packages.html') if os.path.exists('templates/packages.html') else "<h3>صفحة الباقات - قيد الإنشاء</h3>"
 
 @app.route('/subscribers')
 def subscribers():
-    subscribers_list = Subscriber.query.order_by(Subscriber.id.desc()).all()
-    return render_template('subscribers.html', subscribers=subscribers_list)
+    search_query = request.args.get('q', '').strip()
+    try:
+        if search_query:
+            subscribers_list = Subscriber.query.filter(
+                Subscriber.username.ilike(f'%{search_query}%')
+            ).all()
+        else:
+            subscribers_list = Subscriber.query.all()
+    except Exception:
+        logger.exception("فشل في جلب قائمة المشتركين")
+        subscribers_list = []
+    return render_template('subscribers.html', subscribers=subscribers_list, search_query=search_query)
 
 @app.route('/add_subscriber', methods=['GET', 'POST'])
 def add_subscriber():
+    try:
+        routers_list = Router.query.all()
+    except Exception:
+        logger.exception("فشل في جلب قائمة الراوترات لصفحة إضافة مشترك")
+        routers_list = []
+
     if request.method == 'POST':
-        mode = request.form.get('mode', 'single')
-        service_type = request.form.get('service_type', 'PPPoE')
+        username = request.form.get('username')
+        password = request.form.get('password')
         profile = request.form.get('profile', 'Default')
+        phone = request.form.get('phone', '')
         expiry_date = request.form.get('expiry_date', '')
+        router_id = request.form.get('router_id')
+        router_id = int(router_id) if router_id else None
 
-        if not expiry_date and service_type == 'PPPoE':
-            next_month = datetime.now() + timedelta(days=30)
-            expiry_date = next_month.strftime('%Y-%m-%d')
-
-        if mode == 'single':
-            username = request.form.get('username')
-            password = request.form.get('password')
-            phone = request.form.get('phone', '')
-            if username and password:
-                try:
-                    sub = Subscriber(
-                        username=username,
-                        password=password,
-                        service_type=service_type,
-                        profile=profile,
-                        phone=phone,
-                        expiry_date=expiry_date
-                    )
-                    db.session.add(sub)
-                    db.session.commit()
-                    sync_userman(username, password, action='add')
-                except Exception:
-                    db.session.rollback()
-
-        elif mode == 'bulk':
-            try:
-                count = int(request.form.get('count', 10))
-            except ValueError:
-                count = 10
-            
-            prefix = request.form.get('prefix', '')
-            try:
-                pass_len = int(request.form.get('password_length', 6))
-            except ValueError:
-                pass_len = 6
-
-            for _ in range(count):
-                u_rand = generate_random_str(5)
-                p_rand = generate_random_str(pass_len)
-                uname = f"{prefix}{u_rand}"
-                try:
-                    sub = Subscriber(
-                        username=uname,
-                        password=p_rand,
-                        service_type=service_type,
-                        profile=profile,
-                        expiry_date=expiry_date
-                    )
-                    db.session.add(sub)
-                    db.session.commit()
-                    sync_userman(uname, p_rand, action='add')
-                except Exception:
-                    db.session.rollback()
-
-        return redirect(url_for('subscribers'))
-
-    return render_template('add_subscriber.html')
-
-@app.route('/edit_subscriber/<int:id>', methods=['GET', 'POST'])
-def edit_subscriber(id):
-    sub = Subscriber.query.get_or_404(id)
-    if request.method == 'POST':
-        try:
-            old_username = sub.username
-            sub.username = request.form.get('username')
-            sub.password = request.form.get('password')
-            sub.service_type = request.form.get('service_type', 'PPPoE')
-            sub.profile = request.form.get('profile')
-            sub.phone = request.form.get('phone')
-            sub.expiry_date = request.form.get('expiry_date')
-            sub.status = request.form.get('status', 'active')
+        if username and password:
+            sub = Subscriber(
+                username=username, password=password, profile=profile,
+                phone=phone, expiry_date=expiry_date, router_id=router_id
+            )
+            db.session.add(sub)
             db.session.commit()
+            flash('تمت إضافة المشترك بنجاح', 'success')
+        else:
+            flash('لازم تعبي اسم المستخدم وكلمة المرور على الأقل', 'danger')
+        return redirect(url_for('dashboard'))
 
-            sync_userman(old_username, sub.password, action='delete')
-            sync_userman(sub.username, sub.password, action='add')
-        except Exception:
-            db.session.rollback()
-        return redirect(url_for('subscribers'))
-    return render_template('edit_subscriber.html', subscriber=sub)
+    return render_template('add_subscriber.html', routers=routers_list)
 
 @app.route('/delete_subscriber/<int:id>')
 def delete_subscriber(id):
-    try:
-        sub = Subscriber.query.get_or_404(id)
-        sync_userman(sub.username, sub.password, action='delete')
-        db.session.delete(sub)
-        db.session.commit()
-    except Exception:
-        db.session.rollback()
-    return redirect(url_for('subscribers'))
+    sub = Subscriber.query.get_or_404(id)
+    db.session.delete(sub)
+    db.session.commit()
+    return redirect(url_for('dashboard'))
+
+
+# ⚠️ صفحة اختبار مؤقتة - لفحص الاتصال بـ User Manager عبر API فقط. لازم تنحذف بعد التأكد.
+@app.route('/debug_userman')
+def debug_userman():
+    ip = request.args.get('ip')
+    username = request.args.get('username')
+    password = request.args.get('password')
+    port = int(request.args.get('port', 8728))
+
+    if not (ip and username and password):
+        return "استخدم الرابط هيك: /debug_userman?ip=IP&username=USER&password=PASS", 400
+
+    class TempRouter:
+        pass
+    r = TempRouter()
+    r.ip_address = ip
+    r.username = username
+    r.password = password
+    r.port = port
+
+    users_result = mikrotik_api.get_userman_users(r)
+    profiles_result = mikrotik_api.get_userman_profiles(r)
+
+    output = "=== المستخدمون (Users) ===\n"
+    output += str(users_result) + "\n\n"
+    output += "=== البروفايلات (Profiles) ===\n"
+    output += str(profiles_result)
+
+    return f"<pre style='direction:ltr; text-align:left; padding:20px; font-size:14px;'>{output}</pre>"
+
 
 if __name__ == '__main__':
-    port = int(os.environ.get('ZINAR_PORT', 1892))
-    app.run(debug=False, host='0.0.0.0', port=port)
+    app.run(debug=True, host='0.0.0.0', port=5000)
