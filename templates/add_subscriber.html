@@ -1,83 +1,97 @@
-@app.route('/add_subscriber', methods=['GET', 'POST'])
-def add_subscriber():
-    db = get_db()
-    cursor = db.cursor()
-    
-    if request.method == 'POST':
-        username = request.form.get('username', '').strip()
-        password = request.form.get('password', '').strip()
-        profile = request.form.get('profile', '').strip()
-        service_type = request.form.get('service_type', 'hotspot').strip().lower()
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>إضافة مشترك جديد - زينار</title>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.rtl.min.css">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.5/font/bootstrap-icons.css">
+    <style>
+        body { background-color: #0f172a; color: #f8fafc; font-family: system-ui, -apple-system, sans-serif; }
+        .sidebar { min-height: 100vh; background-color: #1e293b; border-left: 1px solid #334155; }
+        .nav-link { color: #94a3b8; padding: 12px 20px; border-radius: 8px; margin-bottom: 4px; display: flex; align-items: center; gap: 10px; }
+        .nav-link:hover, .nav-link.active { color: #38bdf8; background-color: #0f172a; }
+        .btn-cyan { background-color: #0284c7; border: none; color: #fff; }
+        .btn-cyan:hover { background-color: #0369a1; color: #fff; }
+        .card-custom { background-color: #1e293b; border: 1px solid #334155; border-radius: 12px; }
+        .text-custom-muted { color: #94a3b8 !important; }
+        .form-control, .form-select { background-color: #0f172a; border: 1px solid #334155; color: #fff; }
+        .form-control:focus, .form-select:focus { background-color: #0f172a; color: #fff; border-color: #38bdf8; box-shadow: none; }
+    </style>
+</head>
+<body>
+<div class="container-fluid">
+    <div class="row">
+        <div class="col-md-3 col-lg-2 sidebar p-3">
+            <h4 class="text-white mb-1 fw-bold">زينار</h4>
+            <p class="text-custom-muted small mb-4">نظام إدارة المشتركين</p>
+            <nav class="nav flex-column">
+                <a class="nav-link" href="{{ url_for('dashboard') }}"><i class="bi bi-speedometer2"></i> لوحة التحكم</a>
+                <a class="nav-link active" href="{{ url_for('subscribers') }}"><i class="bi bi-people"></i> المشتركون</a>
+                <a class="nav-link" href="{{ url_for('packages') }}"><i class="bi bi-box-seam"></i> الباقات</a>
+                <a class="nav-link" href="{{ url_for('routers') }}"><i class="bi bi-router"></i> السيرفرات والراوترات</a>
+            </nav>
+        </div>
 
-        if not username or not password or not profile:
-            flash('الرجاء إدخال كافة بيانات المشترك واختيار الباقة!', 'danger')
-            return redirect(url_for('add_subscriber'))
+        <div class="col-md-9 col-lg-10 p-4">
+            <div class="d-flex justify-content-between align-items-center mb-4">
+                <h2 class="text-white mb-0"><i class="bi bi-person-plus text-info"></i> إضافة مشترك جديد</h2>
+                <a href="{{ url_for('subscribers') }}" class="btn btn-outline-secondary"><i class="bi bi-arrow-right"></i> إلغاء ورجوع</a>
+            </div>
 
-        try:
-            # 1. الحفظ في قاعدة بيانات المنصة (مع معالجة توافق الأعمدة)
-            try:
-                cursor.execute(
-                    'INSERT INTO subscribers (username, password, profile, service_type, status) VALUES (?, ?, ?, ?, ?)',
-                    (username, password, profile, service_type, 'active')
-                )
-            except sqlite3.OperationalError:
-                # في حال وجود عمود router_id قديم في الجداول المجهزة سابقاً
-                cursor.execute(
-                    'INSERT INTO subscribers (username, password, profile, service_type, status, router_id) VALUES (?, ?, ?, ?, ?, NULL)',
-                    (username, password, profile, service_type, 'active')
-                )
-            db.commit()
+            {% with messages = get_flashed_messages(with_categories=true) %}
+              {% if messages %}
+                {% for category, message in messages %}
+                  <div class="alert alert-{{ category }} alert-dismissible fade show" role="alert">
+                    {{ message }}
+                    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                  </div>
+                {% endfor %}
+              {% endif %}
+            {% endwith %}
 
-            # 2. تعميم الحساب على جميع السيرفرات المضافة
-            routers_list = cursor.execute('SELECT * FROM routers').fetchall()
-            success_count = 0
-            fail_routers = []
+            <div class="card card-custom p-4">
+                <form action="{{ url_for('add_subscriber') }}" method="POST">
+                    <div class="row g-3">
+                        <div class="col-md-6">
+                            <label class="form-label text-white">اسم المستخدم (Username) <span class="text-danger">*</span></label>
+                            <input type="text" name="username" class="form-control" placeholder="أدخل اسم المستخدم" required>
+                        </div>
 
-            if routers_list:
-                for router in routers_list:
-                    api, connection, error = connect_mikrotik(
-                        router['ip_address'], router['username'], router['password'], router['port']
-                    )
-                    if api and not error:
-                        try:
-                            if service_type == 'hotspot':
-                                users_resource = api.get_resource('/ip/hotspot/user')
-                                existing = users_resource.get(name=username)
-                                if not existing:
-                                    users_resource.add(name=str(username), password=str(password), profile=str(profile))
-                            else:
-                                secret_resource = api.get_resource('/ppp/secret')
-                                existing = secret_resource.get(name=username)
-                                if not existing:
-                                    secret_resource.add(name=str(username), password=str(password), profile=str(profile), service=str(service_type))
-                            
-                            success_count += 1
-                        except Exception:
-                            fail_routers.append(router['name'])
-                        finally:
-                            if connection:
-                                try:
-                                    connection.disconnect()
-                                except:
-                                    pass
-                    else:
-                        fail_routers.append(router['name'])
+                        <div class="col-md-6">
+                            <label class="form-label text-white">كلمة المرور (Password) <span class="text-danger">*</span></label>
+                            <input type="text" name="password" class="form-control" placeholder="أدخل كلمة المرور" required>
+                        </div>
 
-                if fail_routers:
-                    flash(f'تم حفظ المشترك بالمنصة ونجح على ({success_count}) سيرفر، وتعذر على: {", ".join(fail_routers)}', 'warning')
-                else:
-                    flash(f'تمت إضافة المشترك ({username}) بنجاح وتعميمه أوتوماتيكياً على جميع السيرفرات!', 'success')
-            else:
-                flash(f'تم حفظ المشترك ({username}) في المنصة بنجاح! (تنبيه: لا توجد سيرفرات مضافة حالياً)', 'info')
-                
-            return redirect(url_for('subscribers'))
+                        <div class="col-md-6">
+                            <label class="form-label text-white">الباقة / البروفايل (Profile) <span class="text-danger">*</span></label>
+                            <select name="profile" class="form-select" required>
+                                <option value="" disabled selected>-- اختر الباقة --</option>
+                                {% for pkg in packages %}
+                                    <option value="{{ pkg.name }}">{{ pkg.name }} ({{ pkg.rate_limit }})</option>
+                                {% else %}
+                                    <option value="1M">1M - بروفايل افتراضي</option>
+                                {% endfor %}
+                            </select>
+                        </div>
 
-        except sqlite3.IntegrityError:
-            flash('اسم المستخدم موجود بالفعل في المنصة، اختر اسماً آخر!', 'danger')
-            return redirect(url_for('add_subscriber'))
-        except Exception as e:
-            flash(f"حدث خطأ أثناء حفظ المشترك: {str(e)}", "danger")
-            return redirect(url_for('add_subscriber'))
+                        <div class="col-md-6">
+                            <label class="form-label text-white">نوع الخدمة</label>
+                            <select name="service_type" class="form-select">
+                                <option value="hotspot" selected>Hotspot (شبكة كروت / كافيهات)</option>
+                                <option value="pppoe">PPPoE (اشتراكات منزلية)</option>
+                            </select>
+                        </div>
 
-    packages_list = cursor.execute('SELECT * FROM packages').fetchall()
-    return render_template('add_subscriber.html', packages=packages_list)
+                        <div class="col-12 mt-4 text-start">
+                            <button type="submit" class="btn btn-cyan px-4 py-2"><i class="bi bi-check-circle"></i> إضافة المشترك للمنصة</button>
+                        </div>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>
