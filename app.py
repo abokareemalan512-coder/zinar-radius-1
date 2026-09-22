@@ -303,7 +303,7 @@ def delete_subscriber(subscriber_id):
         
     return redirect(url_for('subscribers'))
 
-@app.packages = @app.route('/packages', methods=['GET', 'POST'])
+@app.route('/packages', methods=['GET', 'POST'])
 def packages():
     db = get_db()
     cursor = db.cursor()
