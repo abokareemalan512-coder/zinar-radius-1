@@ -66,7 +66,7 @@ def init_db():
         ''')
         db.commit()
 
-# إنشاء الجداول عند تشغيل السيرفر لأول مرة
+# إنشاء الجداول عند التشغيل
 init_db()
 
 # ==========================================
@@ -74,18 +74,17 @@ init_db()
 # ==========================================
 def connect_mikrotik(ip, username, password, port=8728):
     """
-    دالة آمنة ومصححة للاتصال بالمايكروتيك
+    دالة موحدة ومضمونة للاتصال بالمايكروتيك
     """
     try:
-        # تنظيف الـ IP من أي زيادات أو مسافات
         clean_ip = str(ip).replace('http://', '').replace('https://', '').strip()
-        clean_port = int(port)
+        clean_port = int(port) if port else 8728
 
-        # استخدام المعامل الصحيح host
+        # الاتصال المباشر المتوافق مع جميع إصدارات المكتبة
         connection = routeros_api.RouterOsApiPool(
-            host=clean_ip,
-            username=username,
-            password=password,
+            clean_ip,
+            username=str(username).strip(),
+            password=str(password).strip(),
             port=clean_port,
             plaintext_login=True,
             use_ssl=False
@@ -94,6 +93,8 @@ def connect_mikrotik(ip, username, password, port=8728):
         return api, connection, None
     except Exception as e:
         error_msg = str(e)
+        print("=== MIKROTIK CONNECTION ERROR ===")
+        print(traceback.format_exc())
         return None, None, error_msg
 
 # ==========================================
@@ -107,13 +108,11 @@ def dashboard():
     db = get_db()
     cursor = db.cursor()
     
-    # حساب الإحصائيات
     routers_count = cursor.execute('SELECT COUNT(*) FROM routers').fetchone()[0]
     packages_count = cursor.execute('SELECT COUNT(*) FROM packages').fetchone()[0]
     sub_count = cursor.execute('SELECT COUNT(*) FROM subscribers').fetchone()[0]
     active_subs = cursor.execute("SELECT COUNT(*) FROM subscribers WHERE status='active'").fetchone()[0]
     
-    # جلب أحدث المشتركين
     subscribers = cursor.execute('SELECT * FROM subscribers ORDER BY id DESC LIMIT 10').fetchall()
     
     return render_template(
@@ -173,20 +172,21 @@ def test_router(router_id):
         flash(f"فشل الاتصال بالمايكروتيك ({router['name']})! السبب: {error}", "danger")
     else:
         try:
-            # قراءة الموارد لتأكيد صحة الربط
             resource_api = api.get_resource('/system/resource')
             resource_api.get()
-            connection.disconnect()
-            
             cursor.execute("UPDATE routers SET status='connected' WHERE id=?", (router_id,))
             db.commit()
             flash(f"تم الاتصال بنجاح بالمايكروتيك ({router['name']})!", "success")
         except Exception as e:
-            if connection:
-                connection.disconnect()
             cursor.execute("UPDATE routers SET status='disconnected' WHERE id=?", (router_id,))
             db.commit()
             flash(f"فشل أثناء قراءة بيانات المايكروتيك: {str(e)}", "danger")
+        finally:
+            if connection:
+                try:
+                    connection.disconnect()
+                except Exception:
+                    pass
 
     return redirect(url_for('routers'))
 
@@ -221,14 +221,12 @@ def add_subscriber():
         service_type = request.form.get('service_type', 'pppoe')
         router_id = request.form.get('router_id')
 
-        # جلب معلومات الراوتر المختار
         router = cursor.execute('SELECT * FROM routers WHERE id = ?', (router_id,)).fetchone()
         
         if not router:
             flash('الرجاء اختيار راوتر صالح!', 'danger')
             return redirect(url_for('add_subscriber'))
 
-        # إرسال المستخدم إلى المايكروتيك عبر الـ API
         api, connection, error = connect_mikrotik(
             router['ip_address'],
             router['username'],
@@ -243,14 +241,12 @@ def add_subscriber():
         try:
             ppp_secret = api.get_resource('/ppp/secret')
             ppp_secret.add(
-                name=username,
-                password=password,
-                profile=profile,
-                service=service_type
+                name=str(username),
+                password=str(password),
+                profile=str(profile),
+                service=str(service_type)
             )
-            connection.disconnect()
 
-            # حفظ المشترك في قاعدة البيانات المحلية بعد نجاح الإضافة للمايكروتيك
             cursor.execute(
                 'INSERT INTO subscribers (username, password, profile, service_type, router_id, status) VALUES (?, ?, ?, ?, ?, ?)',
                 (username, password, profile, service_type, router_id, 'active')
@@ -261,10 +257,14 @@ def add_subscriber():
             return redirect(url_for('subscribers'))
 
         except Exception as e:
-            if connection:
-                connection.disconnect()
             flash(f"فشل إضافة المشترك داخل المايكروتيك: {str(e)}", "danger")
             return redirect(url_for('add_subscriber'))
+        finally:
+            if connection:
+                try:
+                    connection.disconnect()
+                except Exception:
+                    pass
 
     routers_list = cursor.execute('SELECT * FROM routers').fetchall()
     packages_list = cursor.execute('SELECT * FROM packages').fetchall()
