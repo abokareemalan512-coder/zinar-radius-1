@@ -217,7 +217,6 @@ def subscribers():
     subscribers_list = cursor.execute('SELECT * FROM subscribers ORDER BY id DESC').fetchall()
     return render_template('subscribers.html', subscribers=subscribers_list)
 
-# 6. إضافة مشترك جديد (تم التعديل للتمييز بين Hotspot و PPPoE)
 @app.route('/add_subscriber', methods=['GET', 'POST'])
 def add_subscriber():
     db = get_db()
@@ -252,7 +251,6 @@ def add_subscriber():
             return redirect(url_for('add_subscriber'))
 
         try:
-            # إضافة المشترك حسب نوع الخدمة
             if service_type == 'hotspot':
                 hotspot_user = api.get_resource('/ip/hotspot/user')
                 hotspot_user.add(
@@ -276,7 +274,7 @@ def add_subscriber():
             )
             db.commit()
 
-            flash(f'تمت إضافة المشترك ({username}) بنجاح إلى المايكروتيك وقاعدة البيانات!', 'success')
+            flash(f'تمت إضافة المشترك ({username}) بنجاح!', 'success')
             return redirect(url_for('subscribers'))
 
         except Exception as e:
@@ -292,6 +290,16 @@ def add_subscriber():
     routers_list = cursor.execute('SELECT * FROM routers').fetchall()
     packages_list = cursor.execute('SELECT * FROM packages').fetchall()
     return render_template('add_subscriber.html', routers=routers_list, packages=packages_list)
+
+# 8. مسار حذف المشترك (جديد)
+@app.route('/subscribers/delete/<int:subscriber_id>')
+def delete_subscriber(subscriber_id):
+    db = get_db()
+    cursor = db.cursor()
+    cursor.execute('DELETE FROM subscribers WHERE id = ?', (subscriber_id,))
+    db.commit()
+    flash('تم حذف المشترك بنجاح.', 'success')
+    return redirect(url_for('subscribers'))
 
 @app.route('/packages', methods=['GET', 'POST'])
 def packages():
