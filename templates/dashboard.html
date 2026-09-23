@@ -1,6 +1,24 @@
 <!DOCTYPE html>
-<html dir="rtl"><body style="background:#0f172a;color:#fff;font-family:system-ui;padding:20px">
-<h1>✅ زينار اشتغل</h1>
-<p>IP: 198.145.118.146</p>
-<a href="/login">دخول</a>
-</body></html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>زينار نت - لوحة التحكم</title>
+<style>
+*{box-sizing:border-box}body{margin:0;background:#0f172a;color:#e2e8f0;font-family:system-ui}
+.header{background:#1e293b;padding:16px 24px;display:flex;justify-content:space-between;align-items:center}
+.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:16px;padding:20px}
+.card{background:linear-gradient(135deg,#1e293b,#162032);border:1px solid #2a3a54;border-radius:14px;padding:20px;text-align:center}
+.card h3{margin:0 0 10px;font-size:28px}
+.card a{display:inline-block;margin-top:10px;background:#0ea5e9;color:#001018;padding:8px 16px;border-radius:8px;text-decoration:none;font-weight:700}
+</style>
+</head>
+<body>
+<div class="header"><b>🌐 ZINAR NET</b><a href="/logout" style="color:#94a3b8;text-decoration:none">خروج</a></div>
+<div class="grid">
+<div class="card"><h3>👥</h3><p>المشتركين</p><a href="/subscribers">فتح</a></div>
+<div class="card"><h3>📡</h3><p>الراوترات</p><a href="/routers">فتح</a></div>
+<div class="card"><h3>➕</h3><p>إضافة مشترك</p><a href="/add_subscriber">فتح</a></div>
+<div class="card"><h3>📦</h3><p>الباقات</p><a href="/packages">فتح</a></div>
+</div>
+</body>
+</html>
