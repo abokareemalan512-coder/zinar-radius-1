@@ -20,21 +20,18 @@ def init_db():
     try:
         db.execute('INSERT INTO users (username, password) VALUES (?,?)', ('admin', generate_password_hash('admin123')))
         db.commit()
-    except:
-        pass
+    except: pass
     db.close()
 
 @app.teardown_appcontext
 def close_connection(e):
     db = getattr(g, '_database', None)
-    if db is not None:
-        db.close()
+    if db is not None: db.close()
 
 init_db()
 
 @app.route('/')
-def home():
-    return redirect('/dashboard')
+def home(): return redirect('/dashboard')
 
 @app.route('/login', methods=['GET','POST'])
 def login():
@@ -49,31 +46,24 @@ def login():
 
 @app.route('/dashboard')
 def dashboard():
-    if 'user' not in session:
-        return redirect('/login')
+    if 'user' not in session: return redirect('/login')
     db = get_db()
     c = db.execute('SELECT COUNT(*) FROM routers').fetchone()[0]
     return f'<body dir="rtl" style="background:#0f172a;color:#fff;font-family:system-ui;padding:20px"><h1>✅ الداشبورد شغال</h1><p>الراوترات: {c}</p><p>IP: 198.145.118.146 | user: zinar_api</p><a href="/routers" style="background:#0ea5e9;color:#000;padding:10px 20px;border-radius:8px;text-decoration:none">إدارة الراوترات</a> | <a href="/logout" style="color:#94a3b8">خروج</a></body>'
 
 @app.route('/routers', methods=['GET','POST'])
 def routers():
-    if 'user' not in session:
-        return redirect('/login')
+    if 'user' not in session: return redirect('/login')
     db = get_db()
-    msg=""
     if request.method=='POST':
         db.execute('INSERT INTO routers (name, ip, username, password, api_port) VALUES (?,?,?,?,?)',(request.form['name'],request.form['ip'],request.form['username'],request.form['password'],int(request.form['api_port'])))
         db.commit()
-        msg='<p style="color:#22c55e">✅ انحفظ</p>'
-    rows=""
-    for r in db.execute('SELECT * FROM routers').fetchall():
-        rows+=f"<tr><td>{r['name']}</td><td>{r['ip']}</td></tr>"
-    return f'<body dir="rtl" style="background:#0f172a;color:#fff;font-family:system-ui;padding:20px"><a href="/dashboard">رجوع</a><h2>الراوترات</h2>{msg}<form method="post" style="background:#1e293b;padding:20px;border-radius:12px;max-width:400px"><input name="name" value="زينار" style="width:100%;padding:8px;margin:5px 0"><input name="ip" value="198.145.118.146" style="width:100%;padding:8px;margin:5px 0"><input name="username" value="zinar_api" style="width:100%;padding:8px;margin:5px 0"><input name="password" placeholder="باسورد الراوتر" style="width:100%;padding:8px;margin:5px 0"><input name="api_port" value="8728" style="width:100%;padding:8px;margin:5px 0"><button style="background:#0ea5e9;padding:10px;border:0;border-radius:6px;width:100%">حفظ</button></form><table border=1 style="margin-top:20px;width:100%;border-collapse:collapse"><tr><th>الاسم</th><th>IP</th></tr>{rows}</table></body>'
+    rows="".join([f"<tr><td>{r['name']}</td><td>{r['ip']}</td></tr>" for r in db.execute('SELECT * FROM routers').fetchall()])
+    return f'<body dir="rtl" style="background:#0f172a;color:#fff;font-family:system-ui;padding:20px"><a href="/dashboard">رجوع</a><h2>الراوترات</h2><form method="post" style="background:#1e293b;padding:20px;border-radius:12px;max-width:400px"><input name="name" value="زينار" style="width:100%;padding:8px;margin:5px 0"><input name="ip" value="198.145.118.146" style="width:100%;padding:8px;margin:5px 0"><input name="username" value="zinar_api" style="width:100%;padding:8px;margin:5px 0"><input name="password" placeholder="باسورد الراوتر" style="width:100%;padding:8px;margin:5px 0"><input name="api_port" value="8728" style="width:100%;padding:8px;margin:5px 0"><button style="background:#0ea5e9;padding:10px;border:0;border-radius:6px;width:100%">حفظ</button></form><table border=1 style="margin-top:20px;width:100%">{rows}</table></body>'
 
 @app.route('/logout')
 def logout():
     session.clear()
     return redirect('/login')
 
-if __name__ == '__main__':
-    app.run(host='0.0.0.0', port=10000)
+if __name__ == '__main__': app.run(host='0.0.0.0', port=10000)
