@@ -1,69 +1,40 @@
 <!DOCTYPE html>
 <html lang="ar" dir="rtl">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>إضافة مشترك - زينار</title>
-  <style>
-    body { background:#0f172a; color:white; font-family:sans-serif; padding:20px; margin:0 }
-    .card { background:#1e293b; border-radius:12px; padding:25px; max-width:700px; margin:auto }
-    input, select { width:100%; padding:12px; margin:8px 0 15px; border-radius:8px; border:1px solid #334155; background:#0f172a; color:white; box-sizing:border-box }
-    .btn { background:#0ea5e9; color:white; border:none; padding:14px; width:100%; border-radius:8px; font-weight:bold; cursor:pointer; font-size:16px }
-    .btn:hover { background:#0284c7 }
-    .sham-box { background:#e0f2fe; border:2px dashed #0ea5e9; color:#0c4a6e; padding:15px; border-radius:10px; margin-bottom:20px; text-align:center; font-weight:bold }
-    label { color:#cbd5e1; font-size:14px }
-    a { text-decoration:none }
-  </style>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>إضافة مشترك</title>
+<style>
+body{background:#0f172a;color:white;font-family:sans-serif;padding:20px}
+.card{background:#1e293b;border-radius:12px;padding:25px;max-width:700px;margin:auto}
+input,select{width:100%;padding:12px;margin:8px 0 15px;border-radius:8px;border:1px solid #334155;background:#0f172a;color:white;box-sizing:border-box}
+.btn{background:#0ea5e9;color:white;border:none;padding:14px;width:100%;border-radius:8px;font-weight:bold;cursor:pointer;font-size:16px}
+.sham-box{background:#e0f2fe;border:2px dashed #0ea5e9;color:#0c4a6e;padding:15px;border-radius:10px;margin-bottom:20px;text-align:center;font-weight:bold}
+label{color:#cbd5e1;font-size:14px}
+</style>
 </head>
 <body>
-  <div class="card">
-    <h2>➕ إضافة مشترك جديد</h2>
-
-    {% if not packages or packages|length==0 %}
-      <div style="background:#ef4444; padding:12px; border-radius:8px; margin-bottom:15px">
-        ⚠️ ما في باقات! رح تنضاف تلقائيا بعد التحديث (1M, 2M, 4M, 8M)
-      </div>
-    {% else %}
-      <div class="sham-box">
-        💳 حساب شام كاش: {{ sham_account }}<br>
-        <span style="font-size:12px; font-weight:normal">اترك خانة العملية فاضية اذا ما بدك دفع هلا</span>
-      </div>
-    {% endif %}
-
-    <form method="POST">
-      <label>اسم المستخدم *</label>
-      <input type="text" name="username" required placeholder="ahmad123">
-
-      <label>كلمة المرور *</label>
-      <input type="text" name="password" required placeholder="123456">
-
-      <label>الباقة *</label>
-      <select name="profile" required>
-        <option value="">-- اختر الباقة --</option>
-        {% for pkg in packages %}
-          <option value="{{ pkg['name'] }}">
-            {{ pkg['name'] }} - {{ pkg['rate_limit'] }} - {{ pkg['price'] }}$
-          </option>
-        {% endfor %}
-      </select>
-
-      <label>نوع الخدمة</label>
-      <select name="service_type">
-        <option value="hotspot">Hotspot (شبكة كروت)</option>
-        <option value="pppoe">PPPoE</option>
-      </select>
-
-      <label>رقم عملية شام كاش (اختياري)</label>
-      <input type="text" name="shamcash_tx" placeholder="مثال: 123456789 - اتركو فاضي للتجربة">
-
-      <button type="submit" class="btn">✔ إضافة للمنصة</button>
-    </form>
-
-    <div style="margin-top:20px; text-align:center; display:flex; gap:10px; justify-content:center">
-      <a href="/dashboard" style="color:#94a3b8; border:1px solid #334155; padding:6px 14px; border-radius:6px">← لوحة التحكم</a>
-      <a href="/packages" style="color:#0ea5e9; border:1px solid #0ea5e9; padding:6px 14px; border-radius:6px">الباقات</a>
-      <a href="/subscribers" style="color:#22c55e; border:1px solid #22c55e; padding:6px 14px; border-radius:6px">المشتركين</a>
-    </div>
-  </div>
+<div class="card">
+<h2>➕ إضافة مشترك جديد</h2>
+<div class="sham-box">💳 حساب شام كاش: {{ sham_account }}</div>
+<form method="POST">
+<label>اسم المستخدم *</label>
+<input type="text" name="username" required placeholder="ahmad123">
+<label>كلمة المرور *</label>
+<input type="text" name="password" required placeholder="123456">
+<label>رقم واتساب الزبون * (بدون +)</label>
+<input type="text" name="phone" required placeholder="9639xxxxxxxx">
+<label>الباقة *</label>
+<select name="profile" required>
+<option value="">-- اختر الباقة --</option>
+{% for pkg in packages %}<option value="{{ pkg['name'] }}">{{ pkg['name'] }} - {{ pkg['price'] }}$</option>{% endfor %}
+</select>
+<label>نوع الخدمة</label>
+<select name="service_type"><option value="hotspot">Hotspot</option><option value="pppoe">PPPoE</option></select>
+<label>رقم عملية شام كاش (اختياري)</label>
+<input type="text" name="shamcash_tx" placeholder="123456789">
+<button type="submit" class="btn">✔ إضافة للمنصة</button>
+</form>
+<div style="text-align:center;margin-top:15px"><a href="/dashboard" style="color:#94a3b8">رجوع</a></div>
+</div>
 </body>
 </html>
