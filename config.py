@@ -1,7 +1,6 @@
-# ملف قابل للتحديث 100% - غير من هون فقط
 SHAM_CASH = {
-    "account": "حط رقم حسابك شام كاش هون",
-    "mode": "manual",  # هلا يدوي، بكرا auto
+    "account": "5889XXXX", # حط حسابك
+    "mode": "manual", # بكرا بتصير auto
     "packages": {
         "1M": 4,
         "2M": 5,
