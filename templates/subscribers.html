@@ -2,41 +2,68 @@
 <html lang="ar" dir="rtl">
 <head>
 <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>المشتركين</title>
+<title>المشتركين - زينار</title>
 <style>
-body{background:#0f172a;color:white;font-family:sans-serif;padding:20px}
-.card{background:#1e293b;border-radius:12px;padding:20px}
-table{width:100%;border-collapse:collapse;margin-top:15px}
-th,td{padding:10px;border-bottom:1px solid #334155;text-align:right;font-size:14px}
-.btn{padding:6px 10px;border-radius:6px;text-decoration:none;font-size:13px;margin:2px;display:inline-block}
+body{background:#0f172a;color:white;font-family:sans-serif;padding:10px;margin:0}
+.header{display:flex;justify-content:space-between;align-items:center;padding:15px}
+.card{background:#1e293b;border-radius:12px;padding:10px;overflow-x:auto}
+table{width:100%;border-collapse:collapse;min-width:900px}
+th{color:#94a3b8;font-size:12px;padding:12px 8px;text-align:right;border-bottom:1px solid #334155}
+td{padding:10px 8px;border-bottom:1px solid #1e293b;font-size:13px}
+.badge{padding:3px 8px;border-radius:12px;font-size:11px}
+.badge-active{background:#16a34a22;color:#22c55e;border:1px solid #22c55e}
+.badge-off{background:#ef444422;color:#ef4444;border:1px solid #ef4444}
+.btn{padding:5px 9px;border-radius:6px;text-decoration:none;font-size:12px;display:inline-block;margin:2px}
 .btn-wa{background:#22c55e;color:white}
+.btn-on{background:#0ea5e9;color:white}
+.btn-off{background:#f59e0b;color:white}
+.btn-reset{background:#8b5cf6;color:white}
 .btn-del{background:#ef4444;color:white}
-.btn-add{background:#0ea5e9;color:white;padding:10px 16px;border-radius:8px;text-decoration:none}
+.btn-add{background:#0ea5e9;color:white;padding:10px 18px;border-radius:8px;text-decoration:none;font-weight:bold}
 </style>
 </head>
 <body>
-<div style="display:flex;justify-content:space-between;align-items:center">
+<div class="header">
 <h2>👥 المشتركين</h2>
 <a href="/add-subscriber" class="btn-add">+ إضافة</a>
 </div>
 <div class="card">
 <table>
-<tr><th>المستخدم</th><th>الباقة</th><th>رقم واتساب</th><th>إجراء</th></tr>
+<tr>
+<th>اسم المشترك</th>
+<th>المستخدم / كلمة المرور</th>
+<th>الباقة</th>
+<th>رقم واتساب</th>
+<th>تاريخ البداية</th>
+<th>تاريخ الانتهاء</th>
+<th>الحالة</th>
+<th>إجراءات</th>
+</tr>
 {% for s in subscribers %}
 <tr>
-<td><b>{{ s['username'] }}</b><br><small style="color:#94a3b8">{{ s['password'] }}</small></td>
-<td>{{ s['profile'] }}</td>
+<td><b>{{ s['full_name'] or s['username'] }}</b></td>
+<td><b style="color:#38bdf8">{{ s['username'] }}</b><br><small style="color:#94a3b8">{{ s['password'] }}</small></td>
+<td><span style="background:#0ea5e922;border:1px solid #0ea5e9;padding:2px 7px;border-radius:6px">{{ s['profile'] }}</span></td>
 <td>{{ s['phone'] }}</td>
+<td>{{ s['start_date'] or '-' }}</td>
+<td>{{ s['expiry_date'] or '-' }}</td>
+<td>{% if s['status']=='active' %}<span class="badge badge-active">مفعل</span>{% else %}<span class="badge badge-off">موقف</span>{% endif %}</td>
 <td>
-<a class="btn btn-wa" target="_blank" href="https://wa.me/{{ s['phone'] }}?text=مرحبا%20{{ s['username'] }}%20تم%20تفعيل%20باقتك%20{{ s['profile'] }}%20✅%0Aاليوزر:%20{{ s['username'] }}%0Aالباس:%20{{ s['password'] }}%0Aشكرا%20لشبكة%20زينار">📱 واتساب</a>
-<a class="btn btn-del" href="/subscribers/delete/{{ s['id'] }}">حذف</a>
+<a class="btn btn-wa" target="_blank" href="https://wa.me/{{ s['phone'] }}?text=مرحبا%20{{ s['full_name'] or s['username'] }}%20تم%20تفعيل%20باقتك%20{{ s['profile'] }}%20✅%0Aاليوزر:%20{{ s['username'] }}%0Aالباس:%20{{ s['password'] }}%0Aينتهي:%20{{ s['expiry_date'] }}%0Aشبكة%20زينار">📱 واتساب</a>
+{% if s['status']=='active' %}
+<a class="btn btn-off" href="/subscribers/toggle/{{ s['id'] }}">⏸️ إيقاف</a>
+{% else %}
+<a class="btn btn-on" href="/subscribers/toggle/{{ s['id'] }}">▶️ تفعيل</a>
+{% endif %}
+<a class="btn btn-reset" href="/subscribers/reset/{{ s['id'] }}" onclick="return confirm('تصفير استهلاك وتجديد 30 يوم؟')">🔄 تصفير</a>
+<a class="btn btn-del" href="/subscribers/delete/{{ s['id'] }}" onclick="return confirm('حذف نهائي؟')">🗑️</a>
 </td>
 </tr>
 {% else %}
-<tr><td colspan="4" style="text-align:center;color:#64748b;padding:20px">لا يوجد مشتركين</td></tr>
+<tr><td colspan="8" style="text-align:center;color:#64748b;padding:30px">لا يوجد مشتركين بعد</td></tr>
 {% endfor %}
 </table>
 </div>
-<div style="text-align:center;margin-top:20px"><a href="/dashboard" style="color:#94a3b8">← رجوع</a></div>
+<div style="text-align:center;margin-top:20px"><a href="/dashboard" style="color:#94a3b8;text-decoration:none">← رجوع للوحة التحكم</a></div>
 </body>
 </html>
