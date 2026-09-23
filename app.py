@@ -1,15 +1,19 @@
 import sqlite3
-import traceback
+from datetime import datetime, timedelta
 from flask import Flask, render_template, request, redirect, url_for, flash, g
 import routeros_api
+
+try:
+    from config import SHAM_CASH_ACCOUNT, SHAM_CASH_ENABLED, PACKAGES_PRICES
+except:
+    SHAM_CASH_ACCOUNT="5889"
+    SHAM_CASH_ENABLED=True
+    PACKAGES_PRICES={"1M":4,"2M":5,"4M":7,"8M":10}
 
 app = Flask(__name__)
 app.secret_key = "zenar_secret_key_safe_123"
 DATABASE = 'zinar.db'
 
-# ==========================================
-# إدارة قاعدة البيانات (SQLite)
-# ==========================================
 def get_db():
     db = getattr(g, '_database', None)
     if db is None:
@@ -26,306 +30,206 @@ def close_connection(exception):
 def init_db():
     with app.app_context():
         db = get_db()
-        cursor = db.cursor()
-        
-        # جدول الراوترات
-        cursor.execute('''
-            CREATE TABLE IF NOT EXISTS routers (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                name TEXT NOT NULL,
-                ip_address TEXT NOT NULL,
-                username TEXT NOT NULL,
-                password TEXT NOT NULL,
-                port INTEGER DEFAULT 8728,
-                status TEXT DEFAULT 'disconnected'
-            )
-        ''')
-        
-        # جدول المشتركين
-        cursor.execute('''
-            CREATE TABLE IF NOT EXISTS subscribers (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                username TEXT NOT NULL,
-                password TEXT NOT NULL,
-                profile TEXT NOT NULL,
-                service_type TEXT DEFAULT 'pppoe',
-                expiry_date TEXT,
-                status TEXT DEFAULT 'active',
-                router_id INTEGER
-            )
-        ''')
-        
-        # جدول الباقات
-        cursor.execute('''
-            CREATE TABLE IF NOT EXISTS packages (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                name TEXT NOT NULL,
-                rate_limit TEXT NOT NULL,
-                price REAL DEFAULT 0
-            )
-        ''')
+        c=db.cursor()
+        c.execute('''CREATE TABLE IF NOT EXISTS routers (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT, ip_address TEXT, username TEXT, password TEXT, port INTEGER DEFAULT 8728, status TEXT DEFAULT 'disconnected')''')
+        c.execute('''CREATE TABLE IF NOT EXISTS subscribers (id INTEGER PRIMARY KEY AUTOINCREMENT, username TEXT UNIQUE, password TEXT, profile TEXT, service_type TEXT DEFAULT 'hotspot', phone TEXT DEFAULT '', full_name TEXT DEFAULT '', status TEXT DEFAULT 'active', start_date TEXT, expiry_date TEXT)''')
+        c.execute('''CREATE TABLE IF NOT EXISTS packages (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT, rate_limit TEXT, price REAL)''')
+        c.execute('''CREATE TABLE IF NOT EXISTS payments (id INTEGER PRIMARY KEY AUTOINCREMENT, subscriber_username TEXT, package_name TEXT, amount REAL, shamcash_tx TEXT, status TEXT DEFAULT 'pending', created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP)''')
         db.commit()
-
+        try:
+            for col in ['phone','full_name','start_date','expiry_date']:
+                try: c.execute(f'ALTER TABLE subscribers ADD COLUMN {col} TEXT DEFAULT ""')
+                except: pass
+            db.commit()
+        except: pass
+        count=c.execute('SELECT COUNT(*) FROM packages').fetchone()[0]
+        if count==0:
+            for n,p in PACKAGES_PRICES.items():
+                try: c.execute('INSERT INTO packages (name,rate_limit,price) VALUES (?,?,?)',(n,f"{n}/{n}",p))
+                except: pass
+            db.commit()
 init_db()
 
-# ==========================================
-# معالج الأخطاء العالمي
-# ==========================================
-@app.errorhandler(500)
-def internal_error(error):
-    err_msg = traceback.format_exc()
-    return f"""
-    <div dir="rtl" style="padding: 20px; background-color: #f8d7da; color: #721c24; font-family: sans-serif; border-radius: 8px; margin: 20px;">
-        <h2>حدث خطأ غير متوقع في الخادم (500 Error):</h2>
-        <p>تفاصيل الخطأ البرمجي:</p>
-        <pre style="background: #1e1e1e; color: #00ff00; padding: 15px; border-radius: 5px; overflow-x: auto; text-align: left; direction: ltr;">{err_msg}</pre>
-    </div>
-    """, 500
-
-# ==========================================
-# دالة الاتصال بالمايكروتيك (MikroTik API)
-# ==========================================
-def connect_mikrotik(ip, username, password, port=8728):
+def connect_mikrotik(ip,user,pwd,port=8728):
     try:
-        clean_ip = str(ip).replace('http://', '').replace('https://', '').strip()
-        clean_port = int(port) if port else 8728
-
-        connection = routeros_api.RouterOsApiPool(
-            clean_ip,
-            username=str(username).strip(),
-            password=str(password).strip(),
-            port=clean_port,
-            plaintext_login=True,
-            use_ssl=False
-        )
-        api = connection.get_api()
-        return api, connection, None
+        ip=str(ip).replace('http://','').replace('https://','').strip()
+        pool=routeros_api.RouterOsApiPool(ip,username=str(user).strip(),password=str(pwd).strip(),port=int(port),plaintext_login=True)
+        return pool.get_api(),pool,None
     except Exception as e:
-        return None, None, str(e)
-
-# ==========================================
-# المسارات الرئيسية (Routes)
-# ==========================================
+        return None,None,str(e)
 
 @app.route('/')
 @app.route('/dashboard')
 def dashboard():
-    db = get_db()
-    cursor = db.cursor()
-    
-    routers_count = cursor.execute('SELECT COUNT(*) FROM routers').fetchone()[0]
-    packages_count = cursor.execute('SELECT COUNT(*) FROM packages').fetchone()[0]
-    sub_count = cursor.execute('SELECT COUNT(*) FROM subscribers').fetchone()[0]
-    active_subs = cursor.execute("SELECT COUNT(*) FROM subscribers WHERE status='active'").fetchone()[0]
-    
-    subscribers = cursor.execute('SELECT * FROM subscribers ORDER BY id DESC LIMIT 10').fetchall()
-    
-    return render_template(
-        'dashboard.html',
-        routers_count=routers_count,
-        packages_count=packages_count,
-        sub_count=sub_count,
-        active_subs=active_subs,
-        subscribers=subscribers
-    )
+    db=get_db(); cur=db.cursor()
+    rc=cur.execute('SELECT COUNT(*) FROM routers').fetchone()[0]
+    pc=cur.execute('SELECT COUNT(*) FROM packages').fetchone()[0]
+    sc=cur.execute('SELECT COUNT(*) FROM subscribers').fetchone()[0]
+    ac=cur.execute("SELECT COUNT(*) FROM subscribers WHERE status='active'").fetchone()[0]
+    subs=cur.execute('SELECT * FROM subscribers ORDER BY id DESC LIMIT 10').fetchall()
+    pays=cur.execute('SELECT COUNT(*) FROM payments WHERE status="pending"').fetchone()[0]
+    return render_template('dashboard.html',routers_count=rc,packages_count=pc,sub_count=sc,active_subs=ac,subscribers=subs,sham_account=SHAM_CASH_ACCOUNT,pending_pays=pays)
 
-@app.route('/routers', methods=['GET', 'POST'])
+@app.route('/routers',methods=['GET','POST'])
 def routers():
-    db = get_db()
-    cursor = db.cursor()
-    
-    if request.method == 'POST':
-        name = request.form.get('name', '').strip()
-        ip_address = request.form.get('ip_address', '').strip()
-        username = request.form.get('username', '').strip()
-        password = request.form.get('password', '').strip()
-        port = request.form.get('port', 8728)
-
-        if not name or not ip_address or not username:
-            flash('يرجى إدخال جميع الحقول المطلوبة (اسم الراوتر، عنوان IP، واسم المستخدم)', 'danger')
-            return redirect(url_for('routers'))
-
-        try:
-            cursor.execute(
-                'INSERT INTO routers (name, ip_address, username, password, port) VALUES (?, ?, ?, ?, ?)',
-                (name, ip_address, username, password, port)
-            )
-            db.commit()
-            flash('تمت إضافة الراوتر بنجاح!', 'success')
-        except Exception as e:
-            flash(f'فشل حفظ الراوتر: {str(e)}', 'danger')
-
-        return redirect(url_for('routers'))
-        
-    routers_list = cursor.execute('SELECT * FROM routers').fetchall()
-    return render_template('routers.html', routers=routers_list)
-
-@app.route('/routers/test/<int:router_id>')
-def test_router(router_id):
-    db = get_db()
-    cursor = db.cursor()
-    router = cursor.execute('SELECT * FROM routers WHERE id = ?', (router_id,)).fetchone()
-    
-    if not router:
-        flash('الراوتر غير موجود!', 'danger')
-        return redirect(url_for('routers'))
-
-    api, connection, error = connect_mikrotik(
-        router['ip_address'],
-        router['username'],
-        router['password'],
-        router['port']
-    )
-
-    if error:
-        cursor.execute("UPDATE routers SET status='disconnected' WHERE id=?", (router_id,))
+    db=get_db(); cur=db.cursor()
+    if request.method=='POST':
+        cur.execute('INSERT INTO routers (name,ip_address,username,password,port) VALUES (?,?,?,?,?)',(request.form.get('name'),request.form.get('ip_address'),request.form.get('username'),request.form.get('password'),request.form.get('port',8728)))
         db.commit()
-        flash(f"فشل الاتصال بالمايكروتيك ({router['name']})! السبب: {error}", "danger")
-    else:
-        try:
-            resource_api = api.get_resource('/system/resource')
-            resource_api.get()
-            cursor.execute("UPDATE routers SET status='connected' WHERE id=?", (router_id,))
-            db.commit()
-            flash(f"تم الاتصال بنجاح بالمايكروتيك ({router['name']})!", "success")
-        except Exception as e:
-            cursor.execute("UPDATE routers SET status='disconnected' WHERE id=?", (router_id,))
-            db.commit()
-            flash(f"فشل أثناء قراءة بيانات المايكروتيك: {str(e)}", "danger")
-        finally:
-            if connection:
-                try:
-                    connection.disconnect()
-                except Exception:
-                    pass
-
-    return redirect(url_for('routers'))
-
-@app.route('/routers/delete/<int:router_id>')
-def delete_router(router_id):
-    db = get_db()
-    cursor = db.cursor()
-    cursor.execute('DELETE FROM routers WHERE id = ?', (router_id,))
-    db.commit()
-    flash('تم حذف الراوتر بنجاح.', 'success')
-    return redirect(url_for('routers'))
+        return redirect(url_for('routers'))
+    return render_template('routers.html',routers=cur.execute('SELECT * FROM routers').fetchall())
 
 @app.route('/subscribers')
 def subscribers():
-    db = get_db()
-    cursor = db.cursor()
-    subscribers_list = cursor.execute('SELECT * FROM subscribers ORDER BY id DESC').fetchall()
-    return render_template('subscribers.html', subscribers=subscribers_list)
+    db=get_db(); cur=db.cursor()
+    return render_template('subscribers.html',subscribers=cur.execute('SELECT * FROM subscribers ORDER BY id DESC').fetchall())
 
-@app.route('/add_subscriber', methods=['GET', 'POST'])
+@app.route('/add-subscriber',methods=['GET','POST'])
+@app.route('/add_subscriber',methods=['GET','POST'])
 def add_subscriber():
-    db = get_db()
-    cursor = db.cursor()
-    
-    if request.method == 'POST':
-        username = request.form.get('username', '').strip()
-        password = request.form.get('password', '').strip()
-        profile = request.form.get('profile', '').strip()
-        service_type = request.form.get('service_type', 'pppoe').strip().lower()
-        router_id = request.form.get('router_id')
-
-        if not username or not password or not profile or not router_id:
-            flash('الرجاء إدخال كافة بيانات المشترك واختيار الراوتر والبروفايل!', 'danger')
-            return redirect(url_for('add_subscriber'))
-
-        router = cursor.execute('SELECT * FROM routers WHERE id = ?', (router_id,)).fetchone()
-        
-        if not router:
-            flash('الرجاء اختيار راوتر صالح!', 'danger')
-            return redirect(url_for('add_subscriber'))
-
-        api, connection, error = connect_mikrotik(
-            router['ip_address'],
-            router['username'],
-            router['password'],
-            router['port']
-        )
-
-        if error:
-            flash(f"لم يتم حفظ المشترك! فشل الاتصال بالمايكروتيك: {error}", "danger")
-            return redirect(url_for('add_subscriber'))
-
+    db=get_db(); cur=db.cursor()
+    if request.method=='POST':
+        username=request.form.get('username','').strip()
+        password=request.form.get('password','').strip()
+        profile=request.form.get('profile','').strip()
+        phone=request.form.get('phone','').strip().replace('+','').replace(' ','')
+        full_name=request.form.get('full_name','').strip()
+        service_type=request.form.get('service_type','hotspot')
+        start=datetime.now().strftime('%Y-%m-%d')
+        expiry=(datetime.now()+timedelta(days=30)).strftime('%Y-%m-%d')
         try:
-            if service_type == 'hotspot':
-                hotspot_user = api.get_resource('/ip/hotspot/user')
-                hotspot_user.add(
-                    name=str(username),
-                    password=str(password),
-                    profile=str(profile)
-                )
-            else:
-                ppp_secret = api.get_resource('/ppp/secret')
-                valid_ppp_service = service_type if service_type in ['pppoe', 'any', 'l2tp', 'pptp', 'sstp'] else 'any'
-                ppp_secret.add(
-                    name=str(username),
-                    password=str(password),
-                    profile=str(profile),
-                    service=valid_ppp_service
-                )
-
-            cursor.execute(
-                'INSERT INTO subscribers (username, password, profile, service_type, router_id, status) VALUES (?, ?, ?, ?, ?, ?)',
-                (username, password, profile, service_type, router_id, 'active')
-            )
+            cur.execute('INSERT INTO subscribers (username,password,profile,service_type,phone,full_name,status,start_date,expiry_date) VALUES (?,?,?,?,?,?,?,?,?)',(username,password,profile,service_type,phone,full_name,'active',start,expiry))
             db.commit()
-
-            flash(f'تمت إضافة المشترك ({username}) بنجاح!', 'success')
+            for r in cur.execute('SELECT * FROM routers').fetchall():
+                api,conn,err=connect_mikrotik(r['ip_address'],r['username'],r['password'],r['port'])
+                if api and not err:
+                    try:
+                        if service_type=='hotspot':
+                            res=api.get_resource('/ip/hotspot/user')
+                            if not res.get(name=username): res.add(name=username,password=password,profile=profile)
+                        else:
+                            res=api.get_resource('/ppp/secret')
+                            if not res.get(name=username): res.add(name=username,password=password,profile=profile,service=service_type)
+                    except: pass
+                    finally:
+                        try: conn.disconnect()
+                        except: pass
+            flash(f'تم إضافة {username} ✅','success')
             return redirect(url_for('subscribers'))
-
         except Exception as e:
-            flash(f"فشل إضافة المشترك داخل المايكروتيك: {str(e)}", "danger")
+            flash('الاسم موجود مسبقا','danger')
             return redirect(url_for('add_subscriber'))
-        finally:
-            if connection:
+    pkgs=cur.execute('SELECT * FROM packages').fetchall()
+    return render_template('add_subscriber.html',packages=pkgs,sham_account=SHAM_CASH_ACCOUNT)
+
+@app.route('/subscribers/toggle/<int:sid>')
+def toggle_sub(sid):
+    db=get_db(); cur=db.cursor()
+    s=cur.execute('SELECT * FROM subscribers WHERE id=?',(sid,)).fetchone()
+    if s:
+        new_status='disabled' if s['status']=='active' else 'active'
+        cur.execute('UPDATE subscribers SET status=? WHERE id=?',(new_status,sid)); db.commit()
+        for r in cur.execute('SELECT * FROM routers').fetchall():
+            api,conn,err=connect_mikrotik(r['ip_address'],r['username'],r['password'],r['port'])
+            if api and not err:
                 try:
-                    connection.disconnect()
-                except Exception:
-                    pass
-
-    routers_list = cursor.execute('SELECT * FROM routers').fetchall()
-    packages_list = cursor.execute('SELECT * FROM packages').fetchall()
-    return render_template('add_subscriber.html', routers=routers_list, packages=packages_list)
-
-# 8. مسار حذف المشترك (جديد)
-@app.route('/subscribers/delete/<int:subscriber_id>')
-def delete_subscriber(subscriber_id):
-    db = get_db()
-    cursor = db.cursor()
-    cursor.execute('DELETE FROM subscribers WHERE id = ?', (subscriber_id,))
-    db.commit()
-    flash('تم حذف المشترك بنجاح.', 'success')
+                    if s['service_type']=='hotspot':
+                        res=api.get_resource('/ip/hotspot/user')
+                        for u in res.get(name=s['username']):
+                            res.set(id=u['id'],disabled='yes' if new_status=='disabled' else 'no')
+                    else:
+                        res=api.get_resource('/ppp/secret')
+                        for u in res.get(name=s['username']):
+                            res.set(id=u['id'],disabled='yes' if new_status=='disabled' else 'no')
+                except: pass
+                finally:
+                    try: conn.disconnect()
+                    except: pass
     return redirect(url_for('subscribers'))
 
-@app.route('/packages', methods=['GET', 'POST'])
+@app.route('/subscribers/reset/<int:sid>')
+def reset_sub(sid):
+    db=get_db(); cur=db.cursor()
+    s=cur.execute('SELECT * FROM subscribers WHERE id=?',(sid,)).fetchone()
+    if s:
+        start=datetime.now().strftime('%Y-%m-%d')
+        expiry=(datetime.now()+timedelta(days=30)).strftime('%Y-%m-%d')
+        cur.execute('UPDATE subscribers SET start_date=?, expiry_date=?, status=? WHERE id=?',(start,expiry,'active',sid)); db.commit()
+        flash('تم التصفير والتجديد 30 يوم ✅','success')
+    return redirect(url_for('subscribers'))
+
+@app.route('/subscribers/delete/<int:sid>')
+def delete_subscriber(sid):
+    db=get_db(); cur=db.cursor()
+    s=cur.execute('SELECT * FROM subscribers WHERE id=?',(sid,)).fetchone()
+    if s:
+        cur.execute('DELETE FROM subscribers WHERE id=?',(sid,)); db.commit()
+        for r in cur.execute('SELECT * FROM routers').fetchall():
+            api,conn,err=connect_mikrotik(r['ip_address'],r['username'],r['password'],r['port'])
+            if api and not err:
+                try:
+                    if s['service_type']=='hotspot':
+                        for u in api.get_resource('/ip/hotspot/user').get(name=s['username']): api.get_resource('/ip/hotspot/user').remove(id=u['id'])
+                    else:
+                        for u in api.get_resource('/ppp/secret').get(name=s['username']): api.get_resource('/ppp/secret').remove(id=u['id'])
+                except: pass
+                finally:
+                    try: conn.disconnect()
+                    except: pass
+    return redirect(url_for('subscribers'))
+
+@app.route('/packages',methods=['GET','POST'])
 def packages():
-    db = get_db()
-    cursor = db.cursor()
-    
-    if request.method == 'POST':
-        name = request.form.get('name', '').strip()
-        rate_limit = request.form.get('rate_limit', '').strip()
-        price = request.form.get('price', 0)
+    db=get_db(); cur=db.cursor()
+    if request.method=='POST':
+        cur.execute('INSERT INTO packages (name,rate_limit,price) VALUES (?,?,?)',(request.form.get('name'),request.form.get('rate_limit'),request.form.get('price',0))); db.commit(); return redirect(url_for('packages'))
+    return render_template('packages.html',packages=cur.execute('SELECT * FROM packages').fetchall())
 
-        if not name or not rate_limit:
-            flash('يرجى كتابة اسم الباقة والسرعة بشكل صحيح!', 'danger')
-            return redirect(url_for('packages'))
+@app.route('/payments')
+def payments():
+    db=get_db(); cur=db.cursor()
+    return render_template('payments.html',payments=cur.execute('SELECT * FROM payments ORDER BY id DESC').fetchall(),sham_account=SHAM_CASH_ACCOUNT)
 
-        try:
-            cursor.execute('INSERT INTO packages (name, rate_limit, price) VALUES (?, ?, ?)', (name, rate_limit, price))
-            db.commit()
-            flash('تمت إضافة الباقة بنجاح!', 'success')
-        except Exception as e:
-            flash(f'حدث خطأ أثناء حفظ الباقة: {str(e)}', 'danger')
+# ===== صفحات الدفع الذاتي الجديدة =====
+@app.route('/pay', methods=['GET','POST'])
+@app.route('/p/<username>', methods=['GET','POST'])
+def pay_page(username=None):
+    db=get_db(); cur=db.cursor()
+    pkgs=cur.execute('SELECT * FROM packages').fetchall()
+    sub=None
+    if username:
+        sub=cur.execute('SELECT * FROM subscribers WHERE username=?',(username,)).fetchone()
 
-        return redirect(url_for('packages'))
+    if request.method=='POST':
+        u=request.form.get('username','').strip()
+        pkg=request.form.get('package','').strip()
+        tx=request.form.get('tx','').strip()
+        phone=request.form.get('phone','').strip().replace('+','').replace(' ','')
+        p=cur.execute('SELECT * FROM packages WHERE name=?',(pkg,)).fetchone()
+        price=p['price'] if p else 0
+        cur.execute('INSERT INTO payments (subscriber_username,package_name,amount,shamcash_tx,status) VALUES (?,?,?,?,?)',(u,pkg,price,tx,'pending'))
+        existing=cur.execute('SELECT * FROM subscribers WHERE username=?',(u,)).fetchone()
+        if existing:
+            start=datetime.now().strftime('%Y-%m-%d')
+            expiry=(datetime.now()+timedelta(days=30)).strftime('%Y-%m-%d')
+            cur.execute('UPDATE subscribers SET profile=?, phone=?, expiry_date=?, start_date=?, status=? WHERE username=?',(pkg,phone,expiry,start,'active',u))
+        db.commit()
+        return render_template('pay_success.html',username=u,package=pkg,tx=tx,price=price,sham_account=SHAM_CASH_ACCOUNT)
 
-    packages_list = cursor.execute('SELECT * FROM packages').fetchall()
-    return render_template('packages.html', packages=packages_list)
+    return render_template('pay.html',packages=pkgs,subscriber=sub,sham_account=SHAM_CASH_ACCOUNT, username=username)
+
+@app.route('/payments/confirm/<int:pid>')
+def confirm_payment(pid):
+    db=get_db(); cur=db.cursor()
+    pay=cur.execute('SELECT * FROM payments WHERE id=?',(pid,)).fetchone()
+    if pay:
+        cur.execute('UPDATE payments SET status=? WHERE id=?',('confirmed',pid))
+        start=datetime.now().strftime('%Y-%m-%d')
+        expiry=(datetime.now()+timedelta(days=30)).strftime('%Y-%m-%d')
+        cur.execute('UPDATE subscribers SET expiry_date=?, start_date=?, status=?, profile=? WHERE username=?',(expiry,start,'active',pay['package_name'],pay['subscriber_username']))
+        db.commit()
+        flash('تم التأكيد والتجديد ✅','success')
+    return redirect(url_for('payments'))
 
 if __name__ == '__main__':
-    app.run(host='0.0.0.0', port=5000, debug=True)
+    app.run(host='0.0.0.0',port=5000,debug=True)
