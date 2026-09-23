@@ -1,40 +1,53 @@
 <!DOCTYPE html>
 <html lang="ar" dir="rtl">
-<head>
-<meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>إضافة مشترك</title>
+<head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>إضافة مشترك - زينار</title>
 <style>
 body{background:#0f172a;color:white;font-family:sans-serif;padding:20px}
-.card{background:#1e293b;border-radius:12px;padding:25px;max-width:700px;margin:auto}
-input,select{width:100%;padding:12px;margin:8px 0 15px;border-radius:8px;border:1px solid #334155;background:#0f172a;color:white;box-sizing:border-box}
-.btn{background:#0ea5e9;color:white;border:none;padding:14px;width:100%;border-radius:8px;font-weight:bold;cursor:pointer;font-size:16px}
-.sham-box{background:#e0f2fe;border:2px dashed #0ea5e9;color:#0c4a6e;padding:15px;border-radius:10px;margin-bottom:20px;text-align:center;font-weight:bold}
-label{color:#cbd5e1;font-size:14px}
+.card{background:#1e293b;border-radius:12px;padding:20px;max-width:500px;margin:auto}
+input,select{width:100%;padding:12px;margin:8px 0;border-radius:8px;border:1px solid #334155;background:#0f172a;color:white;box-sizing:border-box}
+.btn{background:#0ea5e9;color:white;border:none;padding:12px;width:100%;border-radius:8px;font-weight:bold;cursor:pointer}
+.sham-box{background:#1e3a5f;border:2px dashed #38bdf8;border-radius:10px;padding:14px;text-align:center;margin-bottom:15px;cursor:pointer;transition:0.2s}
+.sham-box:hover{background:#22c55e22;border-color:#22c55e}
+.sham-box b{color:#38bdf8;font-size:22px;letter-spacing:1px}
+.sham-box small{color:#94a3b8;display:block;margin-top:5px}
 </style>
 </head>
 <body>
 <div class="card">
 <h2>➕ إضافة مشترك جديد</h2>
-<div class="sham-box">💳 شام كاش: {{ sham_account }}</div>
-<form method="POST">
-<label>اسم المشترك (الاسم الحقيقي)</label>
-<input type="text" name="full_name" placeholder="مثال: أحمد محمد">
-<label>اسم المستخدم *</label>
-<input type="text" name="username" required placeholder="ahmad123">
-<label>كلمة المرور *</label>
-<input type="text" name="password" required placeholder="123456">
-<label>رقم واتساب *</label>
-<input type="text" name="phone" required placeholder="9639xxxxxxxx">
-<label>الباقة *</label>
-<select name="profile" required>
-<option value="">-- اختر الباقة --</option>
-{% for pkg in packages %}<option value="{{ pkg['name'] }}">{{ pkg['name'] }} - {{ pkg['price'] }}$</option>{% endfor %}
-</select>
-<label>نوع الخدمة</label>
-<select name="service_type"><option value="hotspot">Hotspot</option><option value="pppoe">PPPoE</option></select>
-<button type="submit" class="btn">✔ إضافة للمنصة</button>
-</form>
-<div style="text-align:center;margin-top:15px"><a href="/subscribers" style="color:#94a3b8">رجوع للمشتركين</a></div>
+
+<div class="sham-box" onclick="copySham()" id="shamBox">
+💳 شام كاش: <b id="shamNum">{{ sham_account }}</b>
+<small id="copyText">👆 اضغط للنسخ</small>
 </div>
+
+<form method="POST">
+<input type="text" name="full_name" placeholder="اسم المشترك الحقيقي" value="باسل ابو احمد">
+<input type="text" name="username" placeholder="اسم المستخدم *" required value="102030">
+<input type="text" name="password" placeholder="كلمة المرور *" required value="123">
+<input type="text" name="phone" placeholder="رقم واتساب 9639xxxxxxxx" required value="963981981948">
+<select name="profile" required>
+<option value="">-- الباقة --</option>
+{% for p in packages %}<option value="{{ p['name'] }}" {% if '2M' in p['name'] %}selected{% endif %}>{{ p['name'] }} - {{ p['price'] }}$</option>{% endfor %}
+</select>
+<select name="service_type"><option value="hotspot">هوتسبوت</option><option value="pppoe">PPPoE</option></select>
+<button class="btn">حفظ ✅</button>
+</form>
+<a href="/subscribers" style="color:#94a3b8;display:block;text-align:center;margin-top:15px">← رجوع</a>
+</div>
+
+<script>
+function copySham(){
+  let num=document.getElementById('shamNum').innerText;
+  navigator.clipboard.writeText(num);
+  let t=document.getElementById('copyText');
+  let box=document.getElementById('shamBox');
+  t.innerText='✅ تم النسخ: '+num;
+  box.style.background='#22c55e33';
+  box.style.borderColor='#22c55e';
+  setTimeout(()=>{t.innerText='👆 اضغط للنسخ'; box.style.background='#1e3a5f'; box.style.borderColor='#38bdf8';},2000);
+}
+</script>
 </body>
 </html>
