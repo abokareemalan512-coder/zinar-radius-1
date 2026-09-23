@@ -1,0 +1,45 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>مدفوعات شام كاش</title>
+<style>
+body{background:#0f172a;color:white;font-family: 'Segoe UI', sans-serif;margin:0;padding:20px}
+.card{background:#1e293b;border-radius:12px;padding:20px}
+table{width:100%;border-collapse:collapse;margin-top:15px}
+th,td{padding:12px;text-align:right;border-bottom:1px solid #334155}
+th{color:#94a3b8;font-size:13px}
+.badge-confirmed{background:#22c55e;color:white;padding:4px 10px;border-radius:20px;font-size:12px}
+.badge-pending{background:#f59e0b;color:white;padding:4px 10px;border-radius:20px;font-size:12px}
+a.btn{padding:6px 12px;border-radius:6px;text-decoration:none;font-size:13px}
+.btn-confirm{background:#0ea5e9;color:white}
+.btn-back{border:1px solid #475569;color:#94a3b8;padding:6px 12px;border-radius:6px;text-decoration:none}
+</style>
+</head>
+<body>
+<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px">
+<h2>💳 مدفوعات شام كاش - حساب {{ sham_account }}</h2>
+<a href="/dashboard" class="btn-back">← رجوع للوحة التحكم</a>
+</div>
+
+<div class="card">
+<table>
+<tr><th>#</th><th>المشترك</th><th>الباقة</th><th>المبلغ</th><th>رقم العملية</th><th>الحالة</th><th>إجراء</th></tr>
+{% for p in payments %}
+<tr>
+<td>{{ p['id'] }}</td>
+<td>{{ p['subscriber_username'] }}</td>
+<td>{{ p['package_name'] }}</td>
+<td>{{ p['amount'] }} $</td>
+<td style="font-family:monospace;direction:ltr;text-align:left">{{ p['shamcash_tx'] }}</td>
+<td>{% if p['status']=='confirmed' %}<span class="badge-confirmed">✅ مؤكد تلقائيا</span>{% else %}<span class="badge-pending">⏳ بانتظار</span>{% endif %}</td>
+<td>{% if p['status']!='confirmed' %}<a href="/payments/confirm/{{ p['id'] }}" class="btn btn-confirm">تأكيد يدوي</a>{% endif %}</td>
+</tr>
+{% else %}
+<tr><td colspan="7" style="text-align:center;color:#64748b;padding:30px">لا يوجد مدفوعات بعد - جرب إضافة مشترك مع رقم عملية شام كاش</td></tr>
+{% endfor %}
+</table>
+</div>
+</body>
+</html>
