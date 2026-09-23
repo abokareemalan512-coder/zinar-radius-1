@@ -4,7 +4,6 @@ import re
 from flask import Flask, render_template, request, redirect, url_for, flash, g
 import routeros_api
 
-# إعدادات شام كاش - قابلة للتحديث من config.py
 try:
     from config import (
         SHAM_CASH_ACCOUNT, SHAM_CASH_ENABLED, PAYMENT_MODE,
@@ -44,11 +43,18 @@ def init_db():
         db = get_db()
         cursor = db.cursor()
         cursor.execute('''CREATE TABLE IF NOT EXISTS routers (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT NOT NULL, ip_address TEXT NOT NULL, username TEXT NOT NULL, password TEXT NOT NULL, port INTEGER DEFAULT 8728, status TEXT DEFAULT 'disconnected')''')
-        cursor.execute('''CREATE TABLE IF NOT EXISTS subscribers (id INTEGER PRIMARY KEY AUTOINCREMENT, username TEXT NOT NULL UNIQUE, password TEXT NOT NULL, profile TEXT NOT NULL, service_type TEXT DEFAULT 'hotspot', expiry_date TEXT, status TEXT DEFAULT 'active')''')
+        cursor.execute('''CREATE TABLE IF NOT EXISTS subscribers (id INTEGER PRIMARY KEY AUTOINCREMENT, username TEXT NOT NULL UNIQUE, password TEXT NOT NULL, profile TEXT NOT NULL, service_type TEXT DEFAULT 'hotspot', phone TEXT DEFAULT '', expiry_date TEXT, status TEXT DEFAULT 'active')''')
         cursor.execute('''CREATE TABLE IF NOT EXISTS packages (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT NOT NULL, rate_limit TEXT NOT NULL, price REAL DEFAULT 0)''')
         cursor.execute('''CREATE TABLE IF NOT EXISTS payments (id INTEGER PRIMARY KEY AUTOINCREMENT, subscriber_username TEXT NOT NULL, package_name TEXT, amount REAL, shamcash_tx TEXT, status TEXT DEFAULT 'pending', created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP)''')
         db.commit()
-        # زرع الباقات الافتراضية تلقائيا أول مرة
+        # تحديث الجدول اذا قديم بدون phone
+        try:
+            cursor.execute('SELECT phone FROM subscribers LIMIT 1')
+        except:
+            try:
+                cursor.execute('ALTER TABLE subscribers ADD COLUMN phone TEXT DEFAULT ""')
+                db.commit()
+            except: pass
         count = cursor.execute('SELECT COUNT(*) FROM packages').fetchone()[0]
         if count == 0:
             for name, price in PACKAGES_PRICES.items():
@@ -62,7 +68,7 @@ init_db()
 @app.errorhandler(500)
 def internal_error(error):
     err_msg = traceback.format_exc()
-    return f"""<div dir="rtl" style="padding: 20px; background-color: #f8d7da; color: #721c24; font-family: sans-serif; border-radius: 8px; margin: 20px;"><h2>حدث خطأ 500:</h2><pre style="background: #1e1e1e; color: #00ff00; padding: 15px; border-radius: 5px; overflow-x: auto; text-align: left; direction: ltr;">{err_msg}</pre></div>""", 500
+    return f"<div dir='rtl' style='padding:20px;background:#f8d7da;color:#721c24'><h2>خطأ 500</h2><pre style='background:#1e1e1e;color:#0f0;padding:15px;direction:ltr;text-align:left'>{err_msg}</pre></div>", 500
 
 def connect_mikrotik(ip, username, password, port=8728):
     try:
@@ -76,23 +82,13 @@ def connect_mikrotik(ip, username, password, port=8728):
 
 def verify_shamcash_payment(tx_id, expected_amount=0):
     if not tx_id:
-        return False, "لم يتم إدخال رقم العملية"
+        return False, "لا يوجد رقم"
     tx = str(tx_id).strip()
     if len(tx) < MIN_TX_LENGTH:
-        return False, f"رقم العملية قصير - لازم {MIN_TX_LENGTH} أرقام"
-    if not re.match(r'^[A-Za-z0-9\-_]+$', tx):
-        return False, "رقم العملية فيه رموز غير مقبولة"
-    if PAYMENT_MODE == "auto" and API_SYRIA_KEY and API_SYRIA_KEY!= "":
-        try:
-            import requests
-            # سيتم تفعيله عند الحصول على API رسمي
-            pass
-        except Exception as e:
-            return False, f"فشل الاتصال بـ API: {e}"
-    if AUTO_VERIFY_ENABLED and PAYMENT_MODE == "auto":
-        if len(tx) >= MIN_TX_LENGTH:
-            return True, "تم التحقق تلقائيا (وضع تجريبي)"
-    return False, "بانتظار المراجعة"
+        return False, f"قصير - لازم {MIN_TX_LENGTH}"
+    if AUTO_VERIFY_ENABLED:
+        return True, "تم التحقق تلقائيا"
+    return False, "بانتظار"
 
 @app.route('/')
 @app.route('/dashboard')
@@ -117,15 +113,9 @@ def routers():
         username = request.form.get('username', '').strip()
         password = request.form.get('password', '').strip()
         port = request.form.get('port', 8728)
-        if not name or not ip_address or not username:
-            flash('يرجى إدخال جميع الحقول المطلوبة', 'danger')
-            return redirect(url_for('routers'))
-        try:
-            cursor.execute('INSERT INTO routers (name, ip_address, username, password, port) VALUES (?,?,?,?,?)', (name, ip_address, username, password, port))
-            db.commit()
-            flash('تمت إضافة السيرفر!', 'success')
-        except Exception as e:
-            flash(f'فشل: {str(e)}', 'danger')
+        cursor.execute('INSERT INTO routers (name, ip_address, username, password, port) VALUES (?,?,?,?,?)', (name, ip_address, username, password, port))
+        db.commit()
+        flash('تمت إضافة السيرفر!', 'success')
         return redirect(url_for('routers'))
     routers_list = cursor.execute('SELECT * FROM routers').fetchall()
     return render_template('routers.html', routers=routers_list)
@@ -135,25 +125,19 @@ def test_router(router_id):
     db = get_db()
     cursor = db.cursor()
     router = cursor.execute('SELECT * FROM routers WHERE id =?', (router_id,)).fetchone()
-    if not router:
-        flash('السيرفر غير موجود!', 'danger')
-        return redirect(url_for('routers'))
     api, connection, error = connect_mikrotik(router['ip_address'], router['username'], router['password'], router['port'])
     if error:
         cursor.execute("UPDATE routers SET status='disconnected' WHERE id=?", (router_id,))
         db.commit()
-        flash(f"فشل الاتصال ({router['name']}): {error}", "danger")
+        flash(f"فشل: {error}", "danger")
     else:
         try:
-            resource_api = api.get_resource('/system/resource')
-            resource_api.get()
+            api.get_resource('/system/resource').get()
             cursor.execute("UPDATE routers SET status='connected' WHERE id=?", (router_id,))
             db.commit()
-            flash(f"تم الاتصال بنجاح ({router['name']})!", "success")
+            flash("تم الاتصال!", "success")
         except Exception as e:
-            cursor.execute("UPDATE routers SET status='disconnected' WHERE id=?", (router_id,))
-            db.commit()
-            flash(f"فشل القراءة: {str(e)}", "danger")
+            flash(f"خطأ: {e}", "danger")
         finally:
             if connection:
                 try: connection.disconnect()
@@ -166,7 +150,6 @@ def delete_router(router_id):
     cursor = db.cursor()
     cursor.execute('DELETE FROM routers WHERE id =?', (router_id,))
     db.commit()
-    flash('تم الحذف.', 'success')
     return redirect(url_for('routers'))
 
 @app.route('/subscribers')
@@ -181,7 +164,6 @@ def subscribers():
 def add_subscriber():
     db = get_db()
     cursor = db.cursor()
-    # زرع تلقائي اذا فاضي
     count = cursor.execute('SELECT COUNT(*) FROM packages').fetchone()[0]
     if count == 0:
         for name, price in PACKAGES_PRICES.items():
@@ -189,67 +171,49 @@ def add_subscriber():
                 cursor.execute('INSERT INTO packages (name, rate_limit, price) VALUES (?,?,?)', (name, f"{name}/{name}", price))
             except: pass
         db.commit()
-
     if request.method == 'POST':
         username = request.form.get('username', '').strip()
         password = request.form.get('password', '').strip()
         profile = request.form.get('profile', '').strip()
         service_type = request.form.get('service_type', 'hotspot').strip().lower()
+        phone = request.form.get('phone', '').strip().replace('+','').replace(' ','')
         shamcash_tx = request.form.get('shamcash_tx', '').strip()
         price = PACKAGES_PRICES.get(profile, 0)
         if not username or not password or not profile:
-            flash('الرجاء إدخال كافة البيانات!', 'danger')
+            flash('أدخل البيانات!', 'danger')
             return redirect(url_for('add_subscriber'))
         payment_status = 'pending'
-        verify_msg = ''
         if shamcash_tx:
-            is_valid, verify_msg = verify_shamcash_payment(shamcash_tx, price)
+            is_valid, _ = verify_shamcash_payment(shamcash_tx, price)
             payment_status = 'confirmed' if is_valid else 'pending'
         try:
-            try:
-                cursor.execute('INSERT INTO subscribers (username, password, profile, service_type, status) VALUES (?,?,?,?,?)', (username, password, profile, service_type, 'active'))
-            except sqlite3.OperationalError:
-                cursor.execute('INSERT INTO subscribers (username, password, profile, service_type, status, router_id) VALUES (?,?,?,?,?, NULL)', (username, password, profile, service_type, 'active'))
+            cursor.execute('INSERT INTO subscribers (username, password, profile, service_type, phone, status) VALUES (?,?,?,?,?,?)', (username, password, profile, service_type, phone, 'active'))
             if shamcash_tx:
                 cursor.execute('INSERT INTO payments (subscriber_username, package_name, amount, shamcash_tx, status) VALUES (?,?,?,?,?)', (username, profile, price, shamcash_tx, payment_status))
             db.commit()
-            should_provision = (payment_status == 'confirmed' or not shamcash_tx)
             routers_list = cursor.execute('SELECT * FROM routers').fetchall()
-            if routers_list and should_provision:
-                for router in routers_list:
-                    api, connection, error = connect_mikrotik(router['ip_address'], router['username'], router['password'], router['port'])
-                    if api and not error:
-                        try:
-                            if service_type == 'hotspot':
-                                users_resource = api.get_resource('/ip/hotspot/user')
-                                existing = users_resource.get(name=username)
-                                if not existing:
-                                    users_resource.add(name=str(username), password=str(password), profile=str(profile))
-                            else:
-                                secret_resource = api.get_resource('/ppp/secret')
-                                existing = secret_resource.get(name=username)
-                                if not existing:
-                                    secret_resource.add(name=str(username), password=str(password), profile=str(profile), service=str(service_type))
-                        except: pass
-                        finally:
-                            if connection:
-                                try: connection.disconnect()
-                                except: pass
-            if shamcash_tx:
-                if payment_status == 'confirmed':
-                    flash(f'✅ تم التحقق تلقائيا! ({username})', 'success')
-                else:
-                    flash(f'⏳ بانتظار المراجعة: ({username})', 'warning')
-            else:
-                flash(f'تم حفظ المشترك ({username}) بدون شام كاش!', 'success')
+            for router in routers_list:
+                api, connection, error = connect_mikrotik(router['ip_address'], router['username'], router['password'], router['port'])
+                if api and not error:
+                    try:
+                        if service_type == 'hotspot':
+                            res = api.get_resource('/ip/hotspot/user')
+                            if not res.get(name=username):
+                                res.add(name=str(username), password=str(password), profile=str(profile))
+                        else:
+                            res = api.get_resource('/ppp/secret')
+                            if not res.get(name=username):
+                                res.add(name=str(username), password=str(password), profile=str(profile), service=str(service_type))
+                    except: pass
+                    finally:
+                        if connection:
+                            try: connection.disconnect()
+                            except: pass
+            flash(f'تم حفظ {username} ✅', 'success')
             return redirect(url_for('subscribers'))
         except sqlite3.IntegrityError:
             flash('الاسم موجود!', 'danger')
             return redirect(url_for('add_subscriber'))
-        except Exception as e:
-            flash(f"خطأ: {str(e)}", "danger")
-            return redirect(url_for('add_subscriber'))
-
     packages_list = cursor.execute('SELECT * FROM packages').fetchall()
     return render_template('add_subscriber.html', packages=packages_list, sham_account=SHAM_CASH_ACCOUNT, sham_enabled=SHAM_CASH_ENABLED)
 
@@ -285,21 +249,16 @@ def delete_subscriber(subscriber_id):
             if api and not error:
                 try:
                     if service_type == 'hotspot':
-                        users_resource = api.get_resource('/ip/hotspot/user')
-                        items = users_resource.get(name=username)
-                        for item in items: users_resource.remove(id=item['id'])
+                        res = api.get_resource('/ip/hotspot/user')
+                        for item in res.get(name=username): res.remove(id=item['id'])
                     else:
-                        secret_resource = api.get_resource('/ppp/secret')
-                        items = secret_resource.get(name=username)
-                        for item in items: secret_resource.remove(id=item['id'])
+                        res = api.get_resource('/ppp/secret')
+                        for item in res.get(name=username): res.remove(id=item['id'])
                 except: pass
                 finally:
                     if connection:
                         try: connection.disconnect()
                         except: pass
-        flash(f'تم الحذف ({username})', 'success')
-    else:
-        flash('غير موجود.', 'danger')
     return redirect(url_for('subscribers'))
 
 @app.route('/packages', methods=['GET', 'POST'])
@@ -310,15 +269,8 @@ def packages():
         name = request.form.get('name', '').strip()
         rate_limit = request.form.get('rate_limit', '').strip()
         price = request.form.get('price', 0)
-        if not name or not rate_limit:
-            flash('أدخل الاسم والسرعة!', 'danger')
-            return redirect(url_for('packages'))
-        try:
-            cursor.execute('INSERT INTO packages (name, rate_limit, price) VALUES (?,?,?)', (name, rate_limit, price))
-            db.commit()
-            flash('تمت الإضافة!', 'success')
-        except Exception as e:
-            flash(f'خطأ: {str(e)}', 'danger')
+        cursor.execute('INSERT INTO packages (name, rate_limit, price) VALUES (?,?,?)', (name, rate_limit, price))
+        db.commit()
         return redirect(url_for('packages'))
     packages_list = cursor.execute('SELECT * FROM packages').fetchall()
     return render_template('packages.html', packages=packages_list)
