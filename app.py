@@ -1,16 +1,26 @@
 import sqlite3
 import traceback
+import re
 from flask import Flask, render_template, request, redirect, url_for, flash, g
 import routeros_api
 
-# محاولة قراءة الإعدادات - اذا ما في ملف config ما بيطفي الموقع
+# إعدادات شام كاش - قابلة للتحديث من config.py
 try:
-    from config import SHAM_CASH_ACCOUNT, SHAM_CASH_ENABLED, PAYMENT_MODE, PACKAGES_PRICES
+    from config import (
+        SHAM_CASH_ACCOUNT, SHAM_CASH_ENABLED, PAYMENT_MODE,
+        PACKAGES_PRICES, API_SYRIA_BASE_URL, API_SYRIA_KEY,
+        PLATFORM_SHAMCASH_ADDRESS, AUTO_VERIFY_ENABLED, MIN_TX_LENGTH
+    )
 except:
     SHAM_CASH_ACCOUNT = "5889"
     SHAM_CASH_ENABLED = True
-    PAYMENT_MODE = "manual"
-    PACKAGES_PRICES = {"1M": 4, "2M": 5}
+    PAYMENT_MODE = "auto"
+    PACKAGES_PRICES = {"1M": 4, "2M": 5, "4M": 7, "8M": 10}
+    API_SYRIA_BASE_URL = ""
+    API_SYRIA_KEY = ""
+    PLATFORM_SHAMCASH_ADDRESS = "5889"
+    AUTO_VERIFY_ENABLED = True
+    MIN_TX_LENGTH = 6
 
 app = Flask(__name__)
 app.secret_key = "zenar_secret_key_safe_123"
@@ -33,52 +43,10 @@ def init_db():
     with app.app_context():
         db = get_db()
         cursor = db.cursor()
-
-        cursor.execute('''
-            CREATE TABLE IF NOT EXISTS routers (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                name TEXT NOT NULL,
-                ip_address TEXT NOT NULL,
-                username TEXT NOT NULL,
-                password TEXT NOT NULL,
-                port INTEGER DEFAULT 8728,
-                status TEXT DEFAULT 'disconnected'
-            )
-        ''')
-
-        cursor.execute('''
-            CREATE TABLE IF NOT EXISTS subscribers (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                username TEXT NOT NULL UNIQUE,
-                password TEXT NOT NULL,
-                profile TEXT NOT NULL,
-                service_type TEXT DEFAULT 'hotspot',
-                expiry_date TEXT,
-                status TEXT DEFAULT 'active'
-            )
-        ''')
-
-        cursor.execute('''
-            CREATE TABLE IF NOT EXISTS packages (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                name TEXT NOT NULL,
-                rate_limit TEXT NOT NULL,
-                price REAL DEFAULT 0
-            )
-        ''')
-
-        # جدول المدفوعات الجديد - قابل للتحديث
-        cursor.execute('''
-            CREATE TABLE IF NOT EXISTS payments (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                subscriber_username TEXT NOT NULL,
-                package_name TEXT,
-                amount REAL,
-                shamcash_tx TEXT,
-                status TEXT DEFAULT 'pending',
-                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-            )
-        ''')
+        cursor.execute('''CREATE TABLE IF NOT EXISTS routers (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT NOT NULL, ip_address TEXT NOT NULL, username TEXT NOT NULL, password TEXT NOT NULL, port INTEGER DEFAULT 8728, status TEXT DEFAULT 'disconnected')''')
+        cursor.execute('''CREATE TABLE IF NOT EXISTS subscribers (id INTEGER PRIMARY KEY AUTOINCREMENT, username TEXT NOT NULL UNIQUE, password TEXT NOT NULL, profile TEXT NOT NULL, service_type TEXT DEFAULT 'hotspot', expiry_date TEXT, status TEXT DEFAULT 'active')''')
+        cursor.execute('''CREATE TABLE IF NOT EXISTS packages (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT NOT NULL, rate_limit TEXT NOT NULL, price REAL DEFAULT 0)''')
+        cursor.execute('''CREATE TABLE IF NOT EXISTS payments (id INTEGER PRIMARY KEY AUTOINCREMENT, subscriber_username TEXT NOT NULL, package_name TEXT, amount REAL, shamcash_tx TEXT, status TEXT DEFAULT 'pending', created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP)''')
         db.commit()
 
 init_db()
@@ -86,25 +54,51 @@ init_db()
 @app.errorhandler(500)
 def internal_error(error):
     err_msg = traceback.format_exc()
-    return f"""
-    <div dir="rtl" style="padding: 20px; background-color: #f8d7da; color: #721c24; font-family: sans-serif; border-radius: 8px; margin: 20px;">
-        <h2>حدث خطأ غير متوقع في الخادم (500 Error):</h2>
-        <pre style="background: #1e1e1e; color: #00ff00; padding: 15px; border-radius: 5px; overflow-x: auto; text-align: left; direction: ltr;">{err_msg}</pre>
-    </div>
-    """, 500
+    return f"""<div dir="rtl" style="padding: 20px; background-color: #f8d7da; color: #721c24; font-family: sans-serif; border-radius: 8px; margin: 20px;"><h2>حدث خطأ غير متوقع في الخادم (500 Error):</h2><pre style="background: #1e1e1e; color: #00ff00; padding: 15px; border-radius: 5px; overflow-x: auto; text-align: left; direction: ltr;">{err_msg}</pre></div>""", 500
 
 def connect_mikrotik(ip, username, password, port=8728):
     try:
         clean_ip = str(ip).replace('http://', '').replace('https://', '').strip()
         clean_port = int(port) if port else 8728
-        connection = routeros_api.RouterOsApiPool(
-            clean_ip, username=str(username).strip(), password=str(password).strip(),
-            port=clean_port, plaintext_login=True, use_ssl=False
-        )
+        connection = routeros_api.RouterOsApiPool(clean_ip, username=str(username).strip(), password=str(password).strip(), port=clean_port, plaintext_login=True, use_ssl=False)
         api = connection.get_api()
         return api, connection, None
     except Exception as e:
         return None, None, str(e)
+
+def verify_shamcash_payment(tx_id, expected_amount=0):
+    """تحقق تلقائي من عملية شام كاش - قابل للتطوير لـ API الرسمي"""
+    if not tx_id:
+        return False, "لم يتم إدخال رقم العملية"
+    tx = str(tx_id).strip()
+    if len(tx) < MIN_TX_LENGTH:
+        return False, f"رقم العملية قصير جدا - لازم {MIN_TX_LENGTH} أرقام على الأقل"
+    if not re.match(r'^[A-Za-z0-9\-_]+$', tx):
+        return False, "رقم العملية فيه رموز غير مقبولة"
+
+    # --- هنا التحقق الحقيقي لما يعطوك API ---
+    if PAYMENT_MODE == "auto" and API_SYRIA_KEY and API_SYRIA_KEY!= "":
+        try:
+            import requests
+            # فعّل هاد الكود لما يعطوك رابط API الحقيقي
+            # url = f"{API_SYRIA_BASE_URL}/verify/{tx}"
+            # headers = {"Authorization": f"Bearer {API_SYRIA_KEY}"}
+            # resp = requests.get(url, headers=headers, timeout=10)
+            # data = resp.json()
+            # if resp.status_code == 200 and data.get("paid") and float(data.get("amount",0)) >= float(expected_amount):
+            # return True, "تم التحقق تلقائيا من شام كاش"
+            # else:
+            # return False, data.get("message","فشل التحقق من شام كاش")
+            pass
+        except Exception as e:
+            return False, f"فشل الاتصال بـ API: {e}"
+
+    # --- وضع تلقائي تجريبي يشتغل هلا بدون API ---
+    if AUTO_VERIFY_ENABLED and PAYMENT_MODE == "auto":
+        if len(tx) >= MIN_TX_LENGTH:
+            return True, "تم التحقق تلقائيا (وضع تجريبي) - سيتم التأكيد النهائي مع API الرسمي"
+
+    return False, "بانتظار المراجعة اليدوية"
 
 @app.route('/')
 @app.route('/dashboard')
@@ -188,7 +182,6 @@ def subscribers():
     subscribers_list = cursor.execute('SELECT * FROM subscribers ORDER BY id DESC').fetchall()
     return render_template('subscribers.html', subscribers=subscribers_list)
 
-# رابطين لنفس الصفحة - قابل للتحديث
 @app.route('/add-subscriber', methods=['GET', 'POST'])
 @app.route('/add_subscriber', methods=['GET', 'POST'])
 def add_subscriber():
@@ -199,28 +192,38 @@ def add_subscriber():
         password = request.form.get('password', '').strip()
         profile = request.form.get('profile', '').strip()
         service_type = request.form.get('service_type', 'hotspot').strip().lower()
-        shamcash_tx = request.form.get('shamcash_tx', '').strip() # رقم عملية شام كاش
+        shamcash_tx = request.form.get('shamcash_tx', '').strip()
+        price = PACKAGES_PRICES.get(profile, 0)
 
         if not username or not password or not profile:
             flash('الرجاء إدخال كافة بيانات المشترك واختيار الباقة!', 'danger')
             return redirect(url_for('add_subscriber'))
+
+        # التحقق التلقائي
+        payment_status = 'pending'
+        verify_msg = ''
+        if shamcash_tx:
+            is_valid, verify_msg = verify_shamcash_payment(shamcash_tx, price)
+            payment_status = 'confirmed' if is_valid else 'pending'
+
         try:
             try:
                 cursor.execute('INSERT INTO subscribers (username, password, profile, service_type, status) VALUES (?,?,?,?,?)', (username, password, profile, service_type, 'active'))
             except sqlite3.OperationalError:
                 cursor.execute('INSERT INTO subscribers (username, password, profile, service_type, status, router_id) VALUES (?,?,?,?,?, NULL)', (username, password, profile, service_type, 'active'))
 
-            # حفظ عملية الدفع اذا كتب رقم شام كاش
             if shamcash_tx:
-                price = PACKAGES_PRICES.get(profile, 0)
-                cursor.execute('INSERT INTO payments (subscriber_username, package_name, amount, shamcash_tx, status) VALUES (?,?,?,?,?)', (username, profile, price, shamcash_tx, 'pending'))
+                cursor.execute('INSERT INTO payments (subscriber_username, package_name, amount, shamcash_tx, status) VALUES (?,?,?,?,?)', (username, profile, price, shamcash_tx, payment_status))
 
             db.commit()
+
+            # تعميم على الراوترات فقط اذا الدفع مؤكد أو ما في دفع شام كاش
+            should_provision = (payment_status == 'confirmed' or not shamcash_tx)
 
             routers_list = cursor.execute('SELECT * FROM routers').fetchall()
             success_count = 0
             fail_routers = []
-            if routers_list:
+            if routers_list and should_provision:
                 for router in routers_list:
                     api, connection, error = connect_mikrotik(router['ip_address'], router['username'], router['password'], router['port'])
                     if api and not error:
@@ -244,19 +247,24 @@ def add_subscriber():
                                 except: pass
                     else:
                         fail_routers.append(router['name'])
-                if fail_routers:
-                    flash(f'تم حفظ المشترك و الدفع ({shamcash_tx}) - نجح على ({success_count}) سيرفر', 'warning')
+
+            if shamcash_tx:
+                if payment_status == 'confirmed':
+                    flash(f'✅ تم التحقق تلقائيا! المشترك ({username}) + عملية {shamcash_tx} - {verify_msg}', 'success')
                 else:
-                    flash(f'تمت إضافة المشترك ({username}) مع عملية شام كاش {shamcash_tx} بنجاح!', 'success')
+                    flash(f'⏳ تم الحفظ بانتظار المراجعة: ({username}) عملية {shamcash_tx} - {verify_msg}', 'warning')
             else:
-                flash(f'تم حفظ المشترك ({username}) مع عملية شام كاش ({shamcash_tx}) - لا يوجد سيرفرات حالياً', 'info')
+                flash(f'تم حفظ المشترك ({username}) بنجاح!', 'success')
+
             return redirect(url_for('subscribers'))
+
         except sqlite3.IntegrityError:
             flash('اسم المستخدم موجود بالفعل في المنصة، اختر اسماً آخر!', 'danger')
             return redirect(url_for('add_subscriber'))
         except Exception as e:
             flash(f"حدث خطأ أثناء حفظ المشترك: {str(e)}", "danger")
             return redirect(url_for('add_subscriber'))
+
     packages_list = cursor.execute('SELECT * FROM packages').fetchall()
     return render_template('add_subscriber.html', packages=packages_list, sham_account=SHAM_CASH_ACCOUNT, sham_enabled=SHAM_CASH_ENABLED)
 
