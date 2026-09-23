@@ -5,21 +5,33 @@
 <title>المشتركين - زينار</title>
 <style>
 body{background:#0f172a;color:white;font-family:sans-serif;padding:10px;margin:0}
-.header{display:flex;justify-content:space-between;align-items:center;padding:15px}
-.card{background:#1e293b;border-radius:12px;padding:10px;overflow-x:auto}
-table{width:100%;border-collapse:collapse;min-width:900px}
-th{color:#94a3b8;font-size:12px;padding:12px 8px;text-align:right;border-bottom:1px solid #334155}
-td{padding:10px 8px;border-bottom:1px solid #1e293b;font-size:13px}
-.badge{padding:3px 8px;border-radius:12px;font-size:11px}
-.badge-active{background:#16a34a22;color:#22c55e;border:1px solid #22c55e}
-.badge-off{background:#ef444422;color:#ef4444;border:1px solid #ef4444}
-.btn{padding:5px 9px;border-radius:6px;text-decoration:none;font-size:12px;display:inline-block;margin:2px}
+.header{display:flex;justify-content:space-between;align-items:center;padding:15px;flex-wrap:wrap;gap:10px}
+.card{background:#1e293b;border-radius:12px;padding:15px;overflow-x:auto}
+.tools{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:15px}
+.search-box{background:#0f172a;border:1px solid #334155;border-radius:8px;padding:10px 14px;color:white;width:260px;outline:none}
+.btn{padding:7px 12px;border-radius:6px;text-decoration:none;font-size:12px;display:inline-block;margin:2px;border:none;cursor:pointer}
 .btn-wa{background:#22c55e;color:white}
 .btn-on{background:#0ea5e9;color:white}
 .btn-off{background:#f59e0b;color:white}
 .btn-reset{background:#8b5cf6;color:white}
 .btn-del{background:#ef4444;color:white}
 .btn-add{background:#0ea5e9;color:white;padding:10px 18px;border-radius:8px;text-decoration:none;font-weight:bold}
+.btn-print{background:#e2e8f0;color:#0f172a;font-weight:bold}
+.btn-excel{background:#16a34a;color:white;font-weight:bold}
+table{width:100%;border-collapse:collapse;min-width:950px}
+th{color:#94a3b8;font-size:12px;padding:12px 8px;text-align:right;border-bottom:1px solid #334155}
+td{padding:10px 8px;border-bottom:1px solid #1e293b;font-size:13px}
+.badge{padding:3px 8px;border-radius:12px;font-size:11px}
+.badge-active{background:#16a34a22;color:#22c55e;border:1px solid #22c55e}
+.badge-off{background:#ef444422;color:#ef4444;border:1px solid #ef4444}
+
+@media print {
+  body{background:white;color:black}
+ .header.btn-add,.tools, td:last-child, th:last-child {display:none!important}
+ .card{background:white;border:1px solid #ccc}
+  th{color:black;border-bottom:2px solid black}
+  td{color:black}
+}
 </style>
 </head>
 <body>
@@ -27,8 +39,17 @@ td{padding:10px 8px;border-bottom:1px solid #1e293b;font-size:13px}
 <h2>👥 المشتركين</h2>
 <a href="/add-subscriber" class="btn-add">+ إضافة</a>
 </div>
+
 <div class="card">
-<table>
+<div class="tools">
+<input type="text" id="searchInput" class="search-box" placeholder="🔍 بحث باسم المشترك أو اسم المستخدم..." onkeyup="searchTable()">
+<button class="btn btn-print" onclick="window.print()">🖨️ طباعة</button>
+<button class="btn btn-excel" onclick="exportExcel()">📥 تصدير Excel</button>
+<span id="count" style="color:#94a3b8;font-size:13px;margin-right:10px"></span>
+</div>
+
+<table id="subsTable">
+<thead>
 <tr>
 <th>اسم المشترك</th>
 <th>المستخدم / كلمة المرور</th>
@@ -39,11 +60,13 @@ td{padding:10px 8px;border-bottom:1px solid #1e293b;font-size:13px}
 <th>الحالة</th>
 <th>إجراءات</th>
 </tr>
+</thead>
+<tbody>
 {% for s in subscribers %}
 <tr>
-<td><b>{{ s['full_name'] or s['username'] }}</b></td>
-<td><b style="color:#38bdf8">{{ s['username'] }}</b><br><small style="color:#94a3b8">{{ s['password'] }}</small></td>
-<td><span style="background:#0ea5e922;border:1px solid #0ea5e9;padding:2px 7px;border-radius:6px">{{ s['profile'] }}</span></td>
+<td class="searchable">{{ s['full_name'] or s['username'] }}</td>
+<td class="searchable"><b style="color:#38bdf8">{{ s['username'] }}</b><br><small style="color:#94a3b8">{{ s['password'] }}</small></td>
+<td>{{ s['profile'] }}</td>
 <td>{{ s['phone'] }}</td>
 <td>{{ s['start_date'] or '-' }}</td>
 <td>{{ s['expiry_date'] or '-' }}</td>
@@ -55,15 +78,54 @@ td{padding:10px 8px;border-bottom:1px solid #1e293b;font-size:13px}
 {% else %}
 <a class="btn btn-on" href="/subscribers/toggle/{{ s['id'] }}">▶️ تفعيل</a>
 {% endif %}
-<a class="btn btn-reset" href="/subscribers/reset/{{ s['id'] }}" onclick="return confirm('تصفير استهلاك وتجديد 30 يوم؟')">🔄 تصفير</a>
-<a class="btn btn-del" href="/subscribers/delete/{{ s['id'] }}" onclick="return confirm('حذف نهائي؟')">🗑️</a>
+<a class="btn btn-reset" href="/subscribers/reset/{{ s['id'] }}">🔄 تصفير</a>
+<a class="btn btn-del" href="/subscribers/delete/{{ s['id'] }}">🗑️</a>
 </td>
 </tr>
 {% else %}
-<tr><td colspan="8" style="text-align:center;color:#64748b;padding:30px">لا يوجد مشتركين بعد</td></tr>
+<tr><td colspan="8" style="text-align:center;color:#64748b;padding:30px">لا يوجد مشتركين</td></tr>
 {% endfor %}
+</tbody>
 </table>
 </div>
+
 <div style="text-align:center;margin-top:20px"><a href="/dashboard" style="color:#94a3b8;text-decoration:none">← رجوع للوحة التحكم</a></div>
+
+<script>
+function searchTable() {
+  let input = document.getElementById("searchInput").value.toLowerCase();
+  let rows = document.querySelectorAll("#subsTable tbody tr");
+  let visible = 0;
+  rows.forEach(row => {
+    let text = row.innerText.toLowerCase();
+    // يبحث باسم المشترك + اسم المستخدم
+    let match = text.includes(input);
+    row.style.display = match? "" : "none";
+    if(match) visible++;
+  });
+  document.getElementById("count").innerText = visible + " مشترك";
+}
+function exportExcel() {
+  let table = document.getElementById("subsTable");
+  let rows = [];
+  for (let r of table.rows) {
+    if (r.style.display === "none") continue;
+    let cols = [];
+    for (let i=0; i<r.cells.length-1; i++) { // بدون عمود اجراءات
+      cols.push('"' + r.cells[i].innerText.replace(/"/g,'""') + '"');
+    }
+    rows.push(cols.join(","));
+  }
+  let csv = rows.join("\n");
+  let blob = new Blob(["\ufeff"+csv], {type: "text/csv;charset=utf-8;"});
+  let link = document.createElement("a");
+  link.href = URL.createObjectURL(blob);
+  link.download = "zinar-subscribers-" + new Date().toISOString().slice(0,10) + ".csv";
+  link.click();
+  // بعد التحميل يفتح الطباعة تلقائيا اذا بدك
+  // window.print();
+}
+searchTable();
+</script>
 </body>
 </html>
