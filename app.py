@@ -48,13 +48,21 @@ def init_db():
         cursor.execute('''CREATE TABLE IF NOT EXISTS packages (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT NOT NULL, rate_limit TEXT NOT NULL, price REAL DEFAULT 0)''')
         cursor.execute('''CREATE TABLE IF NOT EXISTS payments (id INTEGER PRIMARY KEY AUTOINCREMENT, subscriber_username TEXT NOT NULL, package_name TEXT, amount REAL, shamcash_tx TEXT, status TEXT DEFAULT 'pending', created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP)''')
         db.commit()
+        # زرع الباقات الافتراضية تلقائيا أول مرة
+        count = cursor.execute('SELECT COUNT(*) FROM packages').fetchone()[0]
+        if count == 0:
+            for name, price in PACKAGES_PRICES.items():
+                try:
+                    cursor.execute('INSERT INTO packages (name, rate_limit, price) VALUES (?,?,?)', (name, f"{name}/{name}", price))
+                except: pass
+            db.commit()
 
 init_db()
 
 @app.errorhandler(500)
 def internal_error(error):
     err_msg = traceback.format_exc()
-    return f"""<div dir="rtl" style="padding: 20px; background-color: #f8d7da; color: #721c24; font-family: sans-serif; border-radius: 8px; margin: 20px;"><h2>حدث خطأ غير متوقع في الخادم (500 Error):</h2><pre style="background: #1e1e1e; color: #00ff00; padding: 15px; border-radius: 5px; overflow-x: auto; text-align: left; direction: ltr;">{err_msg}</pre></div>""", 500
+    return f"""<div dir="rtl" style="padding: 20px; background-color: #f8d7da; color: #721c24; font-family: sans-serif; border-radius: 8px; margin: 20px;"><h2>حدث خطأ 500:</h2><pre style="background: #1e1e1e; color: #00ff00; padding: 15px; border-radius: 5px; overflow-x: auto; text-align: left; direction: ltr;">{err_msg}</pre></div>""", 500
 
 def connect_mikrotik(ip, username, password, port=8728):
     try:
@@ -67,38 +75,24 @@ def connect_mikrotik(ip, username, password, port=8728):
         return None, None, str(e)
 
 def verify_shamcash_payment(tx_id, expected_amount=0):
-    """تحقق تلقائي من عملية شام كاش - قابل للتطوير لـ API الرسمي"""
     if not tx_id:
         return False, "لم يتم إدخال رقم العملية"
     tx = str(tx_id).strip()
     if len(tx) < MIN_TX_LENGTH:
-        return False, f"رقم العملية قصير جدا - لازم {MIN_TX_LENGTH} أرقام على الأقل"
+        return False, f"رقم العملية قصير - لازم {MIN_TX_LENGTH} أرقام"
     if not re.match(r'^[A-Za-z0-9\-_]+$', tx):
         return False, "رقم العملية فيه رموز غير مقبولة"
-
-    # --- هنا التحقق الحقيقي لما يعطوك API ---
     if PAYMENT_MODE == "auto" and API_SYRIA_KEY and API_SYRIA_KEY!= "":
         try:
             import requests
-            # فعّل هاد الكود لما يعطوك رابط API الحقيقي
-            # url = f"{API_SYRIA_BASE_URL}/verify/{tx}"
-            # headers = {"Authorization": f"Bearer {API_SYRIA_KEY}"}
-            # resp = requests.get(url, headers=headers, timeout=10)
-            # data = resp.json()
-            # if resp.status_code == 200 and data.get("paid") and float(data.get("amount",0)) >= float(expected_amount):
-            # return True, "تم التحقق تلقائيا من شام كاش"
-            # else:
-            # return False, data.get("message","فشل التحقق من شام كاش")
+            # سيتم تفعيله عند الحصول على API رسمي
             pass
         except Exception as e:
             return False, f"فشل الاتصال بـ API: {e}"
-
-    # --- وضع تلقائي تجريبي يشتغل هلا بدون API ---
     if AUTO_VERIFY_ENABLED and PAYMENT_MODE == "auto":
         if len(tx) >= MIN_TX_LENGTH:
-            return True, "تم التحقق تلقائيا (وضع تجريبي) - سيتم التأكيد النهائي مع API الرسمي"
-
-    return False, "بانتظار المراجعة اليدوية"
+            return True, "تم التحقق تلقائيا (وضع تجريبي)"
+    return False, "بانتظار المراجعة"
 
 @app.route('/')
 @app.route('/dashboard')
@@ -124,14 +118,14 @@ def routers():
         password = request.form.get('password', '').strip()
         port = request.form.get('port', 8728)
         if not name or not ip_address or not username:
-            flash('يرجى إدخال جميع الحقول المطلوبة للراوتر/السيرفر', 'danger')
+            flash('يرجى إدخال جميع الحقول المطلوبة', 'danger')
             return redirect(url_for('routers'))
         try:
             cursor.execute('INSERT INTO routers (name, ip_address, username, password, port) VALUES (?,?,?,?,?)', (name, ip_address, username, password, port))
             db.commit()
-            flash('تمت إضافة السيرفر بنجاح!', 'success')
+            flash('تمت إضافة السيرفر!', 'success')
         except Exception as e:
-            flash(f'فشل حفظ السيرفر: {str(e)}', 'danger')
+            flash(f'فشل: {str(e)}', 'danger')
         return redirect(url_for('routers'))
     routers_list = cursor.execute('SELECT * FROM routers').fetchall()
     return render_template('routers.html', routers=routers_list)
@@ -148,18 +142,18 @@ def test_router(router_id):
     if error:
         cursor.execute("UPDATE routers SET status='disconnected' WHERE id=?", (router_id,))
         db.commit()
-        flash(f"فشل الاتصال بالسيرفر ({router['name']})! السبب: {error}", "danger")
+        flash(f"فشل الاتصال ({router['name']}): {error}", "danger")
     else:
         try:
             resource_api = api.get_resource('/system/resource')
             resource_api.get()
             cursor.execute("UPDATE routers SET status='connected' WHERE id=?", (router_id,))
             db.commit()
-            flash(f"تم الاتصال بنجاح بالسيرفر ({router['name']})!", "success")
+            flash(f"تم الاتصال بنجاح ({router['name']})!", "success")
         except Exception as e:
             cursor.execute("UPDATE routers SET status='disconnected' WHERE id=?", (router_id,))
             db.commit()
-            flash(f"فشل قراءة بيانات السيرفر: {str(e)}", "danger")
+            flash(f"فشل القراءة: {str(e)}", "danger")
         finally:
             if connection:
                 try: connection.disconnect()
@@ -172,7 +166,7 @@ def delete_router(router_id):
     cursor = db.cursor()
     cursor.execute('DELETE FROM routers WHERE id =?', (router_id,))
     db.commit()
-    flash('تم حذف السيرفر بنجاح.', 'success')
+    flash('تم الحذف.', 'success')
     return redirect(url_for('routers'))
 
 @app.route('/subscribers')
@@ -187,6 +181,15 @@ def subscribers():
 def add_subscriber():
     db = get_db()
     cursor = db.cursor()
+    # زرع تلقائي اذا فاضي
+    count = cursor.execute('SELECT COUNT(*) FROM packages').fetchone()[0]
+    if count == 0:
+        for name, price in PACKAGES_PRICES.items():
+            try:
+                cursor.execute('INSERT INTO packages (name, rate_limit, price) VALUES (?,?,?)', (name, f"{name}/{name}", price))
+            except: pass
+        db.commit()
+
     if request.method == 'POST':
         username = request.form.get('username', '').strip()
         password = request.form.get('password', '').strip()
@@ -194,35 +197,24 @@ def add_subscriber():
         service_type = request.form.get('service_type', 'hotspot').strip().lower()
         shamcash_tx = request.form.get('shamcash_tx', '').strip()
         price = PACKAGES_PRICES.get(profile, 0)
-
         if not username or not password or not profile:
-            flash('الرجاء إدخال كافة بيانات المشترك واختيار الباقة!', 'danger')
+            flash('الرجاء إدخال كافة البيانات!', 'danger')
             return redirect(url_for('add_subscriber'))
-
-        # التحقق التلقائي
         payment_status = 'pending'
         verify_msg = ''
         if shamcash_tx:
             is_valid, verify_msg = verify_shamcash_payment(shamcash_tx, price)
             payment_status = 'confirmed' if is_valid else 'pending'
-
         try:
             try:
                 cursor.execute('INSERT INTO subscribers (username, password, profile, service_type, status) VALUES (?,?,?,?,?)', (username, password, profile, service_type, 'active'))
             except sqlite3.OperationalError:
                 cursor.execute('INSERT INTO subscribers (username, password, profile, service_type, status, router_id) VALUES (?,?,?,?,?, NULL)', (username, password, profile, service_type, 'active'))
-
             if shamcash_tx:
                 cursor.execute('INSERT INTO payments (subscriber_username, package_name, amount, shamcash_tx, status) VALUES (?,?,?,?,?)', (username, profile, price, shamcash_tx, payment_status))
-
             db.commit()
-
-            # تعميم على الراوترات فقط اذا الدفع مؤكد أو ما في دفع شام كاش
             should_provision = (payment_status == 'confirmed' or not shamcash_tx)
-
             routers_list = cursor.execute('SELECT * FROM routers').fetchall()
-            success_count = 0
-            fail_routers = []
             if routers_list and should_provision:
                 for router in routers_list:
                     api, connection, error = connect_mikrotik(router['ip_address'], router['username'], router['password'], router['port'])
@@ -238,31 +230,24 @@ def add_subscriber():
                                 existing = secret_resource.get(name=username)
                                 if not existing:
                                     secret_resource.add(name=str(username), password=str(password), profile=str(profile), service=str(service_type))
-                            success_count += 1
-                        except Exception:
-                            fail_routers.append(router['name'])
+                        except: pass
                         finally:
                             if connection:
                                 try: connection.disconnect()
                                 except: pass
-                    else:
-                        fail_routers.append(router['name'])
-
             if shamcash_tx:
                 if payment_status == 'confirmed':
-                    flash(f'✅ تم التحقق تلقائيا! المشترك ({username}) + عملية {shamcash_tx} - {verify_msg}', 'success')
+                    flash(f'✅ تم التحقق تلقائيا! ({username})', 'success')
                 else:
-                    flash(f'⏳ تم الحفظ بانتظار المراجعة: ({username}) عملية {shamcash_tx} - {verify_msg}', 'warning')
+                    flash(f'⏳ بانتظار المراجعة: ({username})', 'warning')
             else:
-                flash(f'تم حفظ المشترك ({username}) بنجاح!', 'success')
-
+                flash(f'تم حفظ المشترك ({username}) بدون شام كاش!', 'success')
             return redirect(url_for('subscribers'))
-
         except sqlite3.IntegrityError:
-            flash('اسم المستخدم موجود بالفعل في المنصة، اختر اسماً آخر!', 'danger')
+            flash('الاسم موجود!', 'danger')
             return redirect(url_for('add_subscriber'))
         except Exception as e:
-            flash(f"حدث خطأ أثناء حفظ المشترك: {str(e)}", "danger")
+            flash(f"خطأ: {str(e)}", "danger")
             return redirect(url_for('add_subscriber'))
 
     packages_list = cursor.execute('SELECT * FROM packages').fetchall()
@@ -281,7 +266,7 @@ def confirm_payment(payment_id):
     cursor = db.cursor()
     cursor.execute("UPDATE payments SET status='confirmed' WHERE id=?", (payment_id,))
     db.commit()
-    flash('تم تأكيد الدفع بنجاح!', 'success')
+    flash('تم التأكيد!', 'success')
     return redirect(url_for('payments'))
 
 @app.route('/subscribers/delete/<int:subscriber_id>')
@@ -307,15 +292,14 @@ def delete_subscriber(subscriber_id):
                         secret_resource = api.get_resource('/ppp/secret')
                         items = secret_resource.get(name=username)
                         for item in items: secret_resource.remove(id=item['id'])
-                except:
-                    pass
+                except: pass
                 finally:
                     if connection:
                         try: connection.disconnect()
                         except: pass
-        flash(f'تم حذف المشترك ({username}) بنجاح من المنصة وجميع السيرفرات.', 'success')
+        flash(f'تم الحذف ({username})', 'success')
     else:
-        flash('المشترك غير موجود.', 'danger')
+        flash('غير موجود.', 'danger')
     return redirect(url_for('subscribers'))
 
 @app.route('/packages', methods=['GET', 'POST'])
@@ -327,14 +311,14 @@ def packages():
         rate_limit = request.form.get('rate_limit', '').strip()
         price = request.form.get('price', 0)
         if not name or not rate_limit:
-            flash('يرجى كتابة اسم الباقة والسرعة بشكل صحيح!', 'danger')
+            flash('أدخل الاسم والسرعة!', 'danger')
             return redirect(url_for('packages'))
         try:
             cursor.execute('INSERT INTO packages (name, rate_limit, price) VALUES (?,?,?)', (name, rate_limit, price))
             db.commit()
-            flash('تمت إضافة الباقة بنجاح!', 'success')
+            flash('تمت الإضافة!', 'success')
         except Exception as e:
-            flash(f'حدث خطأ أثناء حفظ الباقة: {str(e)}', 'danger')
+            flash(f'خطأ: {str(e)}', 'danger')
         return redirect(url_for('packages'))
     packages_list = cursor.execute('SELECT * FROM packages').fetchall()
     return render_template('packages.html', packages=packages_list)
