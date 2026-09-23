@@ -1,58 +1,115 @@
 <!DOCTYPE html>
-<html lang="ar" dir="rtl">
+<html lang="ar" dir="rtl" class="notranslate" translate="no">
 <head>
-<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>إضافة مشترك - زينار نت</title>
-<style>
-*{box-sizing:border-box}
-body{background:#0f172a;color:#e2e8f0;font-family:system-ui,Tahoma;margin:0;padding:20px}
-.card{background:linear-gradient(180deg,#1e293b,#162032);border:1px solid #2a3a54;border-radius:16px;padding:24px;max-width:480px;margin:auto;box-shadow:0 10px 30px #0005}
-h2{margin:0 0 16px;text-align:center}
-.sham{display:flex;align-items:center;justify-content:space-between;background:#0b1220;border:1px solid #1e3a5f;border-radius:12px;padding:12px 16px;margin-bottom:18px;cursor:pointer}
-.sham:hover{border-color:#22c55e}
-.sham span{color:#94a3b8;font-size:13px}
-.sham b{color:#22c55e;font-size:20px;letter-spacing:1px}
-.sham i{font-style:normal;background:#22c55e;color:#052e13;padding:4px 10px;border-radius:20px;font-size:12px}
-input,select{width:100%;padding:13px 14px;margin:7px 0;border-radius:10px;border:1px solid #2a3a54;background:#0f172a;color:white;outline:none}
-input:focus,select:focus{border-color:#0ea5e9}
-.btn{width:100%;padding:14px;background:linear-gradient(90deg,#0ea5e9,#22d3ee);color:#00111a;border:none;border-radius:10px;font-weight:800;font-size:15px;cursor:pointer;margin-top:10px}
-.link{display:block;text-align:center;margin-top:14px;color:#64748b;text-decoration:none;font-size:13px}
-</style>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>إضافة مشترك جديد - زينار</title>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.rtl.min.css">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.5/font/bootstrap-icons.css">
+    <style>
+        body { background-color: #0f172a; color: #f8fafc; font-family: system-ui, -apple-system, sans-serif; }
+        .sidebar { min-height: 100vh; background-color: #1e293b; border-left: 1px solid #334155; }
+        .nav-link { color: #94a3b8; padding: 12px 20px; border-radius: 8px; margin-bottom: 4px; display: flex; align-items: center; gap: 10px; }
+        .nav-link:hover, .nav-link.active { color: #38bdf8; background-color: #0f172a; }
+        .btn-cyan { background-color: #0284c7; border: none; color: #fff; }
+        .btn-cyan:hover { background-color: #0369a1; color: #fff; }
+        .card-custom { background-color: #1e293b; border: 1px solid #334155; border-radius: 12px; }
+        .text-custom-muted { color: #94a3b8 !important; }
+    </style>
 </head>
-<body>
-<div class="card">
-<h2>✨ إضافة مشترك</h2>
+<body class="notranslate" translate="no">
+<div class="container-fluid">
+    <div class="row">
+        <!-- القائمة الجانبية -->
+        <div class="col-md-3 col-lg-2 sidebar p-3">
+            <h4 class="text-white mb-1 fw-bold">زينار</h4>
+            <p class="text-custom-muted small mb-4">نظام إدارة المشتركين</p>
+            <nav class="nav flex-column">
+                <a class="nav-link" href="{{ url_for('dashboard') }}"><i class="bi bi-speedometer2"></i> لوحة التحكم</a>
+                <a class="nav-link active" href="{{ url_for('subscribers') }}"><i class="bi bi-people"></i> المشتركون</a>
+                <a class="nav-link" href="{{ url_for('packages') }}"><i class="bi bi-box-seam"></i> الباقات</a>
+                <a class="nav-link" href="{{ url_for('routers') }}"><i class="bi bi-router"></i> الراوترات</a>
+            </nav>
+        </div>
 
-<div class="sham" onclick="copySham()" id="box">
-<div>
-<span>💳 حساب شام كاش</span><br>
-<b id="num">{{ sham_account }}</b>
-</div>
-<i id="txt">نسخ</i>
-</div>
+        <!-- المحتوى الرئيسي -->
+        <div class="col-md-9 col-lg-10 p-4">
+            <h2 class="mb-4 text-white"><i class="bi bi-person-plus text-info"></i> إضافة مشترك جديد</h2>
 
-<form method="POST">
-<input name="full_name" placeholder="الاسم الكامل" required>
-<input name="username" placeholder="اسم المستخدم *" required>
-<input name="password" placeholder="كلمة المرور *" required>
-<input name="phone" placeholder="واتساب 9639xxxxxxxx" required>
-<select name="profile" required>
-<option value="">— اختر الباقة —</option>
-{% for p in packages %}<option value="{{ p['name'] }}">{{ p['name'] }} - {{ p['price'] }}$</option>{% endfor %}
-</select>
-<select name="service_type"><option value="hotspot">هوتسبوت Hotspot</option><option value="pppoe">PPPoE</option></select>
-<button class="btn">حفظ وإضافة للمايكروتك ✅</button>
-</form>
-<a class="link" href="/subscribers">← رجوع للمشتركين</a>
+            {% with messages = get_flashed_messages(with_categories=true) %}
+              {% if messages %}
+                {% for category, message in messages %}
+                  <div class="alert alert-{{ category }} alert-dismissible fade show" role="alert">
+                    {{ message }}
+                    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                  </div>
+                {% endfor %}
+              {% endif %}
+            {% endwith %}
+
+            <div class="card card-custom p-4">
+                <form action="{{ url_for('add_subscriber') }}" method="POST">
+                    <div class="row g-3">
+                        <!-- اختيار الراوتر / السيرفر -->
+                        <div class="col-md-6">
+                            <label class="form-label text-custom-muted">اختيار الراوتر / السيرفر <span class="text-danger">*</span></label>
+                            <select name="router_id" class="form-select bg-dark text-white border-secondary" required>
+                                <option value="" disabled selected>-- اختر الراوتر --</option>
+                                {% for r in routers %}
+                                    <option value="{{ r.id }}">{{ r.name }} ({{ r.ip_address }})</option>
+                                {% endfor %}
+                            </select>
+                            {% if not routers %}
+                                <small class="text-warning d-block mt-1">لا توجد راوترات! قم بـ <a href="{{ url_for('routers') }}" class="text-info">إضافة راوتر أولاً</a>.</small>
+                            {% endif %}
+                        </div>
+
+                        <!-- اختيار الباقة / البروفايل -->
+                        <div class="col-md-6">
+                            <label class="form-label text-custom-muted">الباقة / البروفايل (Profile) <span class="text-danger">*</span></label>
+                            <select name="profile" class="form-select bg-dark text-white border-secondary" required>
+                                <option value="" disabled selected>-- اختر الباقة --</option>
+                                {% for p in packages %}
+                                    <option value="{{ p.name }}">{{ p.name }} - ({{ p.rate_limit }})</option>
+                                {% endfor %}
+                            </select>
+                            {% if not packages %}
+                                <small class="text-warning d-block mt-1">لا توجد باقات! قم بـ <a href="{{ url_for('packages') }}" class="text-info">إضافة باقة أولاً</a>.</small>
+                            {% endif %}
+                        </div>
+
+                        <!-- اسم المستخدم -->
+                        <div class="col-md-6">
+                            <label class="form-label text-custom-muted">اسم المستخدم (Username) <span class="text-danger">*</span></label>
+                            <input type="text" name="username" class="form-control bg-dark text-white border-secondary" placeholder="مثال: user123" required>
+                        </div>
+
+                        <!-- كلمة المرور -->
+                        <div class="col-md-6">
+                            <label class="form-label text-custom-muted">كلمة المرور (Password) <span class="text-danger">*</span></label>
+                            <input type="text" name="password" class="form-control bg-dark text-white border-secondary" placeholder="123456" required>
+                        </div>
+
+                        <!-- نوع الخدمة -->
+                        <div class="col-md-6">
+                            <label class="form-label text-custom-muted">نوع الخدمة</label>
+                            <select name="service_type" class="form-select bg-dark text-white border-secondary">
+                                <option value="pppoe" selected>PPPoE</option>
+                                <option value="hotspot">Hotspot</option>
+                                <option value="any">Any</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <div class="mt-4 text-start">
+                        <button type="submit" class="btn btn-cyan px-4"><i class="bi bi-check-circle"></i> إضافة المشترك</button>
+                        <a href="{{ url_for('subscribers') }}" class="btn btn-outline-secondary ms-2">إلغاء</a>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
 </div>
-<script>
-function copySham(){
-  let n=document.getElementById('num').innerText;
-  navigator.clipboard.writeText(n);
-  let t=document.getElementById('txt');
-  t.innerText='✅ تم';
-  setTimeout(()=>t.innerText='نسخ',1500);
-}
-</script>
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
 </body>
 </html>
