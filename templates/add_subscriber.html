@@ -1,47 +1,61 @@
-{% extends "layout.html" %}
-{% block content %}
-<div dir="rtl" style="font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;">
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>إضافة مشترك - زينار</title>
+<style>
+body { background:#0f172a; font-family:'Segoe UI', sans-serif; margin:0; padding:20px; color:white; }
+.card-light { background: linear-gradient(135deg, #ffffff 0%, #f0f9ff 100%); border: 2px solid #0ea5e9; border-radius: 12px; padding: 20px; margin-bottom: 25px; box-shadow: 0 4px 15px rgba(14,165,233,0.15); color:#0f172a; }
+.card-dark { background:#1e293b; border-radius:12px; padding:25px; }
+input, select { width:100%; padding:12px; margin-top:5px; border-radius:8px; border:1px solid #334155; background:#0f172a; color:white; box-sizing:border-box; }
+.card-light input { background:white; border:1px solid #0ea5e9; color:#0f172a; }
+.btn { background:#0ea5e9; color:white; border:none; padding:12px 30px; border-radius:8px; font-weight:bold; cursor:pointer; font-size:16px; }
+.label { color:#cbd5e1; font-size:14px; }
+.card-light .label-dark { color:#334155; font-weight:600; font-size:14px; display:block; margin-bottom:5px; }
+</style>
+</head>
+<body>
 
-<!-- صندوق شام كاش الجديد - فاتح وواضح -->
-<div style="background: linear-gradient(135deg, #ffffff 0%, #f0f9ff 100%); border: 2px solid #0ea5e9; border-radius: 12px; padding: 20px; margin-bottom: 25px; box-shadow: 0 4px 15px rgba(14,165,233,0.15);">
-    <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap;">
-        <h3 style="margin:0; color:#0c4a6e; font-weight:bold;">💳 دفع شام كاش - قابل للتحديث</h3>
-        <span style="background:#0ea5e9; color:white; padding:4px 12px; border-radius:20px; font-size:12px;">{{ sham_account }}</span>
+<!-- صندوق شام كاش - فاتح وواضح -->
+<div class="card-light">
+    <div style="display:flex; justify-content:space-between; align-items:center;">
+        <h3 style="margin:0; color:#0c4a6e;">💳 دفع شام كاش - قابل للتحديث</h3>
+        <span style="background:#0ea5e9; color:white; padding:5px 14px; border-radius:20px; font-size:13px; font-weight:bold;">حساب: {{ sham_account }}</span>
     </div>
-    
-    <div style="display:grid; grid-template-columns: 1fr 1fr; gap:15px; margin-top:15px;">
+    <div style="display:grid; grid-template-columns:1fr 1fr; gap:15px; margin-top:15px;">
         <div>
-            <label style="color:#334155; font-weight:600; font-size:14px; display:block; margin-bottom:5px;">الباقة / السعر</label>
-            <input type="text" value="السعر يتحدث من config.py تلقائيا" readonly style="width:100%; padding:10px; border:1px solid #cbd5e1; border-radius:8px; background:#f8fafc; color:#475569;">
+            <label class="label-dark">الباقة / السعر (من config.py)</label>
+            <input type="text" value="السعر يتحدث تلقائيا" readonly>
         </div>
         <div>
-            <label style="color:#334155; font-weight:600; font-size:14px; display:block; margin-bottom:5px;">رقم عملية شام كاش <span style="color:red;">*</span></label>
-            <input type="text" name="shamcash_tx" placeholder="مثال: 123456 - اتركه فارغ اذا دفع كاش" style="width:100%; padding:10px; border:1px solid #0ea5e9; border-radius:8px; background:white; color:#0f172a;">
-            <small style="color:#64748b;">حول على حساب: <b style="color:#0ea5e9;">{{ sham_account }}</b> - السعر يتحدث من config.py تلقائيا</small>
+            <label class="label-dark">رقم عملية شام كاش</label>
+            <input type="text" id="sham_top" placeholder="مثال: 123456 - اتركه فارغ اذا الدفع كاش">
+            <small style="color:#64748b;">حول على حساب <b style="color:#0ea5e9;">{{ sham_account }}</b></small>
         </div>
     </div>
 </div>
 
-<!-- صندوق إضافة المشترك الأصلي -->
-<div style="background:#1e293b; border-radius:12px; padding:25px; color:white;">
+<!-- صندوق إضافة المشترك -->
+<div class="card-dark">
     <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:20px;">
         <h2 style="margin:0;">➕ إضافة مشترك جديد</h2>
-        <a href="{{ url_for('subscribers') }}" style="background:transparent; border:1px solid #475569; color:#94a3b8; padding:6px 12px; border-radius:6px; text-decoration:none;">→ إلغاء ورجوع</a>
+        <a href="/subscribers" style="border:1px solid #475569; color:#94a3b8; padding:6px 12px; border-radius:6px; text-decoration:none;">→ إلغاء ورجوع</a>
     </div>
 
     <form method="POST">
-        <div style="display:grid; grid-template-columns: 1fr 1fr; gap:15px;">
+        <div style="display:grid; grid-template-columns:1fr 1fr; gap:15px;">
             <div>
-                <label style="color:#cbd5e1; font-size:14px;">اسم المستخدم (Username) *</label>
-                <input type="text" name="username" required placeholder="ادخل اسم المستخدم" style="width:100%; padding:12px; margin-top:5px; border-radius:8px; border:1px solid #334155; background:#0f172a; color:white;">
+                <label class="label">اسم المستخدم (Username) *</label>
+                <input type="text" name="username" required placeholder="ادخل اسم المستخدم">
             </div>
             <div>
-                <label style="color:#cbd5e1; font-size:14px;">كلمة المرور (Password) *</label>
-                <input type="text" name="password" required placeholder="ادخل كلمة المرور" style="width:100%; padding:12px; margin-top:5px; border-radius:8px; border:1px solid #334155; background:#0f172a; color:white;">
+                <label class="label">كلمة المرور (Password) *</label>
+                <input type="text" name="password" required placeholder="ادخل كلمة المرور">
             </div>
             <div>
-                <label style="color:#cbd5e1; font-size:14px;">الباقة / البروفايل (Profile) *</label>
-                <select name="profile" required style="width:100%; padding:12px; margin-top:5px; border-radius:8px; border:1px solid #334155; background:#0f172a; color:white;">
+                <label class="label">الباقة / البروفايل (Profile) *</label>
+                <select name="profile" required>
                     <option value="">-- اختر الباقة --</option>
                     {% for pkg in packages %}
                     <option value="{{ pkg['name'] }}">{{ pkg['name'] }} - {{ pkg['rate_limit'] }}</option>
@@ -49,35 +63,19 @@
                 </select>
             </div>
             <div>
-                <label style="color:#cbd5e1; font-size:14px;">نوع الخدمة</label>
-                <select name="service_type" style="width:100%; padding:12px; margin-top:5px; border-radius:8px; border:1px solid #334155; background:#0f172a; color:white;">
+                <label class="label">نوع الخدمة</label>
+                <select name="service_type">
                     <option value="hotspot">Hotspot (شبكة كروت / كافيهات)</option>
                     <option value="pppoe">PPPoE</option>
                 </select>
             </div>
         </div>
-
-        <!-- هذا الحقل المخفي هو يلي بيرسل رقم شام كاش -->
-        <input type="hidden" id="real_sham_tx" name="shamcash_tx" value="">
-        
+        <input type="hidden" id="real_tx" name="shamcash_tx">
         <div style="margin-top:20px; text-align:center;">
-            <button type="submit" onclick="document.getElementById('real_sham_tx').value = document.querySelector('input[name=shamcash_tx]').value" style="background:#0ea5e9; color:white; border:none; padding:12px 30px; border-radius:8px; font-weight:bold; cursor:pointer; font-size:16px;">✔ إضافة المشترك للمنصة</button>
+            <button type="submit" class="btn" onclick="document.getElementById('real_tx').value=document.getElementById('sham_top').value">✔ إضافة المشترك للمنصة</button>
         </div>
     </form>
 </div>
 
-</div>
-
-<script>
-// ينقل رقم شام كاش من الصندوق الفاتح للفورم
-document.addEventListener('DOMContentLoaded', function(){
-    const topInput = document.querySelector('div[style*="linear-gradient"] input[name=shamcash_tx]');
-    const hiddenInput = document.getElementById('real_sham_tx');
-    if(topInput && hiddenInput){
-        topInput.addEventListener('input', function(){
-            hiddenInput.value = this.value;
-        });
-    }
-});
-</script>
-{% endblock %}
+</body>
+</html>
