@@ -5,77 +5,88 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>إضافة مشترك - زينار</title>
 <style>
-body { background:#0f172a; font-family:'Segoe UI', sans-serif; margin:0; padding:20px; color:white; }
-.card-light { background: linear-gradient(135deg, #ffffff 0%, #f0f9ff 100%); border: 2px solid #0ea5e9; border-radius: 12px; padding: 20px; margin-bottom: 25px; box-shadow: 0 4px 15px rgba(14,165,233,0.15); color:#0f172a; }
-.card-dark { background:#1e293b; border-radius:12px; padding:25px; }
-input, select { width:100%; padding:12px; margin-top:5px; border-radius:8px; border:1px solid #334155; background:#0f172a; color:white; box-sizing:border-box; }
-.card-light input { background:white; border:1px solid #0ea5e9; color:#0f172a; }
-.btn { background:#0ea5e9; color:white; border:none; padding:12px 30px; border-radius:8px; font-weight:bold; cursor:pointer; font-size:16px; }
-.label { color:#cbd5e1; font-size:14px; }
-.card-light .label-dark { color:#334155; font-weight:600; font-size:14px; display:block; margin-bottom:5px; }
+body{background:#0f172a;color:white;font-family:'Segoe UI',sans-serif;margin:0;padding:20px}
+.card-light{background:white;border:2px solid #0ea5e9;border-radius:12px;padding:20px;margin-bottom:25px;color:#0f172a}
+.card-dark{background:#1e293b;border-radius:12px;padding:25px}
+input,select{width:100%;padding:12px;margin-top:5px;border-radius:8px;border:1px solid #334155;background:#0f172a;color:white;box-sizing:border-box}
+.card-light input{background:#f8fafc;border:1px solid #0ea5e9;color:#0f172a;font-weight:bold}
+.btn{background:#0ea5e9;color:white;border:none;padding:12px 30px;border-radius:8px;font-weight:bold;cursor:pointer;font-size:16px}
+.label{color:#cbd5e1;font-size:13px}
+.label-dark{color:#334155;font-weight:600;font-size:13px;display:block;margin-bottom:4px}
 </style>
 </head>
 <body>
 
-<!-- صندوق شام كاش - فاتح وواضح -->
 <div class="card-light">
-    <div style="display:flex; justify-content:space-between; align-items:center;">
-        <h3 style="margin:0; color:#0c4a6e;">💳 دفع شام كاش - قابل للتحديث</h3>
-        <span style="background:#0ea5e9; color:white; padding:5px 14px; border-radius:20px; font-size:13px; font-weight:bold;">حساب: {{ sham_account }}</span>
-    </div>
-    <div style="display:grid; grid-template-columns:1fr 1fr; gap:15px; margin-top:15px;">
-        <div>
-            <label class="label-dark">الباقة / السعر (من config.py)</label>
-            <input type="text" value="السعر يتحدث تلقائيا" readonly>
-        </div>
-        <div>
-            <label class="label-dark">رقم عملية شام كاش</label>
-            <input type="text" id="sham_top" placeholder="مثال: 123456 - اتركه فارغ اذا الدفع كاش">
-            <small style="color:#64748b;">حول على حساب <b style="color:#0ea5e9;">{{ sham_account }}</b></small>
-        </div>
-    </div>
+<div style="display:flex;justify-content:space-between;align-items:center">
+<h3 style="margin:0;color:#0c4a6e">💳 دفع شام كاش - تلقائي</h3>
+<span style="background:#0ea5e9;color:white;padding:5px 14px;border-radius:20px;font-size:13px">الحساب: {{ sham_account }}</span>
+</div>
+<div style="display:grid;grid-template-columns:1fr 1fr;gap:15px;margin-top:15px">
+<div>
+<label class="label-dark">💰 السعر (يتحدث تلقائيا عند اختيار الباقة)</label>
+<input type="text" id="price_display" value="اختر الباقة من الأسفل أولا" readonly>
+</div>
+<div>
+<label class="label-dark">🔢 رقم عملية شام كاش *</label>
+<input type="text" id="sham_top" placeholder="مثال: 123456789">
+<small style="color:#0ea5e9;font-weight:bold">حول المبلغ على حساب {{ sham_account }} ثم ضع رقم العملية هنا</small>
+</div>
+</div>
 </div>
 
-<!-- صندوق إضافة المشترك -->
 <div class="card-dark">
-    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:20px;">
-        <h2 style="margin:0;">➕ إضافة مشترك جديد</h2>
-        <a href="/subscribers" style="border:1px solid #475569; color:#94a3b8; padding:6px 12px; border-radius:6px; text-decoration:none;">→ إلغاء ورجوع</a>
-    </div>
-
-    <form method="POST">
-        <div style="display:grid; grid-template-columns:1fr 1fr; gap:15px;">
-            <div>
-                <label class="label">اسم المستخدم (Username) *</label>
-                <input type="text" name="username" required placeholder="ادخل اسم المستخدم">
-            </div>
-            <div>
-                <label class="label">كلمة المرور (Password) *</label>
-                <input type="text" name="password" required placeholder="ادخل كلمة المرور">
-            </div>
-            <div>
-                <label class="label">الباقة / البروفايل (Profile) *</label>
-                <select name="profile" required>
-                    <option value="">-- اختر الباقة --</option>
-                    {% for pkg in packages %}
-                    <option value="{{ pkg['name'] }}">{{ pkg['name'] }} - {{ pkg['rate_limit'] }}</option>
-                    {% endfor %}
-                </select>
-            </div>
-            <div>
-                <label class="label">نوع الخدمة</label>
-                <select name="service_type">
-                    <option value="hotspot">Hotspot (شبكة كروت / كافيهات)</option>
-                    <option value="pppoe">PPPoE</option>
-                </select>
-            </div>
-        </div>
-        <input type="hidden" id="real_tx" name="shamcash_tx">
-        <div style="margin-top:20px; text-align:center;">
-            <button type="submit" class="btn" onclick="document.getElementById('real_tx').value=document.getElementById('sham_top').value">✔ إضافة المشترك للمنصة</button>
-        </div>
-    </form>
+<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px">
+<h2 style="margin:0">➕ إضافة مشترك جديد</h2>
+<a href="/dashboard" style="border:1px solid #475569;color:#94a3b8;padding:6px 12px;border-radius:6px;text-decoration:none">→ رجوع</a>
 </div>
 
+<form method="POST" id="subForm">
+<div style="display:grid;grid-template-columns:1fr 1fr;gap:15px">
+<div>
+<label class="label">اسم المستخدم *</label>
+<input type="text" name="username" required placeholder="مثال: ahmad123">
+</div>
+<div>
+<label class="label">كلمة المرور *</label>
+<input type="text" name="password" required placeholder="مثال: 123456">
+</div>
+<div>
+<label class="label">الباقة / البروفايل *</label>
+<select name="profile" id="profile_select" required onchange="updatePrice()">
+<option value="">-- اختر الباقة أولا --</option>
+{% for pkg in packages %}
+<option value="{{ pkg['name'] }}" data-price="{{ pkg['price'] }}">{{ pkg['name'] }} - {{ pkg['rate_limit'] }} - {{ pkg['price'] }}$</option>
+{% endfor %}
+</select>
+</div>
+<div>
+<label class="label">نوع الخدمة</label>
+<select name="service_type">
+<option value="hotspot">Hotspot (شبكة كروت)</option>
+<option value="pppoe">PPPoE</option>
+</select>
+</div>
+</div>
+
+<input type="hidden" id="real_tx" name="shamcash_tx">
+<div style="margin-top:20px;text-align:center">
+<button type="submit" class="btn" onclick="document.getElementById('real_tx').value=document.getElementById('sham_top').value">✔ إضافة ديم للمنصة</button>
+<p style="color:#64748b;font-size:12px;margin-top:10px">اذا ما عندك باقات، روح أولا على صفحة الباقات وأضف باقة مثل: 4M بسعر 7$</p>
+</div>
+</form>
+</div>
+
+<script>
+function updatePrice(){
+  var sel = document.getElementById('profile_select');
+  var price = sel.options[sel.selectedIndex].getAttribute('data-price');
+  if(price){
+    document.getElementById('price_display').value = price + ' $ - حول هذا المبلغ على حساب {{ sham_account }}';
+  } else {
+    document.getElementById('price_display').value = 'اختر الباقة من الأسفل أولا';
+  }
+}
+</script>
 </body>
 </html>
