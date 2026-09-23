@@ -1,10 +1,3 @@
-SHAM_CASH = {
-    "account": "5889XXXX", # حط حسابك
-    "mode": "manual", # بكرا بتصير auto
-    "packages": {
-        "1M": 4,
-        "2M": 5,
-        "3M": 6,
-        "6M": 8
-    }
-}
+# قابل للتحديث - تغير الرقم هون بس
+SHAM_CASH_ACCOUNT = "5889"
+SHAM_CASH_ENABLED = True
