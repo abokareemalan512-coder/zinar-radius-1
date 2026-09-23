@@ -1,0 +1,33 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>دفع اشتراك - زينار نت</title>
+<style>
+body{background:#0f172a;color:white;font-family:sans-serif;display:flex;justify-content:center;padding:20px}
+.card{background:#1e293b;border-radius:16px;padding:25px;max-width:420px;width:100%;text-align:center}
+.sham{background:#22c55e;color:white;padding:15px;border-radius:12px;margin:15px 0;font-size:18px;font-weight:bold;letter-spacing:1px}
+input,select{width:100%;padding:14px;margin:10px 0;border-radius:10px;border:1px solid #334155;background:#0f172a;color:white;box-sizing:border-box;font-size:15px}
+.btn{background:#0ea5e9;color:white;border:none;padding:15px;width:100%;border-radius:10px;font-weight:bold;font-size:16px;cursor:pointer;margin-top:10px}
+.small{color:#94a3b8;font-size:13px;margin-top:15px}
+</style></head>
+<body>
+<div class="card">
+<h2>💳 تجديد اشتراك زينار نت</h2>
+{% if subscriber %}
+<p>أهلا <b style="color:#38bdf8">{{ subscriber['full_name'] or subscriber['username'] }}</b> - باقتك الحالية {{ subscriber['profile'] }}</p>
+{% endif %}
+<div class="sham">حول على شام كاش<br><span style="font-size:24px">{{ sham_account }}</span></div>
+<form method="POST">
+<input type="text" name="username" required placeholder="اسم المستخدم" value="{{ username or '' }}">
+<input type="text" name="phone" required placeholder="رقم واتساب 9639xxxxxxxx" value="{{ subscriber['phone'] if subscriber else '' }}">
+<select name="package" required>
+<option value="">-- اختر الباقة --</option>
+{% for p in packages %}<option value="{{ p['name'] }}">{{ p['name'] }} - {{ p['price'] }}$</option>{% endfor %}
+</select>
+<input type="text" name="tx" required placeholder="رقم عملية شام كاش بعد التحويل">
+<button class="btn">✅ أرسلت المبلغ - فعلني</button>
+</form>
+<div class="small">بعد الدفع أرسل رقم العملية، سيتم التفعيل خلال دقائق تلقائيا.<br>للاستفسار واتساب شبكة زينار</div>
+</div>
+</body>
+</html>
