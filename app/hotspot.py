@@ -1,10 +1,30 @@
-from fastapi import APIRouter, Request, Form
-from fastapi.responses import HTMLResponse
+from flask import Blueprint, request
 
-router = APIRouter()
+hotspot_bp = Blueprint('hotspot', __name__)
 
-@router.get("/hotspot/login", response_class=HTMLResponse)
-async def login_page(mac: str = "", ip: str = "", link_login: str = "", error: str = ""):
+@hotspot_bp.route('/hotspot/login', methods=['GET', 'POST'])
+def hotspot_login():
+    mac = request.args.get('mac','')
+    ip = request.args.get('ip','')
+    link_login = request.args.get('link-login','') or request.form.get('link_login','')
+    error = request.args.get('error','')
+
+    if request.method == 'POST':
+        code = request.form.get('code','').strip()
+        link = request.form.get('link_login','')
+        if len(code) < 3:
+            return f"<h3>كود غلط</h3><a href='/hotspot/login?link-login={link}'>رجوع</a>"
+        # هون بيفتح النت
+        return f"""
+        <html><body onload="document.f.submit()">
+          <p>تم التحقق، جاري فتح النت...</p>
+          <form name="f" method="post" action="{link}">
+            <input type="hidden" name="username" value="{code}">
+            <input type="hidden" name="password" value="{code}">
+          </form>
+        </body></html>
+        """
+
     return f"""
     <html dir="rtl" style="font-family:sans-serif; text-align:center; padding-top:50px">
     <h2>ZINAR NET - تجربة</h2>
@@ -12,26 +32,8 @@ async def login_page(mac: str = "", ip: str = "", link_login: str = "", error: s
     <p style="color:red">{error}</p>
     <form method="post">
       <input type="hidden" name="link_login" value="{link_login}">
-      <input name="code" placeholder="دخل كود تجريبي: test123" style="padding:10px; width:200px"><br><br>
+      <input name="code" placeholder="دخل كود تجريبي: test123" style="padding:15px; width:220px"><br><br>
       <button style="padding:10px 30px">دخول تجريبي</button>
     </form>
     </html>
-    """
-
-@router.post("/hotspot/login", response_class=HTMLResponse)
-async def check_code(code: str = Form(...), link_login: str = Form(...)):
-    # هون بعدين منوصلو بقاعدة البيانات تبعك
-    # هلا للتجربة منقبل اي كود
-    if len(code) < 3:
-        return f"<h3>كود غلط</h3><a href='/hotspot/login?link-login={{link_login}}'>رجوع</a>"
-
-    # هاد هو يلي بيفتح النت بالمايكروتك
-    return f"""
-    <html><body onload="document.f.submit()">
-      <p>تم التحقق، جاري فتح النت...</p>
-      <form name="f" method="post" action="{link_login}">
-        <input type="hidden" name="username" value="{code}">
-        <input type="hidden" name="password" value="{code}">
-      </form>
-    </body></html>
     """
