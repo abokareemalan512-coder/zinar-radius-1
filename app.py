@@ -6,7 +6,7 @@ from flask import Flask, render_template, request, redirect, flash
 app = Flask(__name__)
 app.secret_key = 'zinar-premium-2026'
 
-from app.hotspot import hotspot_bp
+from hotspot import hotspot_bp
 app.register_blueprint(hotspot_bp)
 
 DATABASE = 'zinar.db'
