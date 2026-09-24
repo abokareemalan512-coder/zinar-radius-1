@@ -6,6 +6,9 @@ from flask import Flask, render_template, request, redirect, flash
 app = Flask(__name__)
 app.secret_key = 'zinar-premium-2026'
 
+from app.hotspot import hotspot_bp
+app.register_blueprint(hotspot_bp)
+
 DATABASE = 'zinar.db'
 
 def get_db():
@@ -107,10 +110,8 @@ def packages():
     conn.close()
     return render_template('packages.html', packages=p)
 
-# === هاد هو الحل النهائي - مستحيل يعمل خطأ ===
 @app.route('/payments')
 def payments():
-    # ما بيستخدم قاعدة بيانات نهائيا - بيفتح فورا
     return render_template('payments.html', payments=[], pending_pays=0)
 
 @app.route('/pay')
