@@ -7,39 +7,34 @@ hotspot_bp = Blueprint('hotspot', __name__)
 def hotspot_login():
     mac = request.args.get('mac','')
     link_login = request.args.get('link-login','') or request.form.get('link_login','')
-    link_orig = request.args.get('link-orig','') or 'http://neverssl.com'
     
-    # فك التشفير
     if link_login:
         link_login = urllib.parse.unquote(link_login)
+    if not link_login:
+        link_login = "http://13.13.13.13/login"
 
     if request.method == 'POST':
         code = request.form.get('code','').strip()
-        link = request.form.get('link_login','')
-        if link:
-            link = urllib.parse.unquote(link)
-        
-        # اذا الرابط فاضي نحط الافتراضي
-        if not link:
-            link = "http://13.13.13.13/login"
-
         if not code:
-            return "<h1>اكتب كود</h1>"
-
-        # هذا هو الحل النهائي - تحويل GET
-        login_url = f"{link}?username={urllib.parse.quote(code)}&password={urllib.parse.quote(code)}"
-        print(f"Redirecting to: {login_url}") # رح يبين بـ Render logs
+            return "<h1 style='text-align:center;margin-top:100px;font-family:sans-serif'>الرجاء كتابة الكود</h1>"
+        
+        login_url = f"{link_login}?username={urllib.parse.quote(code)}&password={urllib.parse.quote(code)}"
         return redirect(login_url)
 
     return f"""
-    <html dir="rtl" style="text-align:center; padding-top:50px; font-family:sans-serif">
-    <h2>ZINAR NET</h2>
-    <p>{mac}</p>
-    <p style="font-size:10px; color:gray">{link_login}</p>
-    <form method="post">
-      <input type="hidden" name="link_login" value="{urllib.parse.quote(link_login)}">
-      <input name="code" placeholder="test123" style="padding:15px; width:220px"><br><br>
-      <button style="padding:12px 40px; background:#0ea5e9; color:#fff; border:none; border-radius:8px">دخول</button>
-    </form>
+    <html dir="rtl" lang="ar">
+    <head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"></head>
+    <body style="font-family:sans-serif; background:#f0f9ff; text-align:center; padding-top:60px">
+        <div style="background:white; max-width:340px; margin:auto; padding:25px; border-radius:15px; box-shadow:0 4px 15px #0002">
+            <h2 style="color:#0ea5e9">شبكة زينار نت</h2>
+            <p style="color:#666; font-size:12px">{mac}</p>
+            <form method="post">
+              <input type="hidden" name="link_login" value="{urllib.parse.quote(link_login)}">
+              <input name="code" placeholder="أدخل كود الكرت هنا" style="padding:14px; width:90%; border:1px solid #ddd; border-radius:8px; text-align:center; font-size:16px"><br><br>
+              <button style="padding:13px; width:95%; background:#0ea5e9; color:#fff; border:none; border-radius:8px; font-size:17px; font-weight:bold">اتصال</button>
+            </form>
+            <p style="margin-top:20px; font-size:11px; color:#999">للدعم الفني تواصل مع الإدارة</p>
+        </div>
+    </body>
     </html>
     """
