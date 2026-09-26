@@ -1,73 +1,119 @@
-<!DOCTYPE html>
-<html lang="ar" dir="rtl">
-<head>
-<meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>إدارة الباقات - ZINAR</title>
-<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.rtl.min.css">
-<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css">
-<style>
-@import url('https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;800&display=swap');
-body{font-family:'Cairo',sans-serif;background:#0B1020;color:#e2e8f0}
-.sidebar{background:linear-gradient(180deg,#151D32 0%,#0F172A 100%);border-left:1px solid #1e293b;min-height:100vh}
-.brand{font-weight:800;background:linear-gradient(90deg,#38bdf8,#818cf8);-webkit-background-clip:text;-webkit-text-fill-color:transparent;font-size:28px}
-.nav-link{color:#64748b;border-radius:12px;padding:12px 16px;margin-bottom:6px;display:flex;gap:12px}
-.nav-link:hover{background:#1e293b;color:#38bdf8}
-.nav-link.active{background:linear-gradient(90deg,#0284c7,#38bdf8);color:#fff;box-shadow:0 10px 20px rgba(56,189,248,.3)}
-.main-card{background:#151D32;border:1px solid #1e293b;border-radius:20px}
-.input-dark{background:#0B1020;border:1px solid #334155;border-radius:12px;color:#fff;padding:12px}
-.input-dark:focus{background:#0B1020;border-color:#38bdf8;color:#fff;box-shadow:0 0 0 3px rgba(56,189,248,.2)}
-.btn-glow{background:linear-gradient(90deg,#0284c7,#38bdf8);border:none;border-radius:12px;font-weight:600}
-.package-row{transition:.2s}
-.package-row:hover{background:rgba(56,189,248,.05)}
-</style>
-</head>
-<body>
-<div class="container-fluid p-0"><div class="row g-0">
-<div class="col-md-3 col-lg-2 sidebar p-4">
-    <div class="brand">ZINAR NET</div><div class="text-muted small mb-5">إدارة الباقات</div>
-    <nav class="nav flex-column">
-        <a class="nav-link" href="/dashboard"><i class="bi bi-grid-1x2-fill"></i> لوحة التحكم</a>
-        <a class="nav-link" href="/subscribers"><i class="bi bi-people-fill"></i> المشتركون</a>
-        <a class="nav-link active" href="/packages"><i class="bi bi-box-seam-fill"></i> الباقات</a>
-        <a class="nav-link" href="/routers"><i class="bi bi-hdd-stack-fill"></i> الراوترات</a>
-        <a class="nav-link" href="/payments"><i class="bi bi-wallet2"></i> المدفوعات</a>
-    </nav>
-</div>
-<div class="col-md-9 col-lg-10 p-4 p-lg-5">
-    <h2 class="fw-bold mb-1"><i class="bi bi-box-seam text-info"></i> إدارة الباقات</h2>
-    <p class="text-muted mb-5">أنشئ وعدل سرعات الانترنت لعملائك</p>
+{% extends "base.html" %}
+{% block title %}الباقات{% endblock %}
+{% block content %}
 
-    <div class="main-card p-4 mb-5">
-        <h5 class="fw-bold mb-4"><i class="bi bi-plus-circle text-info"></i> إضافة باقة جديدة</h5>
+<div class="topline">
+    <h1><i class="fa-solid fa-box-archive" style="color:var(--signal)"></i> الباقات المتاحة</h1>
+</div>
+
+<style>
+    .pk-grid { display: grid; grid-template-columns: 320px 1fr; gap: 16px; align-items: start; }
+    .pk-form-group { margin-bottom: 16px; }
+    .pk-form-group label { display: block; font-size: 12.5px; color: var(--muted); margin-bottom: 6px; font-weight: 500; }
+    .pk-input {
+        width: 100%; background: var(--panel-2); border: 1px solid var(--border);
+        color: var(--text); padding: 9px 12px; border-radius: 8px; font-size: 14px;
+        font-family: 'Tajawal', sans-serif;
+    }
+    .pk-input:focus { outline: none; border-color: var(--signal); box-shadow: 0 0 0 3px var(--signal-dim); }
+    .pk-submit {
+        width: 100%; background: var(--signal); color: #04141A; border: none;
+        padding: 11px; border-radius: 9px; font-weight: 700; font-size: 14.5px; cursor: pointer;
+    }
+    .pk-submit:hover { background: #4DE0F5; }
+    table.pk-table { width: 100%; border-collapse: collapse; font-size: 13.5px; }
+    table.pk-table th { text-align: right; padding: 12px 18px; color: var(--muted); font-weight: 500; font-size: 12px; border-bottom: 1px solid var(--border); }
+    table.pk-table td { padding: 13px 18px; border-bottom: 1px solid var(--border); }
+    table.pk-table tr:last-child td { border-bottom: none; }
+    .pk-mini-input {
+        width: 70px; background: var(--panel-2); border: 1px solid var(--border);
+        color: var(--text); padding: 5px 8px; border-radius: 6px; font-size: 13px;
+    }
+    .pk-icon-btn {
+        background: none; border: 1px solid var(--border); color: var(--muted);
+        width: 28px; height: 28px; border-radius: 6px; cursor: pointer; font-size: 12px;
+    }
+    .pk-icon-btn:hover.save { color: var(--ok); border-color: var(--ok); }
+    .pk-icon-btn.danger:hover { color: var(--danger); border-color: var(--danger); }
+    .pk-empty { padding: 50px 20px; text-align: center; color: var(--muted); }
+    @media (max-width: 900px) { .pk-grid { grid-template-columns: 1fr; } }
+</style>
+
+{% if not has_master %}
+<div class="alert-flash" style="border-right-color:var(--warn);">
+    لازم تحدد راوتر كـ "سيرفر رئيسي" أولاً من صفحة
+    <a href="{{ url_for('routers') }}" style="color:var(--signal)">الراوترات</a>.
+</div>
+{% endif %}
+
+<div class="pk-grid">
+    <div class="card" style="padding:22px;">
+        <h2 style="font-size:15.5px; font-weight:700; margin:0 0 18px;">
+            <i class="fa-solid fa-plus" style="color:var(--signal)"></i> إضافة باقة جديدة
+        </h2>
         <form method="POST">
-            <div class="row g-3">
-                <div class="col-md-4"><label class="small text-muted mb-2">اسم الباقة (Profile Name)</label><input name="name" required placeholder="مثال: 4M" class="form-control input-dark"></div>
-                <div class="col-md-4"><label class="small text-muted mb-2">السرعة (Rate Limit)</label><input name="rate_limit" required placeholder="مثال: 4M/4M" class="form-control input-dark"></div>
-                <div class="col-md-4"><label class="small text-muted mb-2">السعر $</label><input name="price" type="number" step="0.1" required placeholder="7.0" class="form-control input-dark"></div>
+            <div class="pk-form-group">
+                <label>اسم الباقة</label>
+                <input type="text" name="name" class="pk-input" required placeholder="مثال: 5M" {{ 'disabled' if not has_master }}>
             </div>
-            <button class="btn btn-glow text-white mt-4 px-4"><i class="bi bi-check-lg"></i> حفظ الباقة</button>
+            <div class="pk-form-group">
+                <label>السعر</label>
+                <input type="text" name="price" class="pk-input" value="0" {{ 'disabled' if not has_master }}>
+            </div>
+            <div class="pk-form-group">
+                <label>مدة الصلاحية (مثال: 30d أو 0 لبدون انتهاء)</label>
+                <input type="text" name="validity" class="pk-input" value="0" {{ 'disabled' if not has_master }}>
+            </div>
+            <button type="submit" class="pk-submit" {{ 'disabled' if not has_master }}>حفظ الباقة</button>
         </form>
     </div>
 
-    <div class="main-card p-4">
-        <h5 class="fw-bold mb-4"><i class="bi bi-list-ul text-info"></i> قائمة الباقات المتاحة ({{ packages|length }})</h5>
-        <div class="table-responsive">
-        <table class="table table-dark table-hover align-middle mb-0" style="--bs-table-bg:transparent">
-            <thead class="text-muted small"><tr><th>#</th><th>اسم الباقة</th><th>السرعة المحدد</th><th>السعر</th></tr></thead>
+    <div class="card">
+        <div class="panel-head">
+            <h2><i class="fa-solid fa-list" style="color:var(--signal)"></i> الباقات الحالية</h2>
+        </div>
+        {% if profiles %}
+        <table class="pk-table">
+            <thead>
+                <tr>
+                    <th>الاسم</th>
+                    <th>السعر</th>
+                    <th>الصلاحية</th>
+                    <th>حفظ التعديل</th>
+                    <th>حذف</th>
+                </tr>
+            </thead>
             <tbody>
-            {% for pkg in packages %}
-            <tr class="package-row">
-                <td class="text-muted">{{ loop.index }}</td>
-                <td><span class="badge bg-info bg-opacity-10 text-info border border-info border-opacity-25 px-3 py-2 fs-6">{{ pkg['name'] }}</span></td>
-                <td><span class="text-danger" style="font-family:monospace">{{ pkg['rate_limit'] }}</span></td>
-                <td><span class="fw-bold text-success">${{ pkg['price'] }}</span></td>
-            </tr>
-            {% endfor %}
+                {% for p in profiles %}
+                <tr>
+                    <td><strong>{{ p.name }}</strong></td>
+                    <td>
+                        <input type="text" name="price" class="pk-mini-input" value="{{ p.price }}" form="pform-{{ loop.index }}">
+                    </td>
+                    <td>
+                        <input type="text" name="validity" class="pk-mini-input" value="{{ p.validity }}" form="pform-{{ loop.index }}">
+                    </td>
+                    <td>
+                        <button type="submit" form="pform-{{ loop.index }}" class="pk-icon-btn save" title="حفظ"><i class="fa-solid fa-check"></i></button>
+                    </td>
+                    <td>
+                        <a href="{{ url_for('delete_package', name=p.name) }}" class="pk-icon-btn danger" style="display:inline-flex; align-items:center; justify-content:center; text-decoration:none;" onclick="return confirm('هل أنت متأكد من حذف هذه الباقة؟')">
+                            <i class="fa-solid fa-trash"></i>
+                        </a>
+                    </td>
+                </tr>
+                {% endfor %}
             </tbody>
         </table>
+        {% for p in profiles %}
+        <form id="pform-{{ loop.index }}" method="POST" action="{{ url_for('edit_package', name=p.name) }}" style="display:none;"></form>
+        {% endfor %}
+        {% else %}
+        <div class="pk-empty">
+            <i class="fa-solid fa-box-open" style="font-size:26px; margin-bottom:10px; display:block; color:var(--border);"></i>
+            لا توجد باقات مضافة حتى الآن.
         </div>
+        {% endif %}
     </div>
 </div>
-</div></div>
-</body>
-</html>
+{% endblock %}
