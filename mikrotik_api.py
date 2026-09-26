@@ -173,6 +173,100 @@ def get_userman_profiles(router):
                 pass
 
 
+def add_userman_profile(router, name, price='0', validity='0'):
+    """يضيف باقة (بروفايل) جديدة بـ User Manager."""
+    connection = None
+    try:
+        connection, api = _connect(router)
+        api.get_resource('/tool/user-manager/profile').add(
+            name=name, price=str(price), validity=str(validity)
+        )
+        return {'success': True}
+    except Exception as e:
+        return {'success': False, 'error': str(e)}
+    finally:
+        if connection:
+            try:
+                connection.disconnect()
+            except Exception:
+                pass
+
+
+def edit_userman_profile(router, name, price=None, validity=None):
+    """يعدّل باقة موجودة (بالبحث عن اسمها أولاً لمعرفة الـ id)."""
+    connection = None
+    try:
+        connection, api = _connect(router)
+        resource = api.get_resource('/tool/user-manager/profile')
+        matches = resource.get(name=name)
+        if not matches:
+            return {'success': False, 'error': 'الباقة غير موجودة'}
+        params = {}
+        if price is not None:
+            params['price'] = str(price)
+        if validity is not None:
+            params['validity'] = str(validity)
+        resource.set(id=matches[0]['id'], **params)
+        return {'success': True}
+    except Exception as e:
+        return {'success': False, 'error': str(e)}
+    finally:
+        if connection:
+            try:
+                connection.disconnect()
+            except Exception:
+                pass
+
+
+def remove_userman_profile(router, name):
+    """يحذف باقة من User Manager بالاعتماد على اسمها."""
+    connection = None
+    try:
+        connection, api = _connect(router)
+        resource = api.get_resource('/tool/user-manager/profile')
+        matches = resource.get(name=name)
+        if not matches:
+            return {'success': False, 'error': 'الباقة غير موجودة'}
+        for m in matches:
+            resource.remove(id=m['id'])
+        return {'success': True}
+    except Exception as e:
+        return {'success': False, 'error': str(e)}
+    finally:
+        if connection:
+            try:
+                connection.disconnect()
+            except Exception:
+                pass
+
+
+def edit_userman_user(router, username, password=None, profile=None):
+    """يعدّل مستخدم موجود (كلمة السر و/أو الباقة) بالاعتماد على اسم المستخدم."""
+    connection = None
+    try:
+        connection, api = _connect(router)
+        resource = api.get_resource('/tool/user-manager/user')
+        matches = resource.get(username=username)
+        if not matches:
+            return {'success': False, 'error': 'المستخدم غير موجود'}
+        params = {}
+        if password:
+            params['password'] = password
+        if profile:
+            params['actual-profile'] = profile
+        if params:
+            resource.set(id=matches[0]['id'], **params)
+        return {'success': True}
+    except Exception as e:
+        return {'success': False, 'error': str(e)}
+    finally:
+        if connection:
+            try:
+                connection.disconnect()
+            except Exception:
+                pass
+
+
 def add_userman_user(router, username, password, profile=None):
     """
     يضيف مستخدم جديد لـ User Manager مباشرة عبر API.
@@ -194,6 +288,29 @@ def add_userman_user(router, username, password, profile=None):
                 connection.disconnect()
             except Exception:
                 pass
+def remove_userman_user(router, username):
+    """يحذف مستخدم من User Manager بالاعتماد على اسم المستخدم."""
+    connection = None
+    try:
+        connection, api = _connect(router)
+        resource = api.get_resource('/tool/user-manager/user')
+        matches = resource.get(username=username)
+        if not matches:
+            return {'success': False, 'error': 'المستخدم غير موجود'}
+        for m in matches:
+            resource.remove(id=m['id'])
+        return {'success': True}
+    except Exception as e:
+        return {'success': False, 'error': str(e)}
+    finally:
+        if connection:
+            try:
+                connection.disconnect()
+            except Exception:
+                pass
+
+
+def disconnect_ppp_user(router, username):
     """
     يفصل مستخدم PPPoE معيّن فوراً من راوتر محدد (متل زر "قطع الاتصال").
     """
