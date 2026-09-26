@@ -1,92 +1,120 @@
-<!DOCTYPE html>
-<html lang="ar" dir="rtl">
-<head>
-<meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>المشتركين - ZINAR</title>
-<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.rtl.min.css">
-<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css">
-<style>
-@import url('https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;800&display=swap');
-body{font-family:'Cairo',sans-serif;background:#0B1020;color:#e2e8f0}
-.sidebar{background:linear-gradient(180deg,#151D32 0%,#0F172A 100%);border-left:1px solid #1e293b;min-height:100vh}
-.brand{font-weight:800;background:linear-gradient(90deg,#38bdf8,#818cf8);-webkit-background-clip:text;-webkit-text-fill-color:transparent;font-size:28px}
-.nav-link{color:#64748b;border-radius:12px;padding:12px 16px;margin-bottom:6px;display:flex;gap:12px}
-.nav-link:hover{background:#1e293b;color:#38bdf8}
-.nav-link.active{background:linear-gradient(90deg,#0284c7,#38bdf8);color:#fff}
-.main-card{background:#151D32;border:1px solid #1e293b;border-radius:20px}
-.input-dark{background:#0B1020;border:1px solid #334155;border-radius:12px;color:#fff;padding:10px 16px}
-.btn-glow{background:linear-gradient(90deg,#0284c7,#38bdf8);border:none;border-radius:12px;font-weight:600}
-.table-dark{--bs-table-bg:transparent}
-.action-btn{width:32px;height:32px;border-radius:8px;display:inline-flex;align-items:center;justify-content:center;border:none}
-</style>
-</head>
-<body>
-<div class="container-fluid p-0"><div class="row g-0">
-<div class="col-md-3 col-lg-2 sidebar p-4">
-    <div class="brand">ZINAR NET</div><div class="text-muted small mb-5">إدارة المشتركين</div>
-    <nav class="nav flex-column">
-        <a class="nav-link" href="/dashboard"><i class="bi bi-grid-1x2-fill"></i> لوحة التحكم</a>
-        <a class="nav-link active" href="/subscribers"><i class="bi bi-people-fill"></i> المشتركون</a>
-        <a class="nav-link" href="/routers"><i class="bi bi-hdd-stack-fill"></i> الراوترات</a>
-        <a class="nav-link" href="/packages"><i class="bi bi-box-seam-fill"></i> الباقات</a>
-        <a class="nav-link" href="/payments"><i class="bi bi-wallet2"></i> المدفوعات</a>
-    </nav>
-    <a href="/add-subscriber" class="btn btn-glow w-100 mt-5 text-white"><i class="bi bi-plus-lg"></i> إضافة مشترك</a>
+{% extends "base.html" %}
+{% block title %}المشتركون{% endblock %}
+{% block content %}
+
+<div class="topline">
+    <h1><i class="fa-solid fa-users" style="color:var(--signal)"></i> إدارة المشتركين (مباشر من الراوتر)</h1>
+    <a href="{{ url_for('add_subscriber') }}" style="background:var(--signal); color:#04141A; font-weight:700; font-size:13.5px; padding:9px 16px; border-radius:8px; text-decoration:none;">
+        <i class="fa-solid fa-user-plus"></i> إضافة مشترك جديد
+    </a>
 </div>
-<div class="col-md-9 col-lg-10 p-4 p-lg-5">
-    <div class="d-flex justify-content-between align-items-center mb-4">
-        <h2 class="fw-bold"><i class="bi bi-people-fill text-info"></i> المشتركين <span class="badge bg-info bg-opacity-10 text-info border border-info border-opacity-25 ms-2">{{ subscribers|length }}</span></h2>
-        <a href="/add-subscriber" class="btn btn-glow text-white"><i class="bi bi-plus"></i> إضافة</a>
-    </div>
 
-    <div class="main-card p-4">
-        <div class="d-flex gap-2 mb-4 flex-wrap">
-            <input id="search" onkeyup="filterTable()" type="text" placeholder="🔍 بحث باسم المشترك أو اسم المستخدم..." class="form-control input-dark flex-grow-1">
-            <button onclick="exportExcel()" class="btn btn-success bg-opacity-10 border border-success border-opacity-25"><i class="bi bi-file-earmark-excel"></i> تصدير Excel</button>
-        </div>
+<style>
+    .sb-search { display: flex; gap: 10px; margin-bottom: 16px; }
+    .sb-input {
+        flex: 1; background: var(--panel-2); border: 1px solid var(--border);
+        color: var(--text); padding: 10px 14px; border-radius: 8px; font-size: 14px;
+        font-family: 'Tajawal', sans-serif;
+    }
+    .sb-input:focus { outline: none; border-color: var(--signal); box-shadow: 0 0 0 3px var(--signal-dim); }
+    .sb-btn {
+        background: var(--signal); color: #04141A; border: none; padding: 0 18px;
+        border-radius: 8px; font-weight: 700; font-size: 13.5px; cursor: pointer;
+    }
+    .sb-btn-cancel {
+        background: none; border: 1px solid var(--border); color: var(--muted);
+        padding: 0 16px; border-radius: 8px; font-size: 13.5px; text-decoration: none;
+        display: flex; align-items: center;
+    }
+    table.sb-table { width: 100%; border-collapse: collapse; font-size: 13.5px; }
+    table.sb-table th { text-align: right; padding: 12px 18px; color: var(--muted); font-weight: 500; font-size: 12px; border-bottom: 1px solid var(--border); }
+    table.sb-table td { padding: 13px 18px; border-bottom: 1px solid var(--border); }
+    table.sb-table tr:last-child td { border-bottom: none; }
+    .sb-select, .sb-mini-input {
+        background: var(--panel-2); border: 1px solid var(--border); color: var(--text);
+        padding: 6px 9px; border-radius: 6px; font-size: 12.5px;
+    }
+    .sb-icon-btn {
+        background: none; border: 1px solid var(--border); color: var(--muted);
+        width: 28px; height: 28px; border-radius: 6px; cursor: pointer; font-size: 12px;
+        display: inline-flex; align-items: center; justify-content: center; text-decoration: none;
+    }
+    .sb-icon-btn.save:hover { color: var(--ok); border-color: var(--ok); }
+    .sb-icon-btn.danger:hover { color: var(--danger); border-color: var(--danger); }
+    .sb-empty { padding: 50px 20px; text-align: center; color: var(--muted); }
+</style>
 
-        <div class="table-responsive">
-        <table id="subsTable" class="table table-dark table-hover align-middle mb-0">
-            <thead class="text-muted small"><tr><th>اسم المشترك</th><th>المستخدم / كلمة المرور</th><th>الباقة</th><th>رقم واتساب</th><th>تاريخ البداية</th><th>تاريخ الانتهاء</th><th>الحالة</th><th>إجراءات</th></tr></thead>
-            <tbody>
-            {% for s in subscribers %}
+{% if error_message %}
+<div class="alert-flash" style="border-right-color:var(--warn);">
+    <i class="fa-solid fa-triangle-exclamation"></i> {{ error_message }}
+    {% if not has_master %}
+        <a href="{{ url_for('routers') }}" style="color:var(--signal)">روح لصفحة الراوترات</a>
+    {% endif %}
+</div>
+{% endif %}
+
+<form method="GET" class="sb-search">
+    <input type="text" name="q" class="sb-input" placeholder="ابحث باسم المستخدم..." value="{{ search_query or '' }}">
+    <button type="submit" class="sb-btn"><i class="fa-solid fa-magnifying-glass"></i> بحث</button>
+    {% if search_query %}
+    <a href="{{ url_for('subscribers') }}" class="sb-btn-cancel">إلغاء</a>
+    {% endif %}
+</form>
+
+<div class="card">
+    {% if subscribers %}
+    <table class="sb-table">
+        <thead>
             <tr>
-                <td class="fw-bold">{{ s['full_name'] if s['full_name'] else s['username'] }}<div class="small text-muted">{{ s['username'] }}</div></td>
-                <td><div style="font-family:monospace">{{ s['username'] }}</div><div class="small text-muted">{{ s['password'] }}</div></td>
-                <td><span class="badge bg-primary bg-opacity-10 text-primary border">{{ s['profile'] }}</span><div class="small text-muted">{{ s['service_type'] }}</div></td>
-                <td class="small">{{ s['phone'] }}</td>
-                <td class="small">{{ s['start_date'] }}</td>
-                <td class="small">{{ s['expiry_date'] }}</td>
-                <td>{% if s['status']=='active' %}<span class="badge bg-success bg-opacity-10 text-success border border-success border-opacity-25">نشط</span>{% else %}<span class="badge bg-danger bg-opacity-10 text-danger">متوقف</span>{% endif %}</td>
+                <th>اسم المستخدم</th>
+                <th>الباقة</th>
+                <th>كلمة مرور جديدة</th>
+                <th>حفظ</th>
+                <th>حذف</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for sub in subscribers %}
+            <tr>
+                <td class="mono"><strong>{{ sub.username }}</strong></td>
                 <td>
-                    <a href="/subscribers/toggle/{{ s['id'] }}" class="action-btn bg-warning bg-opacity-10 text-warning" title="تفعيل/ايقاف"><i class="bi bi-power"></i></a>
-                    <a href="/subscribers/reset/{{ s['id'] }}" class="action-btn bg-info bg-opacity-10 text-info" title="تجديد 30 يوم"><i class="bi bi-arrow-clockwise"></i></a>
-                    <a href="/subscribers/delete/{{ s['id'] }}" onclick="return confirm('حذف؟')" class="action-btn bg-danger bg-opacity-10 text-danger" title="حذف"><i class="bi bi-trash"></i></a>
+                    {% if profiles %}
+                    <select class="sb-select" name="profile" form="ef-{{ loop.index }}">
+                        {% for p in profiles %}
+                        <option value="{{ p.name }}" {{ 'selected' if p.name == sub.get('actual-profile') }}>{{ p.name }}</option>
+                        {% endfor %}
+                    </select>
+                    {% else %}
+                    <span class="mono">{{ sub.get('actual-profile', '—') }}</span>
+                    {% endif %}
+                </td>
+                <td>
+                    <input type="text" name="password" class="sb-mini-input" placeholder="بلا تغيير" form="ef-{{ loop.index }}">
+                </td>
+                <td>
+                    <button type="submit" form="ef-{{ loop.index }}" class="sb-icon-btn save" title="حفظ"><i class="fa-solid fa-check"></i></button>
+                </td>
+                <td>
+                    <a href="{{ url_for('delete_subscriber', username=sub.username) }}" class="sb-icon-btn danger" onclick="return confirm('هل أنت متأكد من الحذف؟')">
+                        <i class="fa-solid fa-trash"></i>
+                    </a>
                 </td>
             </tr>
             {% endfor %}
-            </tbody>
-        </table>
-        </div>
-        {% if not subscribers %}<div class="text-center text-muted py-5">لا يوجد مشتركين بعد - أضف أول مشترك</div>{% endif %}
+        </tbody>
+    </table>
+    {% for sub in subscribers %}
+    <form id="ef-{{ loop.index }}" method="POST" action="{{ url_for('edit_subscriber', username=sub.username) }}" style="display:none;"></form>
+    {% endfor %}
+    {% else %}
+    <div class="sb-empty">
+        <i class="fa-solid fa-inbox" style="font-size:26px; margin-bottom:10px; display:block; color:var(--border);"></i>
+        {% if search_query %}
+            ما في نتائج مطابقة لـ "{{ search_query }}"
+        {% else %}
+            لا توجد أي اشتراكات مضافة حتى الآن.
+        {% endif %}
     </div>
-    <a href="/dashboard" class="d-inline-block mt-4 text-muted text-decoration-none">← رجوع للوحة التحكم</a>
+    {% endif %}
 </div>
-</div></div>
-
-<script>
-function filterTable(){
-  let q=document.getElementById('search').value.toLowerCase();
-  document.querySelectorAll('#subsTable tbody tr').forEach(tr=>{
-    tr.style.display = tr.innerText.toLowerCase().includes(q) ? '' : 'none';
-  });
-}
-function exportExcel(){
-  let table=document.getElementById('subsTable');
-  let html=table.outerHTML;
-  let blob=new Blob(['\ufeff'+html],{type:'application/vnd.ms-excel'});
-  let a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download='subscribers.xls'; a.click();
-}
-</script>
-</body>
-</html>
+{% endblock %}
