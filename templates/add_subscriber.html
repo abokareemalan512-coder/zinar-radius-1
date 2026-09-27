@@ -1,63 +1,54 @@
 {% extends "base.html" %}
 {% block title %}إضافة مشترك{% endblock %}
+
 {% block content %}
+<div class="row justify-content-center">
+    <div class="col-md-8 col-lg-6">
+        <div class="d-flex justify-content-between align-items-center mb-4">
+            <h2>➕ إضافة مشترك جديد</h2>
+            <a href="{{ url_for('subscribers') }}" class="btn btn-secondary">↩ رجوع</a>
+        </div>
 
-<div class="topline">
-    <h1><i class="fa-solid fa-user-plus" style="color:var(--signal)"></i> إضافة مشترك جديد</h1>
-</div>
+        <div class="card p-4">
+            <form method="POST">
+                <div class="mb-3">
+                    <label class="form-label">اسم المستخدم</label>
+                    <input type="text" name="username" class="form-control"
+                           placeholder="اسم المشترك أو اسم البطاقة" required autofocus>
+                </div>
 
-<style>
-    .as-form-group { margin-bottom: 16px; }
-    .as-form-group label { display: block; font-size: 12.5px; color: var(--muted); margin-bottom: 6px; font-weight: 500; }
-    .as-input, .as-select {
-        width: 100%; background: var(--panel-2); border: 1px solid var(--border);
-        color: var(--text); padding: 9px 12px; border-radius: 8px; font-size: 14px;
-        font-family: 'Tajawal', sans-serif;
-    }
-    .as-input:focus, .as-select:focus { outline: none; border-color: var(--signal); box-shadow: 0 0 0 3px var(--signal-dim); }
-    .as-submit {
-        width: 100%; background: var(--signal); color: #04141A; border: none;
-        padding: 11px; border-radius: 9px; font-weight: 700; font-size: 14.5px; cursor: pointer;
-    }
-    .as-submit:hover { background: #4DE0F5; }
-    .as-submit:disabled { background: var(--border); color: var(--muted); cursor: not-allowed; }
-</style>
+                <div class="mb-3">
+                    <label class="form-label">كلمة المرور</label>
+                    <input type="text" name="password" class="form-control"
+                           placeholder="كلمة مرور المشترك" required>
+                </div>
 
-{% if not has_master %}
-<div class="alert-flash" style="border-right-color:var(--warn);">
-    لازم تحدد راوتر كـ "سيرفر رئيسي" أولاً من صفحة
-    <a href="{{ url_for('routers') }}" style="color:var(--signal)">الراوترات</a>.
-</div>
-{% endif %}
+                <div class="mb-4">
+                    <label class="form-label">الباقة</label>
+                    <select name="package" class="form-select">
+                        <option value="">— اختر باقة —</option>
+                        <option value="باقة 5 ميجا">باقة 5 ميجا</option>
+                        <option value="باقة 10 ميجا">باقة 10 ميجا</option>
+                        <option value="باقة 20 ميجا">باقة 20 ميجا</option>
+                        <option value="باقة 50 ميجا">باقة 50 ميجا</option>
+                    </select>
+                </div>
 
-<div style="max-width:480px;">
-    <div class="card" style="padding:24px;">
-        <form method="POST">
-            <div class="as-form-group">
-                <label>اسم المستخدم (Username)</label>
-                <input type="text" name="username" class="as-input" required {{ 'disabled' if not has_master }}>
-            </div>
-            <div class="as-form-group">
-                <label>كلمة المرور (Password)</label>
-                <input type="text" name="password" class="as-input" required {{ 'disabled' if not has_master }}>
-            </div>
-            <div class="as-form-group">
-                <label>الباقة (Profile)</label>
-                {% if profiles %}
-                <select name="profile" class="as-select" {{ 'disabled' if not has_master }}>
-                    <option value="">بدون باقة</option>
-                    {% for p in profiles %}
-                    <option value="{{ p.name }}">{{ p.name }}</option>
-                    {% endfor %}
-                </select>
-                {% else %}
-                <input type="text" name="profile" class="as-input" placeholder="مثال: 5M" {{ 'disabled' if not has_master }}>
-                {% endif %}
-            </div>
-            <button type="submit" class="as-submit" {{ 'disabled' if not has_master }}>
-                حفظ وتفعيل المشترك على الراوتر مباشرة
-            </button>
-        </form>
+                <div class="d-grid gap-2">
+                    <button type="submit" class="btn btn-primary py-2 fw-bold">
+                        💾 حفظ المشترك
+                    </button>
+                    <a href="{{ url_for('subscribers') }}" class="btn btn-secondary">
+                        إلغاء
+                    </a>
+                </div>
+            </form>
+        </div>
+
+        <div class="alert alert-info mt-3 small">
+            💡 <strong>ملاحظة:</strong> تأكد من كتابة اسم المستخدم وكلمة المرور
+            بنفس الطريقة التي تريد إنشاءها على راوتر Mikrotik.
+        </div>
     </div>
 </div>
 {% endblock %}
