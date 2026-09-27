@@ -10,34 +10,36 @@
 </div>
 
 <div class="row g-4">
-    <!-- نموذج الإضافة -->
-    <div class="col-lg-7">
+    <div class="col-lg-8">
         <div class="card p-4">
             <form method="POST" action="{{ url_for('add_subscriber') }}">
-                <div class="mb-3">
-                    <label class="form-label">
-                        <i class="bi bi-person text-accent"></i> اسم المستخدم
-                    </label>
-                    <input type="text"
-                           name="username"
-                           class="form-control"
-                           placeholder="اسم المشترك أو اسم البطاقة"
-                           required
-                           autofocus>
-                </div>
 
                 <div class="mb-3">
                     <label class="form-label">
-                        <i class="bi bi-key text-accent"></i> كلمة المرور
+                        <i class="bi bi-person-badge text-accent"></i> اسم المشترك
                     </label>
-                    <input type="text"
-                           name="password"
-                           class="form-control"
-                           placeholder="كلمة مرور المشترك"
-                           required>
+                    <input type="text" name="name" class="form-control"
+                           placeholder="مثال: أحمد محمد">
                 </div>
 
-                <div class="mb-4">
+                <div class="row">
+                    <div class="col-md-6 mb-3">
+                        <label class="form-label">
+                            <i class="bi bi-person text-accent"></i> اسم المستخدم
+                        </label>
+                        <input type="text" name="username" class="form-control"
+                               placeholder="ahmed123" required autofocus>
+                    </div>
+                    <div class="col-md-6 mb-3">
+                        <label class="form-label">
+                            <i class="bi bi-key text-accent"></i> كلمة المرور
+                        </label>
+                        <input type="text" name="password" class="form-control"
+                               placeholder="••••••" required>
+                    </div>
+                </div>
+
+                <div class="mb-3">
                     <label class="form-label">
                         <i class="bi bi-box-seam text-accent"></i> الباقة
                     </label>
@@ -45,62 +47,46 @@
                         <option value="">— اختر باقة —</option>
                         {% for pkg in packages %}
                         <option value="{{ pkg.name }}">
-                            {{ pkg.name }}{% if pkg.speed %} ({{ pkg.speed }}){% endif %} — {{ pkg.price }} ل.س
+                            {{ pkg.name }} — {{ pkg.duration }} يوم — {{ pkg.price }} ل.س
                         </option>
                         {% else %}
-                        <option value="" disabled>لا توجد باقات — أضف باقة أولًا</option>
+                        <option value="" disabled>لا توجد باقات</option>
                         {% endfor %}
                     </select>
-                    {% if not packages %}
-                    <small class="text-muted d-block mt-2">
-                        <i class="bi bi-info-circle"></i>
-                        لم تُضف أي باقة بعد.
-                        <a href="{{ url_for('packages') }}" class="text-accent">اذهب إلى صفحة الباقات</a>
-                    </small>
-                    {% endif %}
+                </div>
+
+                <div class="mb-4">
+                    <label class="form-label">
+                        <i class="bi bi-router text-accent"></i> الراوتر
+                    </label>
+                    <select name="router_id" class="form-select">
+                        <option value="">— بدون راوتر —</option>
+                        {% for r in routers %}
+                        <option value="{{ r.id }}">{{ r.name }} — {{ r.ip_address }}</option>
+                        {% else %}
+                        <option value="" disabled>لا توجد راوترات</option>
+                        {% endfor %}
+                    </select>
                 </div>
 
                 <div class="d-flex gap-2">
                     <button type="submit" class="btn btn-primary flex-grow-1 py-2 fw-bold">
                         <i class="bi bi-save"></i> حفظ المشترك
                     </button>
-                    <a href="{{ url_for('subscribers') }}" class="btn btn-secondary">
-                        إلغاء
-                    </a>
+                    <a href="{{ url_for('subscribers') }}" class="btn btn-secondary">إلغاء</a>
                 </div>
             </form>
         </div>
     </div>
 
-    <!-- لوحة المعلومات الجانبية -->
-    <div class="col-lg-5">
-        <div class="card p-4 mb-3">
-            <h5 class="text-accent mb-3">
-                <i class="bi bi-lightbulb"></i> ملاحظات مهمة
-            </h5>
-            <ul class="list-unstyled mb-0" style="line-height: 2;">
-                <li>✅ اكتب اسم المستخدم بنفس الطريقة التي تريد إنشاءها على راوتر Mikrotik.</li>
-                <li>✅ كلمة المرور ستُخزَّن كما هي — لا تنسَ كتابتها.</li>
-                <li>✅ الباقات تأتي من صفحة <a href="{{ url_for('packages') }}" class="text-accent">الباقات</a>.</li>
-                <li>✅ بعد الحفظ، سيظهر المشترك في صفحة المشتركين فورًا.</li>
+    <div class="col-lg-4">
+        <div class="alert alert-info">
+            💡 <strong>ملاحظة:</strong>
+            <ul class="mb-0 mt-2" style="line-height: 1.8;">
+                <li>تاريخ الانتهاء يُحسب تلقائيًا من مدة الباقة</li>
+                <li>مثال: باقة 30 يوم → ينتهي بعد 30 يوم من اليوم</li>
+                <li>يمكنك تصفير أو تمديد الاشتراك لاحقًا</li>
             </ul>
-        </div>
-
-        <div class="card p-4">
-            <h5 class="text-accent mb-3">
-                <i class="bi bi-speedometer2"></i> إجراءات سريعة
-            </h5>
-            <div class="d-grid gap-2">
-                <a href="{{ url_for('subscribers') }}" class="btn btn-primary">
-                    <i class="bi bi-people"></i> عرض كل المشتركين
-                </a>
-                <a href="{{ url_for('packages') }}" class="btn btn-primary">
-                    <i class="bi bi-box-seam"></i> إدارة الباقات
-                </a>
-                <a href="{{ url_for('dashboard') }}" class="btn btn-secondary">
-                    <i class="bi bi-house"></i> العودة للوحة التحكم
-                </a>
-            </div>
         </div>
     </div>
 </div>
