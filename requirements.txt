@@ -3,3 +3,11 @@ gunicorn
 routeros_api
 psycopg2-binary
 Flask-SQLAlchemy
+Flask==3.0.0
+Flask-SQLAlchemy==3.1.1
+Flask-CORS==4.0.0
+gunicorn==21.2.0
+psycopg2-binary==2.9.9
+paramiko==3.3.1
+requests==2.31.0
+python-dotenv==1.0.0
