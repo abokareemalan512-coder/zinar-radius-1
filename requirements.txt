@@ -3,3 +3,4 @@ Flask-SQLAlchemy
 psycopg[binary]>=3.1.8
 paramiko
 Werkzeug
+gunicorn
