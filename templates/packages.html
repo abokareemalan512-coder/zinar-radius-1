@@ -1,119 +1,87 @@
 {% extends "base.html" %}
 {% block title %}الباقات{% endblock %}
+
 {% block content %}
-
-<div class="topline">
-    <h1><i class="fa-solid fa-box-archive" style="color:var(--signal)"></i> الباقات المتاحة</h1>
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h2>📦 الباقات المتاحة</h2>
 </div>
 
-<style>
-    .pk-grid { display: grid; grid-template-columns: 320px 1fr; gap: 16px; align-items: start; }
-    .pk-form-group { margin-bottom: 16px; }
-    .pk-form-group label { display: block; font-size: 12.5px; color: var(--muted); margin-bottom: 6px; font-weight: 500; }
-    .pk-input {
-        width: 100%; background: var(--panel-2); border: 1px solid var(--border);
-        color: var(--text); padding: 9px 12px; border-radius: 8px; font-size: 14px;
-        font-family: 'Tajawal', sans-serif;
-    }
-    .pk-input:focus { outline: none; border-color: var(--signal); box-shadow: 0 0 0 3px var(--signal-dim); }
-    .pk-submit {
-        width: 100%; background: var(--signal); color: #04141A; border: none;
-        padding: 11px; border-radius: 9px; font-weight: 700; font-size: 14.5px; cursor: pointer;
-    }
-    .pk-submit:hover { background: #4DE0F5; }
-    table.pk-table { width: 100%; border-collapse: collapse; font-size: 13.5px; }
-    table.pk-table th { text-align: right; padding: 12px 18px; color: var(--muted); font-weight: 500; font-size: 12px; border-bottom: 1px solid var(--border); }
-    table.pk-table td { padding: 13px 18px; border-bottom: 1px solid var(--border); }
-    table.pk-table tr:last-child td { border-bottom: none; }
-    .pk-mini-input {
-        width: 70px; background: var(--panel-2); border: 1px solid var(--border);
-        color: var(--text); padding: 5px 8px; border-radius: 6px; font-size: 13px;
-    }
-    .pk-icon-btn {
-        background: none; border: 1px solid var(--border); color: var(--muted);
-        width: 28px; height: 28px; border-radius: 6px; cursor: pointer; font-size: 12px;
-    }
-    .pk-icon-btn:hover.save { color: var(--ok); border-color: var(--ok); }
-    .pk-icon-btn.danger:hover { color: var(--danger); border-color: var(--danger); }
-    .pk-empty { padding: 50px 20px; text-align: center; color: var(--muted); }
-    @media (max-width: 900px) { .pk-grid { grid-template-columns: 1fr; } }
-</style>
-
-{% if not has_master %}
-<div class="alert-flash" style="border-right-color:var(--warn);">
-    لازم تحدد راوتر كـ "سيرفر رئيسي" أولاً من صفحة
-    <a href="{{ url_for('routers') }}" style="color:var(--signal)">الراوترات</a>.
-</div>
-{% endif %}
-
-<div class="pk-grid">
-    <div class="card" style="padding:22px;">
-        <h2 style="font-size:15.5px; font-weight:700; margin:0 0 18px;">
-            <i class="fa-solid fa-plus" style="color:var(--signal)"></i> إضافة باقة جديدة
-        </h2>
-        <form method="POST">
-            <div class="pk-form-group">
-                <label>اسم الباقة</label>
-                <input type="text" name="name" class="pk-input" required placeholder="مثال: 5M" {{ 'disabled' if not has_master }}>
-            </div>
-            <div class="pk-form-group">
-                <label>السعر</label>
-                <input type="text" name="price" class="pk-input" value="0" {{ 'disabled' if not has_master }}>
-            </div>
-            <div class="pk-form-group">
-                <label>مدة الصلاحية (مثال: 30d أو 0 لبدون انتهاء)</label>
-                <input type="text" name="validity" class="pk-input" value="0" {{ 'disabled' if not has_master }}>
-            </div>
-            <button type="submit" class="pk-submit" {{ 'disabled' if not has_master }}>حفظ الباقة</button>
-        </form>
+<div class="row g-4">
+    <!-- نموذج إضافة باقة -->
+    <div class="col-lg-4">
+        <div class="card p-4">
+            <h5 class="text-accent mb-3">➕ إضافة باقة جديدة</h5>
+            <form method="POST" action="{{ url_for('add_package') }}">
+                <div class="mb-3">
+                    <label class="form-label">اسم الباقة</label>
+                    <input type="text" name="name" class="form-control"
+                           placeholder="مثال: 5M" required>
+                </div>
+                <div class="mb-3">
+                    <label class="form-label">السرعة</label>
+                    <input type="text" name="speed" class="form-control"
+                           placeholder="مثال: 5M/5M">
+                </div>
+                <div class="mb-3">
+                    <label class="form-label">السعر</label>
+                    <input type="number" name="price" class="form-control"
+                           placeholder="0" step="0.01" required>
+                </div>
+                <div class="mb-3">
+                    <label class="form-label">المدة (بالأيام)</label>
+                    <input type="number" name="duration" class="form-control"
+                           placeholder="30" value="30">
+                </div>
+                <button type="submit" class="btn btn-primary w-100">
+                    <i class="bi bi-save"></i> حفظ الباقة
+                </button>
+            </form>
+        </div>
     </div>
 
-    <div class="card">
-        <div class="panel-head">
-            <h2><i class="fa-solid fa-list" style="color:var(--signal)"></i> الباقات الحالية</h2>
+    <!-- عرض الباقات -->
+    <div class="col-lg-8">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="mb-0 text-accent">📋 الباقات الحالية</h5>
+            </div>
+            <div class="table-responsive">
+                <table class="table table-hover">
+                    <thead>
+                        <tr>
+                            <th>#</th>
+                            <th>الاسم</th>
+                            <th>السرعة</th>
+                            <th>السعر</th>
+                            <th>المدة</th>
+                            <th>إجراءات</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for pkg in packages %}
+                        <tr>
+                            <td>{{ pkg.id }}</td>
+                            <td class="text-accent">{{ pkg.name }}</td>
+                            <td>{{ pkg.speed or '-' }}</td>
+                            <td>{{ pkg.price }} ل.س</td>
+                            <td>{{ pkg.duration }} يوم</td>
+                            <td>
+                                <a href="{{ url_for('delete_package', pkg_id=pkg.id) }}"
+                                   class="btn btn-sm btn-danger"
+                                   onclick="return confirm('تأكيد الحذف؟')">🗑</a>
+                            </td>
+                        </tr>
+                        {% else %}
+                        <tr>
+                            <td colspan="6" class="text-center py-5 text-muted">
+                                📭 لا توجد باقات — أضف أول باقة من النموذج
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
         </div>
-        {% if profiles %}
-        <table class="pk-table">
-            <thead>
-                <tr>
-                    <th>الاسم</th>
-                    <th>السعر</th>
-                    <th>الصلاحية</th>
-                    <th>حفظ التعديل</th>
-                    <th>حذف</th>
-                </tr>
-            </thead>
-            <tbody>
-                {% for p in profiles %}
-                <tr>
-                    <td><strong>{{ p.name }}</strong></td>
-                    <td>
-                        <input type="text" name="price" class="pk-mini-input" value="{{ p.price }}" form="pform-{{ loop.index }}">
-                    </td>
-                    <td>
-                        <input type="text" name="validity" class="pk-mini-input" value="{{ p.validity }}" form="pform-{{ loop.index }}">
-                    </td>
-                    <td>
-                        <button type="submit" form="pform-{{ loop.index }}" class="pk-icon-btn save" title="حفظ"><i class="fa-solid fa-check"></i></button>
-                    </td>
-                    <td>
-                        <a href="{{ url_for('delete_package', name=p.name) }}" class="pk-icon-btn danger" style="display:inline-flex; align-items:center; justify-content:center; text-decoration:none;" onclick="return confirm('هل أنت متأكد من حذف هذه الباقة؟')">
-                            <i class="fa-solid fa-trash"></i>
-                        </a>
-                    </td>
-                </tr>
-                {% endfor %}
-            </tbody>
-        </table>
-        {% for p in profiles %}
-        <form id="pform-{{ loop.index }}" method="POST" action="{{ url_for('edit_package', name=p.name) }}" style="display:none;"></form>
-        {% endfor %}
-        {% else %}
-        <div class="pk-empty">
-            <i class="fa-solid fa-box-open" style="font-size:26px; margin-bottom:10px; display:block; color:var(--border);"></i>
-            لا توجد باقات مضافة حتى الآن.
-        </div>
-        {% endif %}
     </div>
 </div>
 {% endblock %}
