@@ -34,6 +34,10 @@ else:
 app.config['SQLALCHEMY_DATABASE_URI'] = database_url
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 
+# ✅ تشخيص: عرض أي قاعدة بيانات نتصل بها
+_masked_url = database_url.split('@')[-1] if '@' in database_url else database_url
+logger.info(f"📊 قاعدة البيانات: ...@{_masked_url}")
+
 db = SQLAlchemy(app)
 
 # ============ نماذج قاعدة البيانات ============
@@ -111,7 +115,41 @@ def init_database():
             logger.error(traceback.format_exc())
 
 
+def ensure_columns():
+    """إضافة الأعمدة الناقصة للجداول الموجودة (Auto Migration)."""
+    with app.app_context():
+        try:
+            from sqlalchemy import text, inspect
+            inspector = inspect(db.engine)
+            existing_tables = inspector.get_table_names()
+
+            with db.engine.connect() as conn:
+                # ✅ إضافة is_active لجدول routers
+                if 'routers' in existing_tables:
+                    cols = [c['name'] for c in inspector.get_columns('routers')]
+                    if 'is_active' not in cols:
+                        conn.execute(text(
+                            "ALTER TABLE routers ADD COLUMN is_active BOOLEAN DEFAULT TRUE"
+                        ))
+                        logger.info("✅ تم إضافة routers.is_active")
+
+                # ✅ إضافة name لجدول subscribers
+                if 'subscribers' in existing_tables:
+                    cols = [c['name'] for c in inspector.get_columns('subscribers')]
+                    if 'name' not in cols:
+                        conn.execute(text(
+                            "ALTER TABLE subscribers ADD COLUMN name VARCHAR(100)"
+                        ))
+                        logger.info("✅ تم إضافة subscribers.name")
+
+                conn.commit()
+            logger.info("✅ فحص الأعمدة اكتمل")
+        except Exception as e:
+            logger.warning(f"⚠️ تحذير في ensure_columns: {e}")
+
+
 init_database()
+ensure_columns()
 
 
 # ============ دوال مساعدة ============
