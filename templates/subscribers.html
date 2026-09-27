@@ -4,19 +4,24 @@
 {% block content %}
 <div class="d-flex justify-content-between align-items-center mb-4">
     <h2>👥 المشتركين</h2>
-    <a href="{{ url_for('add_subscriber') }}" class="btn btn-primary">➕ إضافة مشترك</a>
+    <a href="{{ url_for('add_subscriber') }}" class="btn btn-primary">
+        <i class="bi bi-person-plus"></i> إضافة مشترك
+    </a>
 </div>
 
-<form method="GET" class="mb-3">
-    <div class="input-group">
-        <input type="text" name="q" class="form-control" placeholder="بحث..." value="{{ search }}">
-        <button class="btn btn-primary" type="submit">🔍 بحث</button>
-    </div>
-</form>
+<div class="card mb-3 p-3">
+    <form method="GET" class="d-flex gap-2">
+        <input type="text" name="q" class="form-control"
+               placeholder="بحث عن مشترك..." value="{{ search }}">
+        <button class="btn btn-primary" type="submit">
+            <i class="bi bi-search"></i> بحث
+        </button>
+    </form>
+</div>
 
 <div class="card">
     <div class="table-responsive">
-        <table class="table table-dark table-hover mb-0">
+        <table class="table table-hover">
             <thead>
                 <tr>
                     <th>#</th>
@@ -31,7 +36,7 @@
                 {% for sub in subscribers %}
                 <tr>
                     <td>{{ sub.id }}</td>
-                    <td>{{ sub.username }}</td>
+                    <td class="text-accent">{{ sub.username }}</td>
                     <td>{{ sub.package or '-' }}</td>
                     <td>
                         {% if sub.status == 'active' %}
@@ -44,11 +49,15 @@
                     <td>
                         <a href="{{ url_for('delete_subscriber', sub_id=sub.id) }}"
                            class="btn btn-sm btn-danger"
-                           onclick="return confirm('تأكيد الحذف؟')">🗑 حذف</a>
+                           onclick="return confirm('تأكيد الحذف؟')">🗑</a>
                     </td>
                 </tr>
                 {% else %}
-                <tr><td colspan="6" class="text-center py-4">لا يوجد مشتركين</td></tr>
+                <tr>
+                    <td colspan="6" class="text-center py-5 text-muted">
+                        📭 لا يوجد مشتركون بعد
+                    </td>
+                </tr>
                 {% endfor %}
             </tbody>
         </table>
