@@ -124,7 +124,6 @@ def ensure_columns():
             existing_tables = inspector.get_table_names()
 
             with db.engine.connect() as conn:
-                # ✅ إضافة is_active لجدول routers
                 if 'routers' in existing_tables:
                     cols = [c['name'] for c in inspector.get_columns('routers')]
                     if 'is_active' not in cols:
@@ -133,7 +132,6 @@ def ensure_columns():
                         ))
                         logger.info("✅ تم إضافة routers.is_active")
 
-                # ✅ إضافة name لجدول subscribers
                 if 'subscribers' in existing_tables:
                     cols = [c['name'] for c in inspector.get_columns('subscribers')]
                     if 'name' not in cols:
@@ -297,6 +295,68 @@ def dashboard():
         logger.error(traceback.format_exc())
         flash(f'❌ خطأ: {str(e)}', 'danger')
         return render_template('error.html', error=str(e)), 500
+
+
+# ============ إدارة حساب المدير ============
+
+@app.route('/admin/change-credentials', methods=['POST'])
+def change_admin_credentials():
+    """تغيير اسم المستخدم وكلمة المرور للمدير."""
+    admin_id = session.get('admin_id')
+    if not admin_id:
+        flash('❌ غير مصرح', 'danger')
+        return redirect(url_for('login'))
+
+    admin = AdminUser.query.get(admin_id)
+    if not admin:
+        flash('❌ المستخدم غير موجود', 'danger')
+        return redirect(url_for('login'))
+
+    try:
+        new_username = request.form.get('new_username', '').strip()
+        current_password = request.form.get('current_password', '').strip()
+        new_password = request.form.get('new_password', '').strip()
+        confirm_password = request.form.get('confirm_password', '').strip()
+
+        # التحقق من كلمة المرور الحالية (إلزامي)
+        if not current_password:
+            flash('❌ يجب إدخال كلمة المرور الحالية', 'danger')
+            return redirect(url_for('dashboard'))
+
+        if not check_password_hash(admin.password, current_password):
+            flash('❌ كلمة المرور الحالية غير صحيحة', 'danger')
+            return redirect(url_for('dashboard'))
+
+        # تغيير اسم المستخدم
+        if new_username and new_username != admin.username:
+            existing = AdminUser.query.filter(
+                AdminUser.username == new_username,
+                AdminUser.id != admin_id
+            ).first()
+            if existing:
+                flash('❌ اسم المستخدم موجود مسبقاً', 'danger')
+                return redirect(url_for('dashboard'))
+            admin.username = new_username
+            session['admin_name'] = new_username
+
+        # تغيير كلمة المرور
+        if new_password:
+            if new_password != confirm_password:
+                flash('❌ كلمتا المرور الجديدتان غير متطابقتين', 'danger')
+                return redirect(url_for('dashboard'))
+            if len(new_password) < 6:
+                flash('❌ كلمة المرور يجب أن تكون 6 أحرف على الأقل', 'danger')
+                return redirect(url_for('dashboard'))
+            admin.password = generate_password_hash(new_password)
+
+        db.session.commit()
+        flash('✅ تم تحديث بيانات الدخول بنجاح', 'success')
+    except Exception as e:
+        db.session.rollback()
+        logger.error(f"❌ خطأ في change_admin_credentials: {e}")
+        flash(f'❌ خطأ: {str(e)}', 'danger')
+
+    return redirect(url_for('dashboard'))
 
 
 # ============ الراوترات ============
