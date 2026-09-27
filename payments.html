@@ -1,55 +1,154 @@
-<!DOCTYPE html>
-<html lang="ar" dir="rtl">
-<head>
-<meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>المدفوعات - ZINAR NET</title>
-<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.rtl.min.css">
-<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css">
-<style>
-@import url('https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;800&display=swap');
-body{font-family:'Cairo',sans-serif;background:#0B1020;color:#e2e8f0}
-.sidebar{background:linear-gradient(180deg,#151D32 0%,#0F172A 100%);border-left:1px solid #1e293b;min-height:100vh}
-.brand{font-weight:800;background:linear-gradient(90deg,#38bdf8,#818cf8);-webkit-background-clip:text;-webkit-text-fill-color:transparent;font-size:28px}
-.nav-link{color:#64748b;border-radius:12px;padding:12px 16px;margin-bottom:6px;display:flex;gap:12px}
-.nav-link:hover{background:#1e293b;color:#38bdf8}
-.nav-link.active{background:linear-gradient(90deg,#0284c7,#38bdf8);color:#fff}
-.main-card{background:#151D32;border:1px solid #1e293b;border-radius:20px}
-.stat{border-radius:16px;padding:20px;background:#0B1020;border:1px solid #1e293b}
-</style>
-</head>
-<body>
-<div class="container-fluid p-0"><div class="row g-0">
-<div class="col-md-2 sidebar p-4">
-    <div class="brand">ZINAR NET</div><div class="text-muted small mb-5">المدفوعات</div>
-    <nav class="nav flex-column">
-        <a class="nav-link" href="/dashboard"><i class="bi bi-grid"></i> لوحة التحكم</a>
-        <a class="nav-link" href="/subscribers"><i class="bi bi-people"></i> المشتركون</a>
-        <a class="nav-link" href="/packages"><i class="bi bi-box"></i> الباقات</a>
-        <a class="nav-link active" href="/payments"><i class="bi bi-wallet2"></i> المدفوعات</a>
-    </nav>
+{% extends "base.html" %}
+{% block title %}الدفعات{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h2>💰 الدفعات</h2>
+    <span class="text-muted">
+        إجمالي: <span class="text-accent fw-bold">{{ payments|length }}</span> دفعة
+    </span>
 </div>
-<div class="col-md-10 p-4 p-lg-5">
-    <h2 class="fw-bold mb-4"><i class="bi bi-credit-card text-info"></i> المدفوعات وشام كاش</h2>
-    <div class="row g-3 mb-4">
-        <div class="col-md-4"><div class="stat"><div class="text-muted small">المدفوعات المعلقة</div><h2 class="text-warning fw-bold">{{ pending_pays if pending_pays is defined else 0 }}</h2></div></div>
-        <div class="col-md-8"><div class="stat"><div class="text-muted small">الحالة</div><div class="text-success">النظام شغال ✅ تم اصلاح خطأ السيرفر</div></div></div>
+
+<!-- بطاقات الإحصائيات السريعة -->
+<div class="row g-3 mb-4">
+    <div class="col-md-4">
+        <div class="card p-3 text-center">
+            <div class="fs-2 text-accent">💰</div>
+            <h4 class="mb-1">
+                {{ "%.0f"|format(payments|selectattr('status', 'equalto', 'completed')|map(attribute='amount')|sum) }}
+            </h4>
+            <p class="text-muted mb-0">إجمالي المكتملة</p>
+        </div>
     </div>
-    <div class="main-card p-4">
-        {% if payments and payments|length > 0 %}
-        <table class="table table-dark table-hover" style="--bs-table-bg:transparent">
-            <thead class="text-muted small"><tr><th>#</th><th>المشترك</th><th>المبلغ</th><th>الحالة</th><th>التاريخ</th></tr></thead>
+    <div class="col-md-4">
+        <div class="card p-3 text-center">
+            <div class="fs-2 text-accent">⏳</div>
+            <h4 class="mb-1">
+                {{ payments|selectattr('status', 'equalto', 'pending')|list|length }}
+            </h4>
+            <p class="text-muted mb-0">دفعات معلقة</p>
+        </div>
+    </div>
+    <div class="col-md-4">
+        <div class="card p-3 text-center">
+            <div class="fs-2 text-accent">✅</div>
+            <h4 class="mb-1">
+                {{ payments|selectattr('status', 'equalto', 'completed')|list|length }}
+            </h4>
+            <p class="text-muted mb-0">دفعات مكتملة</p>
+        </div>
+    </div>
+</div>
+
+<!-- جدول الدفعات -->
+<div class="card">
+    <div class="table-responsive">
+        <table class="table table-hover mb-0">
+            <thead>
+                <tr>
+                    <th>#</th>
+                    <th>رقم المشترك</th>
+                    <th>المبلغ</th>
+                    <th>الحالة</th>
+                    <th>تاريخ الإنشاء</th>
+                    <th>إجراءات</th>
+                </tr>
+            </thead>
             <tbody>
-            {% for pay in payments %}
-            <tr><td>{{ pay['id'] }}</td><td>{{ pay['username'] if pay['username'] else pay['subscriber_id'] }}</td><td>${{ pay['amount'] }}</td><td><span class="badge bg-warning">{{ pay['status'] }}</span></td><td>{{ pay['created_at'] if pay['created_at'] else '-' }}</td></tr>
-            {% endfor %}
+                {% for p in payments %}
+                <tr id="payment-row-{{ p.id }}">
+                    <td>{{ p.id }}</td>
+                    <td class="text-accent">
+                        <i class="bi bi-person"></i> #{{ p.subscriber_id }}
+                    </td>
+                    <td class="fw-bold">
+                        {{ "%.0f"|format(p.amount) }} ل.س
+                    </td>
+                    <td>
+                        {% if p.status == 'completed' %}
+                            <span class="badge bg-success">
+                                <i class="bi bi-check-circle"></i> مكتملة
+                            </span>
+                        {% elif p.status == 'pending' %}
+                            <span class="badge bg-warning">
+                                <i class="bi bi-clock"></i> معلقة
+                            </span>
+                        {% else %}
+                            <span class="badge bg-secondary">{{ p.status }}</span>
+                        {% endif %}
+                    </td>
+                    <td>
+                        {{ p.created_at.strftime('%Y-%m-%d %H:%M') if p.created_at else '-' }}
+                    </td>
+                    <td>
+                        {% if p.status != 'completed' %}
+                        <button class="btn btn-sm btn-primary"
+                                onclick="completePayment({{ p.id }})">
+                            <i class="bi bi-check2"></i> تأكيد
+                        </button>
+                        {% else %}
+                        <span class="text-muted small">
+                            <i class="bi bi-check-all"></i> لا يوجد إجراء
+                        </span>
+                        {% endif %}
+                    </td>
+                </tr>
+                {% else %}
+                <tr>
+                    <td colspan="6" class="text-center py-5 text-muted">
+                        📭 لا توجد دفعات بعد
+                    </td>
+                </tr>
+                {% endfor %}
             </tbody>
         </table>
-        {% else %}
-        <div class="text-center py-5 text-muted"><i class="bi bi-inbox fs-1 d-block mb-3"></i>لا يوجد مدفوعات حاليا - النظام جاهز</div>
-        {% endif %}
     </div>
-    <a href="/dashboard" class="btn btn-outline-secondary mt-4 rounded-3">← رجوع</a>
 </div>
-</div></div>
-</body>
-</html>
+
+<!-- سكربت تأكيد الدفع -->
+<script>
+async function completePayment(id) {
+    if (!confirm('تأكيد هذه الدفعة؟')) return;
+
+    const btn = event.target.closest('button');
+    btn.disabled = true;
+    btn.innerHTML = '<i class="bi bi-hourglass-split"></i> جاري...';
+
+    try {
+        const r = await fetch(`/payments/${id}/complete`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' }
+        });
+        const data = await r.json();
+
+        if (data.ok) {
+            // تحديث الصف مباشرة
+            const row = document.getElementById(`payment-row-${id}`);
+            row.querySelector('td:nth-child(4)').innerHTML =
+                '<span class="badge bg-success"><i class="bi bi-check-circle"></i> مكتملة</span>';
+            row.querySelector('td:nth-child(6)').innerHTML =
+                '<span class="text-muted small"><i class="bi bi-check-all"></i> لا يوجد إجراء</span>';
+
+            // إظهار تنبيه نجاح
+            showAlert('✅ تم تأكيد الدفعة', 'success');
+        } else {
+            showAlert('❌ ' + (data.error || 'فشل التأكيد'), 'danger');
+            btn.disabled = false;
+            btn.innerHTML = '<i class="bi bi-check2"></i> تأكيد';
+        }
+    } catch (e) {
+        showAlert('❌ خطأ في الاتصال: ' + e.message, 'danger');
+        btn.disabled = false;
+        btn.innerHTML = '<i class="bi bi-check2"></i> تأكيد';
+    }
+}
+
+function showAlert(msg, type) {
+    const div = document.createElement('div');
+    div.className = `alert alert-${type} alert-dismissible fade show`;
+    div.innerHTML = msg + '<button type="button" class="btn-close" data-bs-dismiss="alert"></button>';
+    document.querySelector('.main').prepend(div);
+    setTimeout(() => div.remove(), 3000);
+}
+</script>
+{% endblock %}
