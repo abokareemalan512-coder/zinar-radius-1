@@ -7,15 +7,16 @@
 </div>
 
 <div class="row g-4">
-    <!-- نموذج إضافة باقة -->
     <div class="col-lg-4">
         <div class="card p-4">
-            <h5 class="text-accent mb-3">➕ إضافة باقة جديدة</h5>
+            <h5 class="text-accent mb-3">
+                <i class="bi bi-plus-circle"></i> إضافة باقة جديدة
+            </h5>
             <form method="POST" action="{{ url_for('add_package') }}">
                 <div class="mb-3">
                     <label class="form-label">اسم الباقة</label>
                     <input type="text" name="name" class="form-control"
-                           placeholder="مثال: 5M" required>
+                           placeholder="مثال: باقة شهرية 5M" required>
                 </div>
                 <div class="mb-3">
                     <label class="form-label">السرعة</label>
@@ -30,7 +31,8 @@
                 <div class="mb-3">
                     <label class="form-label">المدة (بالأيام)</label>
                     <input type="number" name="duration" class="form-control"
-                           placeholder="30" value="30">
+                           placeholder="30" value="30" required>
+                    <small class="text-muted">30 = شهر، 90 = 3 أشهر</small>
                 </div>
                 <button type="submit" class="btn btn-primary w-100">
                     <i class="bi bi-save"></i> حفظ الباقة
@@ -39,14 +41,15 @@
         </div>
     </div>
 
-    <!-- عرض الباقات -->
     <div class="col-lg-8">
         <div class="card">
             <div class="card-header">
-                <h5 class="mb-0 text-accent">📋 الباقات الحالية</h5>
+                <h5 class="mb-0 text-accent">
+                    <i class="bi bi-list-ul"></i> الباقات الحالية
+                </h5>
             </div>
             <div class="table-responsive">
-                <table class="table table-hover">
+                <table class="table table-hover mb-0">
                     <thead>
                         <tr>
                             <th>#</th>
@@ -61,14 +64,25 @@
                         {% for pkg in packages %}
                         <tr>
                             <td>{{ pkg.id }}</td>
-                            <td class="text-accent">{{ pkg.name }}</td>
+                            <td class="text-accent fw-bold">{{ pkg.name }}</td>
                             <td>{{ pkg.speed or '-' }}</td>
                             <td>{{ pkg.price }} ل.س</td>
                             <td>{{ pkg.duration }} يوم</td>
                             <td>
-                                <a href="{{ url_for('delete_package', pkg_id=pkg.id) }}"
-                                   class="btn btn-sm btn-danger"
-                                   onclick="return confirm('تأكيد الحذف؟')">🗑</a>
+                                <div class="d-flex gap-1">
+                                    <button class="btn btn-sm btn-primary"
+                                            onclick='openPackageModal({{ pkg.id }}, "{{ pkg.name|e }}", "{{ pkg.speed|e }}", {{ pkg.price }}, {{ pkg.duration }})'
+                                            title="تعديل">
+                                        <i class="bi bi-pencil"></i>
+                                    </button>
+
+                                    <a href="{{ url_for('delete_package', pkg_id=pkg.id) }}"
+                                       class="btn btn-sm btn-danger"
+                                       onclick="return confirm('تأكيد حذف الباقة؟')"
+                                       title="حذف">
+                                        <i class="bi bi-trash"></i>
+                                    </a>
+                                </div>
                             </td>
                         </tr>
                         {% else %}
@@ -84,4 +98,60 @@
         </div>
     </div>
 </div>
+
+<div class="modal fade" id="editPackageModal" tabindex="-1">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <form method="POST" id="editPackageForm">
+                <div class="modal-header border-secondary">
+                    <h5 class="modal-title text-accent">
+                        <i class="bi bi-pencil-square"></i> تعديل الباقة
+                    </h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                </div>
+
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label class="form-label">اسم الباقة</label>
+                        <input type="text" name="name" id="pkg_name" class="form-control" required>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">السرعة</label>
+                        <input type="text" name="speed" id="pkg_speed" class="form-control">
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">السعر</label>
+                        <input type="number" name="price" id="pkg_price"
+                               class="form-control" step="0.01" required>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">المدة (بالأيام)</label>
+                        <input type="number" name="duration" id="pkg_duration"
+                               class="form-control" required>
+                    </div>
+                </div>
+
+                <div class="modal-footer border-secondary">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">إلغاء</button>
+                    <button type="submit" class="btn btn-primary">
+                        <i class="bi bi-save"></i> حفظ التعديلات
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<script>
+function openPackageModal(id, name, speed, price, duration) {
+    document.getElementById('editPackageForm').action = '/packages/update/' + id;
+    document.getElementById('pkg_name').value = name;
+    document.getElementById('pkg_speed').value = speed;
+    document.getElementById('pkg_price').value = price;
+    document.getElementById('pkg_duration').value = duration;
+
+    const modal = new bootstrap.Modal(document.getElementById('editPackageModal'));
+    modal.show();
+}
+</script>
 {% endblock %}
