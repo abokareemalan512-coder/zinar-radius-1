@@ -5,15 +5,18 @@
 <div class="d-flex justify-content-between align-items-center mb-4">
     <h2>🏠 لوحة التحكم</h2>
 
-    <div class="user-badge">
+    <!-- ✅ بطاقة admin قابلة للضغط -->
+    <button type="button" class="user-badge" data-bs-toggle="modal" data-bs-target="#changeCredModal">
         <div class="user-avatar">{{ admin_name[0]|upper }}</div>
         <div class="user-info">
             <span class="user-greeting">مرحباً بك 👋</span>
             <span class="user-name">{{ admin_name }}</span>
         </div>
-    </div>
+        <i class="bi bi-gear text-accent ms-2"></i>
+    </button>
 </div>
 
+<!-- بطاقات الإحصائيات -->
 <div class="row g-3 mb-4">
     <div class="col-md-3">
         <div class="card p-3 text-center">
@@ -49,6 +52,7 @@
     </div>
 </div>
 
+<!-- حالة النظام + إجراءات سريعة -->
 <div class="row g-3 mb-4">
     <div class="col-md-6">
         <div class="card p-3">
@@ -84,6 +88,7 @@
     </div>
 </div>
 
+<!-- آخر المشتركين -->
 <div class="card">
     <div class="card-header d-flex justify-content-between align-items-center">
         <h5 class="mb-0">👥 آخر المشتركين</h5>
@@ -133,6 +138,77 @@
     </div>
 </div>
 
+<!-- ============ Modal تغيير بيانات الدخول ============ -->
+<div class="modal fade" id="changeCredModal" tabindex="-1">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <form method="POST" action="{{ url_for('change_admin_credentials') }}">
+                <div class="modal-header border-secondary">
+                    <h5 class="modal-title text-accent">
+                        <i class="bi bi-shield-lock"></i> تغيير بيانات الدخول
+                    </h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                </div>
+
+                <div class="modal-body">
+
+                    <div class="alert alert-warning small">
+                        ⚠️ <strong>مطلوب:</strong> يجب إدخال كلمة المرور الحالية لتأكيد التغيير.
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label">
+                            <i class="bi bi-key text-accent"></i> كلمة المرور الحالية *
+                        </label>
+                        <input type="password" name="current_password"
+                               class="form-control" required autocomplete="current-password">
+                    </div>
+
+                    <hr class="border-secondary my-3">
+
+                    <div class="mb-3">
+                        <label class="form-label">
+                            <i class="bi bi-person text-accent"></i> اسم المستخدم الجديد
+                        </label>
+                        <input type="text" name="new_username" class="form-control"
+                               value="{{ admin_name }}"
+                               autocomplete="username">
+                        <small class="text-muted">اتركه كما هو إذا لا تريد تغييره</small>
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label">
+                            <i class="bi bi-lock text-accent"></i> كلمة المرور الجديدة
+                        </label>
+                        <input type="password" name="new_password" class="form-control"
+                               placeholder="اتركها فارغة للإبقاء على الحالية"
+                               minlength="6" autocomplete="new-password">
+                        <small class="text-muted">6 أحرف على الأقل</small>
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label">
+                            <i class="bi bi-lock-fill text-accent"></i> تأكيد كلمة المرور الجديدة
+                        </label>
+                        <input type="password" name="confirm_password" class="form-control"
+                               placeholder="أعد كتابة كلمة المرور الجديدة"
+                               minlength="6" autocomplete="new-password">
+                    </div>
+
+                </div>
+
+                <div class="modal-footer border-secondary">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">إلغاء</button>
+                    <button type="submit" class="btn btn-primary">
+                        <i class="bi bi-save"></i> حفظ التغييرات
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- ============ الأنماط ============ -->
 <style>
     .user-badge {
         display: flex;
@@ -143,8 +219,17 @@
         border-radius: 50px;
         padding: 6px 16px 6px 6px;
         transition: 0.3s;
+        cursor: pointer;
+        color: inherit;
+        font-family: inherit;
     }
     .user-badge:hover {
+        border-color: var(--accent);
+        box-shadow: 0 0 15px var(--accent-glow);
+        background: var(--bg-card);
+    }
+    .user-badge:focus {
+        outline: none;
         border-color: var(--accent);
         box-shadow: 0 0 15px var(--accent-glow);
     }
@@ -165,6 +250,7 @@
         display: flex;
         flex-direction: column;
         line-height: 1.2;
+        text-align: right;
     }
     .user-greeting {
         font-size: 11px;
@@ -176,4 +262,5 @@
         color: var(--accent);
     }
 </style>
+
 {% endblock %}
