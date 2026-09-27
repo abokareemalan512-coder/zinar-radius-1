@@ -5,11 +5,10 @@
 <div class="d-flex justify-content-between align-items-center mb-4">
     <h2>📡 إدارة الراوترات</h2>
     <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#addRouterModal">
-        ➕ إضافة راوتر
+        <i class="bi bi-plus-lg"></i> إضافة راوتر
     </button>
 </div>
 
-<!-- جدول الراوترات -->
 <div class="card">
     <div class="table-responsive">
         <table class="table table-hover mb-0">
@@ -20,6 +19,7 @@
                     <th>عنوان IP</th>
                     <th>المنفذ</th>
                     <th>المستخدم</th>
+                    <th>الحالة</th>
                     <th>الرئيسي</th>
                     <th>إجراءات</th>
                 </tr>
@@ -32,23 +32,67 @@
                     <td>{{ r.ip_address }}</td>
                     <td>{{ r.port }}</td>
                     <td>{{ r.username }}</td>
+
+                    <td>
+                        {% if r.is_active %}
+                            <span class="badge bg-success">
+                                <i class="bi bi-check-circle"></i> نشط
+                            </span>
+                        {% else %}
+                            <span class="badge bg-secondary">
+                                <i class="bi bi-pause-circle"></i> متوقف
+                            </span>
+                        {% endif %}
+                    </td>
+
                     <td>
                         {% if r.is_master %}
                             <span class="badge bg-success">⭐ رئيسي</span>
                         {% else %}
                             <a href="{{ url_for('set_master_router', router_id=r.id) }}"
-                               class="btn btn-sm btn-outline-primary">تعيين كرئيسي</a>
+                               class="btn btn-sm btn-outline-primary"
+                               title="تعيين كرئيسي">
+                                <i class="bi bi-star"></i>
+                            </a>
                         {% endif %}
                     </td>
+
                     <td>
-                        <a href="{{ url_for('delete_router', router_id=r.id) }}"
-                           class="btn btn-sm btn-danger"
-                           onclick="return confirm('تأكيد حذف الراوتر {{ r.name }}؟')">🗑 حذف</a>
+                        <div class="d-flex gap-1 flex-wrap">
+                            <a href="{{ url_for('toggle_router', router_id=r.id) }}"
+                               class="btn btn-sm {% if r.is_active %}btn-warning{% else %}btn-success{% endif %}"
+                               title="{% if r.is_active %}إيقاف{% else %}تشغيل{% endif %}">
+                                {% if r.is_active %}
+                                    <i class="bi bi-pause-fill"></i>
+                                {% else %}
+                                    <i class="bi bi-play-fill"></i>
+                                {% endif %}
+                            </a>
+
+                            <a href="{{ url_for('test_router', router_id=r.id) }}"
+                               class="btn btn-sm btn-info"
+                               title="اختبار الاتصال">
+                                <i class="bi bi-wifi"></i>
+                            </a>
+
+                            <button class="btn btn-sm btn-primary"
+                                    onclick='openEditModal({{ r.id }}, "{{ r.name|e }}", "{{ r.ip_address|e }}", "{{ r.username|e }}", {{ r.port }})'
+                                    title="تعديل">
+                                <i class="bi bi-pencil"></i>
+                            </button>
+
+                            <a href="{{ url_for('delete_router', router_id=r.id) }}"
+                               class="btn btn-sm btn-danger"
+                               onclick="return confirm('تأكيد حذف الراوتر {{ r.name }}؟')"
+                               title="حذف">
+                                <i class="bi bi-trash"></i>
+                            </a>
+                        </div>
                     </td>
                 </tr>
                 {% else %}
                 <tr>
-                    <td colspan="7" class="text-center py-5 text-muted">
+                    <td colspan="8" class="text-center py-5 text-muted">
                         📭 لا يوجد راوترات — أضف أول راوتر من الزر أعلاه
                     </td>
                 </tr>
@@ -58,13 +102,15 @@
     </div>
 </div>
 
-<!-- نموذج إضافة راوتر (Modal) -->
+<!-- Modal إضافة راوتر -->
 <div class="modal fade" id="addRouterModal" tabindex="-1">
     <div class="modal-dialog modal-dialog-centered">
-        <div class="modal-content" style="background: var(--bg-card); color: var(--text-main);">
+        <div class="modal-content">
             <form method="POST" action="{{ url_for('routers') }}">
                 <div class="modal-header border-secondary">
-                    <h5 class="modal-title text-accent">➕ إضافة راوتر جديد</h5>
+                    <h5 class="modal-title text-accent">
+                        <i class="bi bi-plus-circle"></i> إضافة راوتر جديد
+                    </h5>
                     <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
                 </div>
 
@@ -103,17 +149,86 @@
                     <div class="form-check">
                         <input type="checkbox" name="is_master" class="form-check-input" id="isMaster">
                         <label class="form-check-label" for="isMaster">
-                            تعيين كراوتر رئيسي ⭐
+                            ⭐ تعيين كراوتر رئيسي
                         </label>
                     </div>
                 </div>
 
                 <div class="modal-footer border-secondary">
                     <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">إلغاء</button>
-                    <button type="submit" class="btn btn-primary">💾 حفظ</button>
+                    <button type="submit" class="btn btn-primary">
+                        <i class="bi bi-save"></i> حفظ
+                    </button>
                 </div>
             </form>
         </div>
     </div>
 </div>
+
+<!-- Modal تعديل راوتر -->
+<div class="modal fade" id="editRouterModal" tabindex="-1">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <form method="POST" id="editRouterForm">
+                <div class="modal-header border-secondary">
+                    <h5 class="modal-title text-accent">
+                        <i class="bi bi-pencil-square"></i> تعديل الراوتر
+                    </h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                </div>
+
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label class="form-label">اسم الراوتر</label>
+                        <input type="text" name="name" id="edit_name" class="form-control" required>
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label">عنوان IP</label>
+                        <input type="text" name="ip_address" id="edit_ip" class="form-control" required>
+                    </div>
+
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label">اسم المستخدم</label>
+                            <input type="text" name="username" id="edit_username" class="form-control" required>
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label">كلمة المرور</label>
+                            <input type="password" name="password" id="edit_password"
+                                   class="form-control" placeholder="اتركها فارغة للإبقاء">
+                        </div>
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label">منفذ SSH</label>
+                        <input type="number" name="port" id="edit_port" class="form-control"
+                               min="1" max="65535">
+                    </div>
+                </div>
+
+                <div class="modal-footer border-secondary">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">إلغاء</button>
+                    <button type="submit" class="btn btn-primary">
+                        <i class="bi bi-save"></i> حفظ التعديلات
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<script>
+function openEditModal(id, name, ip, username, port) {
+    document.getElementById('editRouterForm').action = '/routers/update/' + id;
+    document.getElementById('edit_name').value = name;
+    document.getElementById('edit_ip').value = ip;
+    document.getElementById('edit_username').value = username;
+    document.getElementById('edit_port').value = port;
+    document.getElementById('edit_password').value = '';
+
+    const modal = new bootstrap.Modal(document.getElementById('editRouterModal'));
+    modal.show();
+}
+</script>
 {% endblock %}
