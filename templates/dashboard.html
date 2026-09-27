@@ -4,10 +4,16 @@
 {% block content %}
 <div class="d-flex justify-content-between align-items-center mb-4">
     <h2>🏠 لوحة التحكم</h2>
-    <span class="text-muted">مرحباً، <span class="text-accent">{{ admin_name }}</span></span>
+
+    <div class="user-badge">
+        <div class="user-avatar">{{ admin_name[0]|upper }}</div>
+        <div class="user-info">
+            <span class="user-greeting">مرحباً بك 👋</span>
+            <span class="user-name">{{ admin_name }}</span>
+        </div>
+    </div>
 </div>
 
-<!-- بطاقات الإحصائيات -->
 <div class="row g-3 mb-4">
     <div class="col-md-3">
         <div class="card p-3 text-center">
@@ -17,7 +23,6 @@
             <small class="text-accent">🟢 متصل: {{ routers_online }}</small>
         </div>
     </div>
-
     <div class="col-md-3">
         <div class="card p-3 text-center">
             <div class="fs-1 text-accent">👥</div>
@@ -26,7 +31,6 @@
             <small class="text-accent">✅ نشط: {{ active_subs }}</small>
         </div>
     </div>
-
     <div class="col-md-3">
         <div class="card p-3 text-center">
             <div class="fs-1 text-accent">💰</div>
@@ -35,7 +39,6 @@
             <small class="text-accent">⏳ معلقة: {{ pending_pays }}</small>
         </div>
     </div>
-
     <div class="col-md-3">
         <div class="card p-3 text-center">
             <div class="fs-1 text-accent">✨</div>
@@ -46,7 +49,6 @@
     </div>
 </div>
 
-<!-- حالة النظام -->
 <div class="row g-3 mb-4">
     <div class="col-md-6">
         <div class="card p-3">
@@ -82,7 +84,6 @@
     </div>
 </div>
 
-<!-- آخر المشتركين -->
 <div class="card">
     <div class="card-header d-flex justify-content-between align-items-center">
         <h5 class="mb-0">👥 آخر المشتركين</h5>
@@ -93,6 +94,7 @@
             <thead>
                 <tr>
                     <th>#</th>
+                    <th>اسم المشترك</th>
                     <th>اسم المستخدم</th>
                     <th>الباقة</th>
                     <th>الحالة</th>
@@ -103,11 +105,16 @@
                 {% for sub in subscribers %}
                 <tr>
                     <td>{{ sub.id }}</td>
-                    <td class="text-accent">{{ sub.username }}</td>
+                    <td class="text-accent">{{ sub.name or sub.username }}</td>
+                    <td>{{ sub.username }}</td>
                     <td>{{ sub.package or '-' }}</td>
                     <td>
                         {% if sub.status == 'active' %}
                             <span class="badge bg-success">نشط</span>
+                        {% elif sub.status == 'paused' %}
+                            <span class="badge bg-warning">موقوف</span>
+                        {% elif sub.status == 'expired' %}
+                            <span class="badge bg-danger">منتهي</span>
                         {% else %}
                             <span class="badge bg-secondary">{{ sub.status }}</span>
                         {% endif %}
@@ -116,7 +123,7 @@
                 </tr>
                 {% else %}
                 <tr>
-                    <td colspan="5" class="text-center py-4 text-muted">
+                    <td colspan="6" class="text-center py-4 text-muted">
                         لا يوجد مشتركون بعد
                     </td>
                 </tr>
@@ -125,4 +132,48 @@
         </table>
     </div>
 </div>
+
+<style>
+    .user-badge {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        background: var(--bg-card);
+        border: 1px solid var(--bg-hover);
+        border-radius: 50px;
+        padding: 6px 16px 6px 6px;
+        transition: 0.3s;
+    }
+    .user-badge:hover {
+        border-color: var(--accent);
+        box-shadow: 0 0 15px var(--accent-glow);
+    }
+    .user-avatar {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        width: 40px;
+        height: 40px;
+        background: linear-gradient(135deg, var(--accent), #0ea5e9);
+        color: #0f172a;
+        font-weight: 800;
+        font-size: 18px;
+        border-radius: 50%;
+        box-shadow: 0 3px 10px var(--accent-glow);
+    }
+    .user-info {
+        display: flex;
+        flex-direction: column;
+        line-height: 1.2;
+    }
+    .user-greeting {
+        font-size: 11px;
+        color: var(--text-muted);
+    }
+    .user-name {
+        font-size: 14px;
+        font-weight: 700;
+        color: var(--accent);
+    }
+</style>
 {% endblock %}
