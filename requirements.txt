@@ -2,3 +2,4 @@ Flask
 gunicorn
 routeros_api
 psycopg2-binary
+Flask-SQLAlchemy
