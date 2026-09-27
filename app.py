@@ -26,10 +26,12 @@ database_url = os.environ.get('DATABASE_URL')
 if not database_url:
     database_url = 'sqlite:///zinar.db'
 else:
+    # Render قد يعطي postgres:// — نحوّلها إلى postgresql://
     if database_url.startswith('postgres://'):
         database_url = database_url.replace('postgres://', 'postgresql://', 1)
+    # ✅ استخدام psycopg3 بدل psycopg2
     if 'postgresql://' in database_url and '+psycopg' not in database_url:
-        database_url = database_url.replace('postgresql://', 'postgresql+psycopg2://', 1)
+        database_url = database_url.replace('postgresql://', 'postgresql+psycopg://', 1)
 
 app.config['SQLALCHEMY_DATABASE_URI'] = database_url
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
@@ -121,7 +123,7 @@ def test_mikrotik_connection(router):
         )
         ssh.close()
         return True
-    except (paramiko.SSHException, socket.error, Exception) as e:
+    except Exception as e:
         logger.warning(f"⚠️ فشل الاتصال بـ {router.name}: {e}")
         return False
 
@@ -163,7 +165,6 @@ def check_admin_login():
         return
     if request.endpoint.startswith('static'):
         return
-    # المسارات العامة
     public_endpoints = {'login', 'logout'}
     if request.endpoint in public_endpoints:
         return
@@ -217,7 +218,6 @@ def dashboard():
         active_subs = Subscriber.query.filter_by(status='active').count()
         pending_pays = Payment.query.filter_by(status='pending').count()
 
-        # إيرادات اليوم — الطريقة الآمنة مع كل قواعد البيانات
         start, end = _day_bounds()
         today_revenue = db.session.query(db.func.sum(Payment.amount)).filter(
             Payment.status == 'completed',
@@ -225,7 +225,6 @@ def dashboard():
             Payment.created_at < end
         ).scalar() or 0
 
-        # مستخدمون جدد اليوم
         new_users_today = Subscriber.query.filter(
             Subscriber.created_at >= start,
             Subscriber.created_at < end
@@ -465,7 +464,6 @@ def update_admin_profile():
         new_password = (data.get('password') or '').strip()
         old_password = (data.get('old_password') or '').strip()
 
-        # تعديل كلمة المرور يتطلب التحقق من القديمة
         if new_password:
             if not old_password or not check_password_hash(admin.password, old_password):
                 return jsonify({'ok': False, 'error': 'كلمة المرور القديمة غير صحيحة'}), 400
