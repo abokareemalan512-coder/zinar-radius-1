@@ -1,5 +1,46 @@
-<form method="post" style="text-align:center;margin-top:100px">
-<input name="username" placeholder="admin"><br><br>
-<input name="password" type="password" placeholder="admin123"><br><br>
-<button>دخول</button>
-</form>
+{% extends "base.html" %}
+{% block title %}تسجيل الدخول{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center align-items-center" style="min-height: 80vh;">
+    <div class="col-md-5 col-lg-4">
+        <div class="card p-4 shadow-lg">
+            <div class="text-center mb-4">
+                <h2 class="fw-bold">
+                    <span class="text-accent">⚡ ZINAR</span>
+                </h2>
+                <p class="text-muted">نظام إدارة شبكات Mikrotik</p>
+            </div>
+
+            <form method="POST" action="{{ url_for('login') }}">
+                <div class="mb-3">
+                    <label class="form-label">اسم المستخدم</label>
+                    <div class="input-group">
+                        <span class="input-group-text bg-dark border-secondary text-accent">👤</span>
+                        <input type="text" name="username" class="form-control"
+                               placeholder="أدخل اسم المستخدم" required autofocus>
+                    </div>
+                </div>
+
+                <div class="mb-4">
+                    <label class="form-label">كلمة المرور</label>
+                    <div class="input-group">
+                        <span class="input-group-text bg-dark border-secondary text-accent">🔒</span>
+                        <input type="password" name="password" class="form-control"
+                               placeholder="أدخل كلمة المرور" required>
+                    </div>
+                </div>
+
+                <button type="submit" class="btn btn-primary w-100 py-2 fw-bold">
+                    🚀 تسجيل الدخول
+                </button>
+            </form>
+
+            <hr class="my-4 border-secondary">
+            <p class="text-center text-muted small mb-0">
+                © 2024 ZINAR — جميع الحقوق محفوظة
+            </p>
+        </div>
+    </div>
+</div>
+{% endblock %}
