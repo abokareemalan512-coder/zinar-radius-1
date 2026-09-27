@@ -1,16 +1,21 @@
 import os
 import logging
 import traceback
-from flask import Flask, render_template, request, redirect, url_for, flash
+from flask import Flask, render_template, request, redirect, url_for, flash, jsonify
 from flask_sqlalchemy import SQLAlchemy
-import mikrotik_api
+from flask_cors import CORS
+import librouteros  # مكتبة للاتصال بـ Mikrotik
 
 app = Flask(__name__)
 app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', 'zinar-secret-key-123')
 
+# تفعيل CORS للاتصال من Frontend
+CORS(app, resources={r"/api/*": {"origins": "*"}})
+
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
+# ============ إعدادات قاعدة البيانات ============
 database_url = os.environ.get('DATABASE_URL', 'sqlite:///zinar.db')
 if database_url and database_url.startswith('postgres://'):
     database_url = database_url.replace('postgres://', 'postgresql://', 1)
@@ -22,6 +27,7 @@ app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 
 db = SQLAlchemy(app)
 
+# ============ ترجمة النصوص ============
 def t(key):
     translations = {
         'brand_sub': 'نظام إدارة المشتركين',
@@ -37,24 +43,85 @@ def t(key):
 app.jinja_env.globals['t'] = t
 app.jinja_env.filters['t'] = t
 
-# ----------------- نماذج قاعدة البيانات -----------------
+# ============ نماذج قاعدة البيانات ============
 class Router(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     name = db.Column(db.String(100), nullable=False)
     ip_address = db.Column(db.String(50), nullable=False)
     username = db.Column(db.String(50), nullable=False)
-    password = db.Column(db.String(50), nullable=False)
+    password = db.Column(db.String(100), nullable=False)
     port = db.Column(db.Integer, default=8728)
-    is_master = db.Column(db.Boolean, default=False)  # سيرفر User Manager الرئيسي (RADIUS)
+    is_master = db.Column(db.Boolean, default=False)
+    created_at = db.Column(db.DateTime, default=db.func.now())
+
+class AdminUser(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    username = db.Column(db.String(50), unique=True, nullable=False)
+    password = db.Column(db.String(100), nullable=False)
+    created_at = db.Column(db.DateTime, default=db.func.now())
 
 with app.app_context():
     db.create_all()
+    # إنشاء admin افتراضي إذا ما كان موجود
+    if not AdminUser.query.filter_by(username='admin').first():
+        admin = AdminUser(username='admin', password='admin123')
+        db.session.add(admin)
+        db.session.commit()
 
+# ============ دوال مساعدة ============
 def get_master_router():
-    """يرجع الراوتر المعرّف كسيرفر User Manager الرئيسي، أو None إذا ما في."""
+    """ترجع الراوتر الرئيسي"""
     return Router.query.filter_by(is_master=True).first()
 
-# ----------------- المسارات -----------------
+def test_mikrotik_connection(router):
+    """اختبار الاتصال بـ Mikrotik"""
+    try:
+        conn = librouteros.connect(
+            host=router.ip_address,
+            username=router.username,
+            password=router.password,
+            port=router.port
+        )
+        conn.close()
+        return True
+    except Exception as e:
+        logger.error(f"خطأ في الاتصال بـ {router.name}: {e}")
+        return False
+
+def get_mikrotik_users(router):
+    """جلب المستخدمين من Mikrotik User Manager"""
+    try:
+        conn = librouteros.connect(
+            host=router.ip_address,
+            username=router.username,
+            password=router.password,
+            port=router.port
+        )
+        users = conn('/user/print')
+        conn.close()
+        return users
+    except Exception as e:
+        logger.error(f"خطأ في جلب المستخدمين: {e}")
+        return []
+
+def get_ppp_connections(router):
+    """جلب اتصالات PPP النشطة"""
+    try:
+        conn = librouteros.connect(
+            host=router.ip_address,
+            username=router.username,
+            password=router.password,
+            port=router.port
+        )
+        sessions = conn('/ppp/secret/print')
+        conn.close()
+        return len(sessions)
+    except Exception as e:
+        logger.error(f"خطأ في جلب الجلسات: {e}")
+        return 0
+
+# ============ المسارات / Routes ============
+
 @app.route('/')
 def index():
     return redirect(url_for('dashboard'))
@@ -70,27 +137,25 @@ def dashboard():
     try:
         routers_list = Router.query.all()
         routers_count = len(routers_list)
-    except Exception:
-        logger.exception("فشل في جلب الراوترات لصفحة dashboard")
+        routers_online = sum(1 for r in routers_list if test_mikrotik_connection(r))
+    except Exception as e:
+        logger.exception("خطأ في جلب الراوترات")
         routers_list = []
         routers_count = 0
+        routers_online = 0
 
-    live_stats = mikrotik_api.get_all_routers_stats(routers_list)
-    active_sessions = live_stats['totals']['ppp_active'] + live_stats['totals']['hotspot_active']
-    routers_online = live_stats['totals']['online_count']
-
-    # عدد المشتركين الحقيقي من User Manager (مش من قاعدة بيانات منفصلة)
+    master = get_master_router()
     sub_count = 0
     active_subs = 0
     subscribers_preview = []
-    master = get_master_router()
+    active_sessions = 0
+
     if master:
-        result = mikrotik_api.get_userman_users(master)
-        if result.get('success'):
-            raw_users = result.get('raw', [])
-            sub_count = len(raw_users)
-            active_subs = sub_count  # User Manager ما بيرجع حالة enabled/disabled مباشرة بهالقراءة البسيطة
-            subscribers_preview = raw_users[-8:][::-1]
+        subscribers = get_mikrotik_users(master)
+        sub_count = len(subscribers)
+        active_subs = sub_count
+        subscribers_preview = subscribers[-8:] if len(subscribers) > 8 else subscribers
+        active_sessions = get_ppp_connections(master)
 
     try:
         return render_template(
@@ -106,111 +171,80 @@ def dashboard():
             has_master=master is not None
         )
     except Exception as e:
-        logger.error("فشل في عرض dashboard.html: %s", e)
-        logger.error(traceback.format_exc())
+        logger.error(f"خطأ في عرض dashboard: {e}")
         return f"<h2>خطأ في عرض لوحة التحكم</h2><pre>{traceback.format_exc()}</pre>", 500
 
 @app.route('/routers', methods=['GET', 'POST'])
 def routers():
     if request.method == 'POST':
-        name = request.form.get('name')
-        ip_address = request.form.get('ip') or request.form.get('ip_address')
-        username = request.form.get('username')
-        password = request.form.get('password')
-        port = request.form.get('port', 8728)
+        name = request.form.get('name', '').strip()
+        ip_address = request.form.get('ip_address', '').strip()
+        username = request.form.get('username', '').strip()
+        password = request.form.get('password', '').strip()
+        port = request.form.get('port', '8728')
         is_master = request.form.get('is_master') == 'on'
+
         try:
             port = int(port)
         except (TypeError, ValueError):
             port = 8728
 
-        if name and ip_address:
-            if is_master:
-                # راوتر واحد بس ممكن يكون رئيسي بأي وقت
-                Router.query.update({Router.is_master: False})
-            new_router = Router(name=name, ip_address=ip_address, username=username,
-                                 password=password, port=port, is_master=is_master)
-            db.session.add(new_router)
-            db.session.commit()
-            flash('تمت إضافة الراوتر بنجاح', 'success')
-        else:
-            flash('لازم تعبي اسم الراوتر وعنوان الآيباد على الأقل', 'danger')
+        if not name or not ip_address:
+            flash('لازم تعبي: اسم الراوتر وعنوان IP', 'danger')
+            return redirect(url_for('routers'))
+
+        if is_master:
+            Router.query.update({Router.is_master: False})
+
+        new_router = Router(
+            name=name,
+            ip_address=ip_address,
+            username=username,
+            password=password,
+            port=port,
+            is_master=is_master
+        )
+        db.session.add(new_router)
+        db.session.commit()
+        flash(f'✅ تمت إضافة الراوتر "{name}" بنجاح', 'success')
         return redirect(url_for('routers'))
 
     try:
         routers_list = Router.query.all()
-    except Exception:
-        logger.exception("فشل في جلب قائمة الراوترات")
+    except Exception as e:
+        logger.exception("خطأ في جلب الراوترات")
         routers_list = []
 
     connection_status = {}
     for r in routers_list:
-        connection_status[r.id] = mikrotik_api.test_connection(r)
+        connection_status[r.id] = test_mikrotik_connection(r)
 
     return render_template('routers.html', routers=routers_list, connection_status=connection_status)
 
 @app.route('/routers/set_master/<int:id>')
 def set_master_router(id):
-    Router.query.update({Router.is_master: False})
-    router = Router.query.get_or_404(id)
-    router.is_master = True
-    db.session.commit()
-    flash(f'صار "{router.name}" هو سيرفر User Manager الرئيسي', 'success')
+    try:
+        Router.query.update({Router.is_master: False})
+        router = Router.query.get_or_404(id)
+        router.is_master = True
+        db.session.commit()
+        flash(f'✅ "{router.name}" الآن سيرفر RADIUS الرئيسي', 'success')
+    except Exception as e:
+        logger.error(f"خطأ في تحديد الراوتر الرئيسي: {e}")
+        flash('❌ فشل تحديث الراوتر الرئيسي', 'danger')
     return redirect(url_for('routers'))
 
-@app.route('/packages', methods=['GET', 'POST'])
-def packages():
-    master = get_master_router()
-
-    if request.method == 'POST':
-        if not master:
-            flash('لازم تحدد راوتر رئيسي أولاً من صفحة الراوترات', 'danger')
-            return redirect(url_for('routers'))
-
-        name = request.form.get('name')
-        price = request.form.get('price', '0')
-        validity = request.form.get('validity', '0')
-
-        if name:
-            result = mikrotik_api.add_userman_profile(master, name, price, validity)
-            if result.get('success'):
-                flash('تمت إضافة الباقة بنجاح', 'success')
-            else:
-                flash(f"فشلت الإضافة: {result.get('error')}", 'danger')
-        else:
-            flash('لازم تكتب اسم الباقة', 'danger')
-        return redirect(url_for('packages'))
-
-    profiles = []
-    if master:
-        result = mikrotik_api.get_userman_profiles(master)
-        if result.get('success'):
-            profiles = result.get('raw', [])
-    return render_template('packages.html', profiles=profiles, has_master=master is not None)
-
-@app.route('/packages/delete/<name>')
-def delete_package(name):
-    master = get_master_router()
-    if master:
-        result = mikrotik_api.remove_userman_profile(master, name)
-        if result.get('success'):
-            flash('تم حذف الباقة بنجاح', 'success')
-        else:
-            flash(f"فشل الحذف: {result.get('error')}", 'danger')
-    return redirect(url_for('packages'))
-
-@app.route('/packages/edit/<name>', methods=['POST'])
-def edit_package(name):
-    master = get_master_router()
-    if master:
-        price = request.form.get('price')
-        validity = request.form.get('validity')
-        result = mikrotik_api.edit_userman_profile(master, name, price, validity)
-        if result.get('success'):
-            flash('تم تعديل الباقة بنجاح', 'success')
-        else:
-            flash(f"فشل التعديل: {result.get('error')}", 'danger')
-    return redirect(url_for('packages'))
+@app.route('/routers/delete/<int:id>')
+def delete_router(id):
+    try:
+        router = Router.query.get_or_404(id)
+        db.session.delete(router)
+        db.session.commit()
+        flash(f'✅ تم حذف الراوتر "{router.name}" بنجاح', 'success')
+    except Exception as e:
+        logger.error(f"خطأ في حذف الراوتر: {e}")
+        flash('❌ فشل حذف الراوتر', 'danger')
+    return redirect(url_for('routers'))
 
 @app.route('/subscribers')
 def subscribers():
@@ -220,83 +254,134 @@ def subscribers():
     error_message = None
 
     if not master:
-        error_message = 'لازم تحدد راوتر كـ "سيرفر رئيسي" أولاً من صفحة الراوترات.'
+        error_message = '⚠️ لازم تحدد راوتر رئيسي من صفحة الراوترات'
     else:
-        result = mikrotik_api.get_userman_users(master)
-        if result.get('success'):
-            subscribers_list = result.get('raw', [])
-            if search_query:
-                subscribers_list = [
-                    s for s in subscribers_list
-                    if search_query.lower() in s.get('username', '').lower()
-                ]
-        else:
-            error_message = f"تعذر الاتصال بالراوتر الرئيسي: {result.get('error')}"
+        subscribers_list = get_mikrotik_users(master)
+        if search_query:
+            subscribers_list = [
+                s for s in subscribers_list
+                if search_query.lower() in s.get('name', '').lower()
+            ]
 
-    profiles = []
-    if master:
-        p_result = mikrotik_api.get_userman_profiles(master)
-        if p_result.get('success'):
-            profiles = p_result.get('raw', [])
+    return render_template(
+        'subscribers.html',
+        subscribers=subscribers_list,
+        search_query=search_query,
+        error_message=error_message,
+        has_master=master is not None
+    )
 
-    return render_template('subscribers.html', subscribers=subscribers_list,
-                            search_query=search_query, error_message=error_message,
-                            has_master=master is not None, profiles=profiles)
-
-@app.route('/subscribers/edit/<username>', methods=['POST'])
-def edit_subscriber(username):
-    master = get_master_router()
-    if master:
-        password = request.form.get('password')
-        profile = request.form.get('profile')
-        result = mikrotik_api.edit_userman_user(master, username, password or None, profile or None)
-        if result.get('success'):
-            flash('تم تعديل المشترك بنجاح', 'success')
-        else:
-            flash(f"فشل التعديل: {result.get('error')}", 'danger')
-    return redirect(url_for('subscribers'))
-
-@app.route('/add_subscriber', methods=['GET', 'POST'])
+@app.route('/subscribers/add', methods=['GET', 'POST'])
 def add_subscriber():
     master = get_master_router()
 
     if request.method == 'POST':
-        username = request.form.get('username')
-        password = request.form.get('password')
-        profile = request.form.get('profile')
+        username = request.form.get('username', '').strip()
+        password = request.form.get('password', '').strip()
 
         if not master:
-            flash('لازم تحدد راوتر رئيسي أولاً من صفحة الراوترات', 'danger')
+            flash('⚠️ لازم تحدد راوتر رئيسي أولاً', 'danger')
             return redirect(url_for('routers'))
 
-        if username and password:
-            result = mikrotik_api.add_userman_user(master, username, password, profile)
-            if result.get('success'):
-                flash('تمت إضافة المشترك بنجاح على الراوتر مباشرة', 'success')
-            else:
-                flash(f"فشلت الإضافة: {result.get('error')}", 'danger')
-        else:
-            flash('لازم تعبي اسم المستخدم وكلمة المرور على الأقل', 'danger')
-        return redirect(url_for('subscribers'))
+        if not username or not password:
+            flash('❌ لازم تعبي: الاسم وكلمة المرور', 'danger')
+            return redirect(url_for('add_subscriber'))
 
-    profiles = []
-    if master:
-        result = mikrotik_api.get_userman_profiles(master)
-        if result.get('success'):
-            profiles = result.get('raw', [])
+        try:
+            conn = librouteros.connect(
+                host=master.ip_address,
+                username=master.username,
+                password=master.password,
+                port=master.port
+            )
+            conn('/user/add', name=username, password=password)
+            conn.close()
+            flash(f'✅ تم إضافة المستخدم "{username}" بنجاح', 'success')
+            return redirect(url_for('subscribers'))
+        except Exception as e:
+            logger.error(f"خطأ في إضافة مستخدم: {e}")
+            flash(f'❌ فشل: {str(e)}', 'danger')
+            return redirect(url_for('add_subscriber'))
 
-    return render_template('add_subscriber.html', has_master=master is not None, profiles=profiles)
+    return render_template('add_subscriber.html', has_master=master is not None)
 
-@app.route('/delete_subscriber/<username>')
+@app.route('/subscribers/delete/<username>')
 def delete_subscriber(username):
     master = get_master_router()
     if master:
-        result = mikrotik_api.remove_userman_user(master, username)
-        if result.get('success'):
-            flash('تم حذف المشترك بنجاح', 'success')
-        else:
-            flash(f"فشل الحذف: {result.get('error')}", 'danger')
+        try:
+            conn = librouteros.connect(
+                host=master.ip_address,
+                username=master.username,
+                password=master.password,
+                port=master.port
+            )
+            conn('/user/remove', name=username)
+            conn.close()
+            flash(f'✅ تم حذف "{username}" بنجاح', 'success')
+        except Exception as e:
+            logger.error(f"خطأ في حذف مستخدم: {e}")
+            flash(f'❌ فشل الحذف: {str(e)}', 'danger')
     return redirect(url_for('subscribers'))
 
+# ============ API للـ Frontend (AJAX) ============
+
+@app.route('/admin/profile', methods=['POST'])
+def update_admin_profile():
+    """API لتحديث بيانات Admin من الـ Frontend"""
+    try:
+        data = request.get_json()
+        username = data.get('username', '').strip()
+        password = data.get('password', '').strip()
+
+        if not username:
+            return jsonify({'success': False, 'error': 'اسم المستخدم مطلوب'}), 400
+
+        admin = AdminUser.query.first()
+        if not admin:
+            admin = AdminUser(username=username, password=password or 'admin123')
+            db.session.add(admin)
+        else:
+            admin.username = username
+            if password:
+                admin.password = password
+        
+        db.session.commit()
+        return jsonify({'success': True, 'message': 'تم التحديث بنجاح'}), 200
+
+    except Exception as e:
+        logger.error(f"خطأ في تحديث البيانات: {e}")
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+@app.route('/api/stats', methods=['GET'])
+def get_stats():
+    """API لجلب الإحصائيات"""
+    try:
+        routers_count = Router.query.count()
+        routers_online = sum(1 for r in Router.query.all() if test_mikrotik_connection(r))
+        
+        master = get_master_router()
+        sub_count = len(get_mikrotik_users(master)) if master else 0
+        active_sessions = get_ppp_connections(master) if master else 0
+
+        return jsonify({
+            'success': True,
+            'routers_count': routers_count,
+            'routers_online': routers_online,
+            'sub_count': sub_count,
+            'active_sessions': active_sessions
+        }), 200
+    except Exception as e:
+        logger.error(f"خطأ في جلب الإحصائيات: {e}")
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+@app.errorhandler(404)
+def not_found(error):
+    return render_template('404.html'), 404
+
+@app.errorhandler(500)
+def server_error(error):
+    logger.error(f"خطأ في السيرفر: {error}")
+    return render_template('500.html'), 500
+
 if __name__ == '__main__':
-    app.run(debug=True, host='0.0.0.0', port=5000)
