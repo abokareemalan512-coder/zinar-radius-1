@@ -1,46 +1,8 @@
 {% extends "base.html" %}
 {% block title %}الدفعات{% endblock %}
-
 {% block content %}
-<div class="d-flex justify-content-between align-items-center mb-4">
-    <h2>💰 الدفعات</h2>
-    <span class="text-muted">
-        إجمالي: <span class="text-accent fw-bold">{{ payments|length }}</span> دفعة
-    </span>
-</div>
+<h2 class="mb-4">💰 الدفعات</h2>
 
-<!-- بطاقات الإحصائيات السريعة -->
-<div class="row g-3 mb-4">
-    <div class="col-md-4">
-        <div class="card p-3 text-center">
-            <div class="fs-2 text-accent">💰</div>
-            <h4 class="mb-1">
-                {{ "%.0f"|format(payments|selectattr('status', 'equalto', 'completed')|map(attribute='amount')|sum) }}
-            </h4>
-            <p class="text-muted mb-0">إجمالي المكتملة</p>
-        </div>
-    </div>
-    <div class="col-md-4">
-        <div class="card p-3 text-center">
-            <div class="fs-2 text-accent">⏳</div>
-            <h4 class="mb-1">
-                {{ payments|selectattr('status', 'equalto', 'pending')|list|length }}
-            </h4>
-            <p class="text-muted mb-0">دفعات معلقة</p>
-        </div>
-    </div>
-    <div class="col-md-4">
-        <div class="card p-3 text-center">
-            <div class="fs-2 text-accent">✅</div>
-            <h4 class="mb-1">
-                {{ payments|selectattr('status', 'equalto', 'completed')|list|length }}
-            </h4>
-            <p class="text-muted mb-0">دفعات مكتملة</p>
-        </div>
-    </div>
-</div>
-
-<!-- جدول الدفعات -->
 <div class="card">
     <div class="table-responsive">
         <table class="table table-hover mb-0">
@@ -50,105 +12,45 @@
                     <th>رقم المشترك</th>
                     <th>المبلغ</th>
                     <th>الحالة</th>
-                    <th>تاريخ الإنشاء</th>
-                    <th>إجراءات</th>
+                    <th>التاريخ</th>
+                    <th>إجراء</th>
                 </tr>
             </thead>
             <tbody>
                 {% for p in payments %}
-                <tr id="payment-row-{{ p.id }}">
+                <tr>
                     <td>{{ p.id }}</td>
-                    <td class="text-accent">
-                        <i class="bi bi-person"></i> #{{ p.subscriber_id }}
-                    </td>
-                    <td class="fw-bold">
-                        {{ "%.0f"|format(p.amount) }} ل.س
-                    </td>
+                    <td class="text-accent">#{{ p.subscriber_id }}</td>
+                    <td>{{ "%.0f"|format(p.amount) }} ل.س</td>
                     <td>
                         {% if p.status == 'completed' %}
-                            <span class="badge bg-success">
-                                <i class="bi bi-check-circle"></i> مكتملة
-                            </span>
-                        {% elif p.status == 'pending' %}
-                            <span class="badge bg-warning">
-                                <i class="bi bi-clock"></i> معلقة
-                            </span>
+                            <span class="badge bg-success">مكتملة</span>
                         {% else %}
-                            <span class="badge bg-secondary">{{ p.status }}</span>
+                            <span class="badge bg-warning">معلقة</span>
                         {% endif %}
                     </td>
-                    <td>
-                        {{ p.created_at.strftime('%Y-%m-%d %H:%M') if p.created_at else '-' }}
-                    </td>
+                    <td>{{ p.created_at.strftime('%Y-%m-%d %H:%M') if p.created_at else '-' }}</td>
                     <td>
                         {% if p.status != 'completed' %}
                         <button class="btn btn-sm btn-primary"
-                                onclick="completePayment({{ p.id }})">
-                            <i class="bi bi-check2"></i> تأكيد
-                        </button>
-                        {% else %}
-                        <span class="text-muted small">
-                            <i class="bi bi-check-all"></i> لا يوجد إجراء
-                        </span>
+                                onclick="completePayment({{ p.id }})">✅ تأكيد</button>
                         {% endif %}
                     </td>
                 </tr>
                 {% else %}
-                <tr>
-                    <td colspan="6" class="text-center py-5 text-muted">
-                        📭 لا توجد دفعات بعد
-                    </td>
-                </tr>
+                <tr><td colspan="6" class="text-center py-5 text-muted">📭 لا توجد دفعات بعد</td></tr>
                 {% endfor %}
             </tbody>
         </table>
     </div>
 </div>
 
-<!-- سكربت تأكيد الدفع -->
 <script>
 async function completePayment(id) {
-    if (!confirm('تأكيد هذه الدفعة؟')) return;
-
-    const btn = event.target.closest('button');
-    btn.disabled = true;
-    btn.innerHTML = '<i class="bi bi-hourglass-split"></i> جاري...';
-
-    try {
-        const r = await fetch(`/payments/${id}/complete`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' }
-        });
-        const data = await r.json();
-
-        if (data.ok) {
-            // تحديث الصف مباشرة
-            const row = document.getElementById(`payment-row-${id}`);
-            row.querySelector('td:nth-child(4)').innerHTML =
-                '<span class="badge bg-success"><i class="bi bi-check-circle"></i> مكتملة</span>';
-            row.querySelector('td:nth-child(6)').innerHTML =
-                '<span class="text-muted small"><i class="bi bi-check-all"></i> لا يوجد إجراء</span>';
-
-            // إظهار تنبيه نجاح
-            showAlert('✅ تم تأكيد الدفعة', 'success');
-        } else {
-            showAlert('❌ ' + (data.error || 'فشل التأكيد'), 'danger');
-            btn.disabled = false;
-            btn.innerHTML = '<i class="bi bi-check2"></i> تأكيد';
-        }
-    } catch (e) {
-        showAlert('❌ خطأ في الاتصال: ' + e.message, 'danger');
-        btn.disabled = false;
-        btn.innerHTML = '<i class="bi bi-check2"></i> تأكيد';
-    }
-}
-
-function showAlert(msg, type) {
-    const div = document.createElement('div');
-    div.className = `alert alert-${type} alert-dismissible fade show`;
-    div.innerHTML = msg + '<button type="button" class="btn-close" data-bs-dismiss="alert"></button>';
-    document.querySelector('.main').prepend(div);
-    setTimeout(() => div.remove(), 3000);
+    const r = await fetch(`/payments/${id}/complete`, { method: 'POST' });
+    const data = await r.json();
+    if (data.ok) location.reload();
+    else alert(data.error);
 }
 </script>
 {% endblock %}
