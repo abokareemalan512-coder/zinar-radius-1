@@ -12,7 +12,7 @@
 <div class="card mb-3 p-3">
     <form method="GET" class="d-flex gap-2">
         <input type="text" name="q" class="form-control"
-               placeholder="بحث عن مشترك..." value="{{ search }}">
+               placeholder="بحث بالاسم أو اسم المستخدم..." value="{{ search }}">
         <button class="btn btn-primary" type="submit">
             <i class="bi bi-search"></i> بحث
         </button>
@@ -21,14 +21,18 @@
 
 <div class="card">
     <div class="table-responsive">
-        <table class="table table-hover">
+        <table class="table table-hover mb-0">
             <thead>
                 <tr>
                     <th>#</th>
+                    <th>اسم المشترك</th>
                     <th>اسم المستخدم</th>
+                    <th>كلمة المرور</th>
                     <th>الباقة</th>
+                    <th>IP الراوتر</th>
                     <th>الحالة</th>
-                    <th>تاريخ الإنشاء</th>
+                    <th>ينتهي في</th>
+                    <th>المتبقي</th>
                     <th>إجراءات</th>
                 </tr>
             </thead>
@@ -36,25 +40,110 @@
                 {% for sub in subscribers %}
                 <tr>
                     <td>{{ sub.id }}</td>
-                    <td class="text-accent">{{ sub.username }}</td>
+                    <td class="text-accent fw-bold">{{ sub.name or sub.username }}</td>
+                    <td>{{ sub.username }}</td>
+
+                    <td>
+                        <span class="password-field" data-id="{{ sub.id }}">••••••</span>
+                        <button class="btn btn-sm btn-outline-light py-0 px-1"
+                                onclick="togglePassword({{ sub.id }}, '{{ sub.password|e }}')"
+                                title="إظهار/إخفاء">
+                            <i class="bi bi-eye" id="eye-{{ sub.id }}"></i>
+                        </button>
+                    </td>
+
                     <td>{{ sub.package or '-' }}</td>
+
+                    <td>
+                        {% if sub.router_id and sub.router_id in routers %}
+                            <span class="text-accent">{{ routers[sub.router_id].ip_address }}</span>
+                            <br><small class="text-muted">{{ routers[sub.router_id].name }}</small>
+                        {% else %}
+                            <span class="text-muted">—</span>
+                        {% endif %}
+                    </td>
+
                     <td>
                         {% if sub.status == 'active' %}
-                            <span class="badge bg-success">نشط</span>
+                            <span class="badge bg-success">🟢 نشط</span>
+                        {% elif sub.status == 'paused' %}
+                            <span class="badge bg-warning">⏸ موقوف</span>
+                        {% elif sub.status == 'expired' %}
+                            <span class="badge bg-danger">🔴 منتهي</span>
                         {% else %}
                             <span class="badge bg-secondary">{{ sub.status }}</span>
                         {% endif %}
                     </td>
-                    <td>{{ sub.created_at.strftime('%Y-%m-%d') if sub.created_at else '-' }}</td>
+
                     <td>
-                        <a href="{{ url_for('delete_subscriber', sub_id=sub.id) }}"
-                           class="btn btn-sm btn-danger"
-                           onclick="return confirm('تأكيد الحذف؟')">🗑</a>
+                        {% if sub.expires_at %}
+                            {{ sub.expires_at.strftime('%Y-%m-%d') }}
+                        {% else %}
+                            <span class="text-muted">—</span>
+                        {% endif %}
+                    </td>
+
+                    <td>
+                        {% if sub.expires_at %}
+                            {% set days_left = (sub.expires_at - now).days %}
+                            {% if days_left > 7 %}
+                                <span class="badge bg-success">{{ days_left }} يوم</span>
+                            {% elif days_left > 3 %}
+                                <span class="badge bg-warning">{{ days_left }} يوم</span>
+                            {% elif days_left > 0 %}
+                                <span class="badge bg-danger">{{ days_left }} يوم</span>
+                            {% else %}
+                                <span class="badge bg-secondary">انتهى</span>
+                            {% endif %}
+                        {% else %}
+                            <span class="text-muted">—</span>
+                        {% endif %}
+                    </td>
+
+                    <td>
+                        <div class="d-flex gap-1 flex-wrap">
+                            <a href="{{ url_for('toggle_subscriber', sub_id=sub.id) }}"
+                               class="btn btn-sm {% if sub.status == 'active' %}btn-warning{% else %}btn-success{% endif %}"
+                               title="{% if sub.status == 'active' %}إيقاف{% else %}تفعيل{% endif %}">
+                                {% if sub.status == 'active' %}
+                                    <i class="bi bi-pause-fill"></i>
+                                {% else %}
+                                    <i class="bi bi-play-fill"></i>
+                                {% endif %}
+                            </a>
+
+                            <a href="{{ url_for('reset_subscriber', sub_id=sub.id) }}"
+                               class="btn btn-sm btn-info"
+                               onclick="return confirm('تصفير باقة {{ sub.username }}؟ سيبدأ من جديد')"
+                               title="تصفير الباقة">
+                                <i class="bi bi-arrow-counterclockwise"></i>
+                            </a>
+
+                            <a href="{{ url_for('extend_subscriber', sub_id=sub.id) }}"
+                               class="btn btn-sm btn-primary"
+                               onclick="return confirm('تمديد اشتراك {{ sub.username }} 30 يوم؟')"
+                               title="تمديد 30 يوم">
+                                <i class="bi bi-plus-circle"></i>
+                            </a>
+
+                            <button class="btn btn-sm btn-secondary"
+                                    onclick='openEditSub({{ sub.id }}, "{{ (sub.name or sub.username)|e }}", "{{ sub.username|e }}", "{{ sub.package|e }}", {{ sub.router_id or 0 }})'
+                                    title="تعديل">
+                                <i class="bi bi-pencil"></i>
+                            </button>
+
+                            <a href="{{ url_for('delete_subscriber', sub_id=sub.id) }}"
+                               class="btn btn-sm btn-danger"
+                               onclick="return confirm('تأكيد حذف {{ sub.username }}؟')"
+                               title="حذف">
+                                <i class="bi bi-trash"></i>
+                            </a>
+                        </div>
                     </td>
                 </tr>
                 {% else %}
                 <tr>
-                    <td colspan="6" class="text-center py-5 text-muted">
+                    <td colspan="10" class="text-center py-5 text-muted">
                         📭 لا يوجد مشتركون بعد
                     </td>
                 </tr>
@@ -63,4 +152,91 @@
         </table>
     </div>
 </div>
+
+<!-- Modal تعديل المشترك -->
+<div class="modal fade" id="editSubModal" tabindex="-1">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <form method="POST" id="editSubForm">
+                <div class="modal-header border-secondary">
+                    <h5 class="modal-title text-accent">
+                        <i class="bi bi-pencil-square"></i> تعديل المشترك
+                    </h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                </div>
+
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label class="form-label">اسم المشترك</label>
+                        <input type="text" name="name" id="sub_name" class="form-control">
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label">اسم المستخدم</label>
+                        <input type="text" name="username" id="sub_username" class="form-control" required>
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label">كلمة المرور</label>
+                        <input type="text" name="password" id="sub_password"
+                               class="form-control" placeholder="اتركها فارغة للإبقاء">
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label">الباقة</label>
+                        <select name="package" id="sub_package" class="form-select">
+                            <option value="">— بلا تغيير —</option>
+                            {% for pkg in packages %}
+                            <option value="{{ pkg.name }}">{{ pkg.name }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label">الراوتر</label>
+                        <select name="router_id" id="sub_router" class="form-select">
+                            <option value="">— بدون راوتر —</option>
+                            {% for r in routers.values() %}
+                            <option value="{{ r.id }}">{{ r.name }} — {{ r.ip_address }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                </div>
+
+                <div class="modal-footer border-secondary">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">إلغاء</button>
+                    <button type="submit" class="btn btn-primary">
+                        <i class="bi bi-save"></i> حفظ التعديلات
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<script>
+function togglePassword(id, password) {
+    const span = document.querySelector(`.password-field[data-id="${id}"]`);
+    const eye = document.getElementById(`eye-${id}`);
+    if (span.textContent === '••••••') {
+        span.textContent = password;
+        eye.className = 'bi bi-eye-slash';
+    } else {
+        span.textContent = '••••••';
+        eye.className = 'bi bi-eye';
+    }
+}
+
+function openEditSub(id, name, username, pkg, routerId) {
+    document.getElementById('editSubForm').action = '/subscribers/update/' + id;
+    document.getElementById('sub_name').value = name;
+    document.getElementById('sub_username').value = username;
+    document.getElementById('sub_password').value = '';
+    document.getElementById('sub_package').value = pkg || '';
+    document.getElementById('sub_router').value = routerId || '';
+
+    const modal = new bootstrap.Modal(document.getElementById('editSubModal'));
+    modal.show();
+}
+</script>
 {% endblock %}
