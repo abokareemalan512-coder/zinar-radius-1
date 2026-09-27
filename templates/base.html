@@ -32,14 +32,48 @@
             padding: 20px 12px;
             flex-shrink: 0;
         }
-        .sidebar .brand {
+        /* شعار ZINAR المحسّن */
+        .brand {
             text-align: center;
-            padding: 12px 0 24px;
+            padding: 20px 0 24px;
             border-bottom: 1px solid var(--bg-hover);
             margin-bottom: 20px;
         }
-        .sidebar .brand h4 { margin: 0; color: var(--accent); font-weight: bold; }
-        .sidebar .brand small { color: var(--text-muted); font-size: 11px; }
+        .brand-logo {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 12px;
+        }
+        .brand-icon {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            width: 46px;
+            height: 46px;
+            background: linear-gradient(135deg, var(--accent), #0ea5e9);
+            border-radius: 12px;
+            font-size: 24px;
+            box-shadow: 0 4px 12px var(--accent-glow);
+        }
+        .brand-text { text-align: right; }
+        .brand-text h4 {
+            margin: 0;
+            font-size: 22px;
+            font-weight: 800;
+            letter-spacing: 2px;
+            background: linear-gradient(135deg, var(--accent), #7dd3fc);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+        .brand-text small {
+            display: block;
+            color: var(--text-muted);
+            font-size: 10px;
+            margin-top: 2px;
+            letter-spacing: 1px;
+        }
         .sidebar .nav-item {
             display: flex;
             align-items: center;
@@ -98,6 +132,9 @@
         }
         .btn-danger { background-color: #ef4444 !important; border-color: #ef4444 !important; }
         .btn-secondary { background-color: var(--bg-hover) !important; border-color: var(--bg-hover) !important; color: var(--text-main) !important; }
+        .btn-info { background-color: #06b6d4 !important; border-color: #06b6d4 !important; color: #fff !important; }
+        .btn-warning { background-color: #f59e0b !important; border-color: #f59e0b !important; color: #000 !important; }
+        .btn-success { background-color: #16a34a !important; border-color: #16a34a !important; }
         .form-control, .form-select {
             background-color: var(--bg-main) !important;
             border: 1px solid var(--bg-hover) !important;
@@ -116,24 +153,34 @@
         .badge.bg-success { background-color: #16a34a !important; }
         .badge.bg-warning { background-color: #f59e0b !important; color: #000; }
         .badge.bg-secondary { background-color: var(--bg-hover) !important; }
+        .badge.bg-danger { background-color: #ef4444 !important; }
         .alert-success { background-color: #064e3b; color: #6ee7b7; border-color: #16a34a; }
         .alert-danger  { background-color: #7f1d1d; color: #fca5a5; border-color: #ef4444; }
         .alert-warning { background-color: #78350f; color: #fcd34d; border-color: #f59e0b; }
         .alert-info    { background-color: #0c4a6e; color: #7dd3fc; border-color: var(--accent); }
         .modal-content { background-color: var(--bg-card) !important; color: var(--text-main) !important; border: 1px solid var(--bg-hover); }
+        @media (max-width: 768px) {
+            .layout { flex-direction: column; }
+            .sidebar { width: 100%; }
+        }
     </style>
 </head>
 <body>
 <div class="layout">
     <aside class="sidebar">
         <div class="brand">
-            <h4>ZINAR</h4>
-            <small>نظام إدارة المشتركين</small>
+            <div class="brand-logo">
+                <span class="brand-icon">⚡</span>
+                <div class="brand-text">
+                    <h4>ZINAR</h4>
+                    <small>نظام إدارة المشتركين</small>
+                </div>
+            </div>
         </div>
         <a href="{{ url_for('dashboard') }}" class="nav-item {% if request.endpoint == 'dashboard' %}active{% endif %}">
             <i class="bi bi-speedometer2"></i> لوحة التحكم
         </a>
-        <a href="{{ url_for('subscribers') }}" class="nav-item {% if request.endpoint == 'subscribers' %}active{% endif %}">
+        <a href="{{ url_for('subscribers') }}" class="nav-item {% if request.endpoint in ['subscribers','add_subscriber'] %}active{% endif %}">
             <i class="bi bi-people"></i> المشتركين
         </a>
         <a href="{{ url_for('packages') }}" class="nav-item {% if request.endpoint == 'packages' %}active{% endif %}">
