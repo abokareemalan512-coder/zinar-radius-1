@@ -26,10 +26,8 @@ database_url = os.environ.get('DATABASE_URL')
 if not database_url:
     database_url = 'sqlite:///zinar.db'
 else:
-    # Render قد يعطي postgres:// — نحوّلها إلى postgresql://
     if database_url.startswith('postgres://'):
         database_url = database_url.replace('postgres://', 'postgresql://', 1)
-    # ✅ استخدام psycopg3 بدل psycopg2
     if 'postgresql://' in database_url and '+psycopg' not in database_url:
         database_url = database_url.replace('postgresql://', 'postgresql+psycopg://', 1)
 
@@ -47,7 +45,7 @@ class Router(db.Model):
     ip_address = db.Column(db.String(50), nullable=False)
     username = db.Column(db.String(50), nullable=False)
     password = db.Column(db.String(150), nullable=False)
-    port = db.Column(db.Integer, default=22)          # ✅ SSH افتراضي
+    port = db.Column(db.Integer, default=22)
     is_master = db.Column(db.Boolean, default=False)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
 
@@ -56,7 +54,7 @@ class AdminUser(db.Model):
     __tablename__ = 'admin_users'
     id = db.Column(db.Integer, primary_key=True)
     username = db.Column(db.String(50), unique=True, nullable=False)
-    password = db.Column(db.String(255), nullable=False)   # ✅ يكفي للهاش
+    password = db.Column(db.String(255), nullable=False)
     email = db.Column(db.String(100))
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
 
@@ -78,7 +76,18 @@ class Payment(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     subscriber_id = db.Column(db.Integer, db.ForeignKey('subscribers.id'))
     amount = db.Column(db.Float, default=0)
-    status = db.Column(db.String(20), default='pending')  # pending/completed
+    status = db.Column(db.String(20), default='pending')
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+
+# ✅ نموذج الباقات الجديد
+class Package(db.Model):
+    __tablename__ = 'packages'
+    id = db.Column(db.Integer, primary_key=True)
+    name = db.Column(db.String(100), nullable=False, unique=True)
+    speed = db.Column(db.String(50))
+    price = db.Column(db.Float, default=0)
+    duration = db.Column(db.Integer, default=30)   # بالأيام
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
 
 
@@ -138,7 +147,7 @@ def get_master_router():
 
 
 def _day_bounds(day=None):
-    """حدود اليوم (بداية/نهاية) — تعمل مع SQLite و PostgreSQL."""
+    """حدود اليوم (بداية/نهاية)."""
     if day is None:
         day = datetime.utcnow()
     start = day.replace(hour=0, minute=0, second=0, microsecond=0)
@@ -400,7 +409,9 @@ def add_subscriber():
             db.session.rollback()
             flash(f'❌ خطأ: {str(e)}', 'danger')
 
-    return render_template('add_subscriber.html')
+    # ✅ جلب الباقات لعرضها في القائمة
+    packages_list = Package.query.order_by(Package.name).all()
+    return render_template('add_subscriber.html', packages=packages_list)
 
 
 @app.route('/subscribers/delete/<int:sub_id>')
@@ -418,17 +429,59 @@ def delete_subscriber(sub_id):
 
 # ============ إدارة الباقات ============
 
-PACKAGES = [
-    {'id': 1, 'name': 'باقة 5 ميجا',  'speed': '5M/5M',   'price': 15000, 'duration': 'شهر'},
-    {'id': 2, 'name': 'باقة 10 ميجا', 'speed': '10M/10M', 'price': 25000, 'duration': 'شهر'},
-    {'id': 3, 'name': 'باقة 20 ميجا', 'speed': '20M/20M', 'price': 40000, 'duration': 'شهر'},
-    {'id': 4, 'name': 'باقة 50 ميجا', 'speed': '50M/50M', 'price': 80000, 'duration': 'شهر'},
-]
-
-
 @app.route('/packages')
 def packages():
-    return render_template('packages.html', packages=PACKAGES)
+    try:
+        packages_list = Package.query.order_by(Package.id).all()
+    except Exception as e:
+        logger.error(f"❌ خطأ: {e}")
+        packages_list = []
+    return render_template('packages.html', packages=packages_list)
+
+
+@app.route('/packages/add', methods=['POST'])
+def add_package():
+    name = request.form.get('name', '').strip()
+    speed = request.form.get('speed', '').strip()
+    price = request.form.get('price', '0').strip()
+    duration = request.form.get('duration', '30').strip()
+
+    if not name:
+        flash('❌ اسم الباقة مطلوب', 'danger')
+        return redirect(url_for('packages'))
+
+    if Package.query.filter_by(name=name).first():
+        flash('❌ اسم الباقة موجود مسبقاً', 'danger')
+        return redirect(url_for('packages'))
+
+    try:
+        pkg = Package(
+            name=name,
+            speed=speed,
+            price=float(price or 0),
+            duration=int(duration or 30),
+        )
+        db.session.add(pkg)
+        db.session.commit()
+        flash(f'✅ تم إضافة باقة "{name}"', 'success')
+    except Exception as e:
+        db.session.rollback()
+        flash(f'❌ خطأ: {str(e)}', 'danger')
+
+    return redirect(url_for('packages'))
+
+
+@app.route('/packages/delete/<int:pkg_id>')
+def delete_package(pkg_id):
+    try:
+        pkg = Package.query.get_or_404(pkg_id)
+        db.session.delete(pkg)
+        db.session.commit()
+        flash('✅ تم حذف الباقة', 'success')
+    except Exception as e:
+        db.session.rollback()
+        flash(f'❌ خطأ: {str(e)}', 'danger')
+    return redirect(url_for('packages'))
 
 
 # ============ إدارة الدفعات ============
