@@ -47,6 +47,7 @@ class Router(db.Model):
     password = db.Column(db.String(150), nullable=False)
     port = db.Column(db.Integer, default=22)
     is_master = db.Column(db.Boolean, default=False)
+    is_active = db.Column(db.Boolean, default=True)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
 
 
@@ -62,6 +63,7 @@ class AdminUser(db.Model):
 class Subscriber(db.Model):
     __tablename__ = 'subscribers'
     id = db.Column(db.Integer, primary_key=True)
+    name = db.Column(db.String(100))
     username = db.Column(db.String(100), nullable=False)
     password = db.Column(db.String(150), nullable=False)
     package = db.Column(db.String(100))
@@ -80,20 +82,18 @@ class Payment(db.Model):
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
 
 
-# ✅ نموذج الباقات الجديد
 class Package(db.Model):
     __tablename__ = 'packages'
     id = db.Column(db.Integer, primary_key=True)
     name = db.Column(db.String(100), nullable=False, unique=True)
     speed = db.Column(db.String(50))
     price = db.Column(db.Float, default=0)
-    duration = db.Column(db.Integer, default=30)   # بالأيام
+    duration = db.Column(db.Integer, default=30)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
 
 
 # ============ تهيئة قاعدة البيانات ============
 def init_database():
-    """تُستدعى مرة واحدة عند بدء التطبيق."""
     with app.app_context():
         try:
             db.create_all()
@@ -117,7 +117,6 @@ init_database()
 # ============ دوال مساعدة ============
 
 def test_mikrotik_connection(router):
-    """اختبار الاتصال بـ Mikrotik عبر SSH."""
     try:
         ssh = paramiko.SSHClient()
         ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
@@ -138,7 +137,6 @@ def test_mikrotik_connection(router):
 
 
 def get_master_router():
-    """جلب الراوتر الرئيسي."""
     try:
         return Router.query.filter_by(is_master=True).first()
     except Exception as e:
@@ -147,7 +145,6 @@ def get_master_router():
 
 
 def _day_bounds(day=None):
-    """حدود اليوم (بداية/نهاية)."""
     if day is None:
         day = datetime.utcnow()
     start = day.replace(hour=0, minute=0, second=0, microsecond=0)
@@ -155,21 +152,10 @@ def _day_bounds(day=None):
     return start, end
 
 
-def login_required(f):
-    """Decorator لحماية المسارات."""
-    @wraps(f)
-    def wrapper(*args, **kwargs):
-        if not session.get('admin_id'):
-            return redirect(url_for('login'))
-        return f(*args, **kwargs)
-    return wrapper
-
-
-# ============ المسارات (Routes) ============
+# ============ حماية المسارات ============
 
 @app.before_request
 def check_admin_login():
-    """التحقق من تسجيل الدخول — حماية شاملة."""
     if request.endpoint is None:
         return
     if request.endpoint.startswith('static'):
@@ -180,6 +166,8 @@ def check_admin_login():
     if not session.get('admin_id'):
         return redirect(url_for('login'))
 
+
+# ============ الصفحة الرئيسية والدخول ============
 
 @app.route('/')
 def index():
@@ -215,12 +203,17 @@ def logout():
     return redirect(url_for('login'))
 
 
+# ============ لوحة التحكم ============
+
 @app.route('/dashboard')
 def dashboard():
     try:
         routers_list = Router.query.all()
         routers_count = len(routers_list)
-        routers_online = sum(1 for r in routers_list if test_mikrotik_connection(r))
+        routers_online = sum(
+            1 for r in routers_list
+            if r.is_active and test_mikrotik_connection(r)
+        )
 
         master = get_master_router()
         sub_count = Subscriber.query.count()
@@ -268,7 +261,7 @@ def dashboard():
         return render_template('error.html', error=str(e)), 500
 
 
-# ============ إدارة الراوترات ============
+# ============ الراوترات ============
 
 @app.route('/routers', methods=['GET', 'POST'])
 def routers():
@@ -307,6 +300,7 @@ def routers():
                 password=password,
                 port=port,
                 is_master=is_master,
+                is_active=True
             )
 
             db.session.add(new_router)
@@ -349,6 +343,76 @@ def set_master_router(router_id):
     return redirect(url_for('routers'))
 
 
+@app.route('/routers/toggle/<int:router_id>')
+def toggle_router(router_id):
+    try:
+        router = Router.query.get_or_404(router_id)
+        router.is_active = not router.is_active
+        db.session.commit()
+        state = "تشغيل" if router.is_active else "إيقاف"
+        flash(f'✅ تم {state} الراوتر "{router.name}"', 'success')
+    except Exception as e:
+        db.session.rollback()
+        flash(f'❌ خطأ: {str(e)}', 'danger')
+    return redirect(url_for('routers'))
+
+
+@app.route('/routers/update/<int:router_id>', methods=['POST'])
+def update_router(router_id):
+    try:
+        router = Router.query.get_or_404(router_id)
+
+        name = request.form.get('name', '').strip()
+        ip_address = request.form.get('ip_address', '').strip()
+        username = request.form.get('username', '').strip()
+        password = request.form.get('password', '').strip()
+        port = request.form.get('port', '22').strip()
+
+        if not name or not ip_address:
+            flash('❌ الاسم وعنوان IP مطلوبان', 'danger')
+            return redirect(url_for('routers'))
+
+        existing = Router.query.filter(
+            Router.name == name,
+            Router.id != router_id
+        ).first()
+        if existing:
+            flash('❌ اسم الراوتر موجود مسبقاً', 'danger')
+            return redirect(url_for('routers'))
+
+        router.name = name
+        router.ip_address = ip_address
+        router.username = username
+        if password:
+            router.password = password
+        try:
+            router.port = int(port)
+        except ValueError:
+            router.port = 22
+
+        db.session.commit()
+        flash(f'✅ تم تحديث الراوتر "{name}" بنجاح', 'success')
+    except Exception as e:
+        db.session.rollback()
+        logger.error(f"❌ خطأ في update_router: {e}")
+        flash(f'❌ خطأ: {str(e)}', 'danger')
+
+    return redirect(url_for('routers'))
+
+
+@app.route('/routers/test/<int:router_id>')
+def test_router(router_id):
+    try:
+        router = Router.query.get_or_404(router_id)
+        if test_mikrotik_connection(router):
+            flash(f'✅ الاتصال بالراوتر "{router.name}" ناجح', 'success')
+        else:
+            flash(f'⚠️ فشل الاتصال بالراوتر "{router.name}"', 'warning')
+    except Exception as e:
+        flash(f'❌ خطأ: {str(e)}', 'danger')
+    return redirect(url_for('routers'))
+
+
 @app.route('/routers/delete/<int:router_id>')
 def delete_router(router_id):
     try:
@@ -362,24 +426,46 @@ def delete_router(router_id):
     return redirect(url_for('routers'))
 
 
-# ============ إدارة المشتركين ============
+# ============ المشتركين ============
 
 @app.route('/subscribers')
 def subscribers():
     search = request.args.get('q', '').strip()
+    now = datetime.utcnow()
     try:
+        expired = Subscriber.query.filter(
+            Subscriber.expires_at.isnot(None),
+            Subscriber.expires_at < now,
+            Subscriber.status == 'active'
+        ).all()
+        for s in expired:
+            s.status = 'expired'
+        if expired:
+            db.session.commit()
+
         query = Subscriber.query
         if search:
-            query = query.filter(Subscriber.username.ilike(f'%{search}%'))
-        subscribers_list = query.all()
+            query = query.filter(
+                db.or_(
+                    Subscriber.username.ilike(f'%{search}%'),
+                    Subscriber.name.ilike(f'%{search}%')
+                )
+            )
+        subscribers_list = query.order_by(Subscriber.created_at.desc()).all()
     except Exception as e:
         logger.error(f"❌ خطأ: {e}")
         subscribers_list = []
 
+    routers_dict = {r.id: r for r in Router.query.all()}
+    packages_list = Package.query.order_by(Package.name).all()
+
     return render_template(
         'subscribers.html',
         subscribers=subscribers_list,
-        search=search
+        routers=routers_dict,
+        packages=packages_list,
+        search=search,
+        now=now
     )
 
 
@@ -387,31 +473,143 @@ def subscribers():
 @app.route('/subscribers/add', methods=['GET', 'POST'])
 def add_subscriber():
     if request.method == 'POST':
+        name = request.form.get('name', '').strip()
         username = request.form.get('username', '').strip()
         password = request.form.get('password', '').strip()
-        package = request.form.get('package', '').strip()
+        package_name = request.form.get('package', '').strip()
+        router_id = request.form.get('router_id', '').strip()
 
         if not username or not password:
-            flash('❌ الاسم وكلمة المرور مطلوبان', 'danger')
+            flash('❌ اسم المستخدم وكلمة المرور مطلوبان', 'danger')
             return redirect(url_for('add_subscriber'))
 
         try:
+            expires_at = None
+            if package_name:
+                pkg = Package.query.filter_by(name=package_name).first()
+                if pkg and pkg.duration:
+                    expires_at = datetime.utcnow() + timedelta(days=pkg.duration)
+
             sub = Subscriber(
+                name=name or username,
                 username=username,
                 password=password,
-                package=package
+                package=package_name,
+                router_id=int(router_id) if router_id else None,
+                expires_at=expires_at,
+                status='active'
             )
             db.session.add(sub)
             db.session.commit()
-            flash(f'✅ تم إضافة "{username}" بنجاح', 'success')
+
+            if expires_at:
+                flash(f'✅ تم إضافة "{username}" — ينتهي في {expires_at.strftime("%Y-%m-%d")}', 'success')
+            else:
+                flash(f'✅ تم إضافة "{username}" بنجاح', 'success')
             return redirect(url_for('subscribers'))
         except Exception as e:
             db.session.rollback()
             flash(f'❌ خطأ: {str(e)}', 'danger')
 
-    # ✅ جلب الباقات لعرضها في القائمة
     packages_list = Package.query.order_by(Package.name).all()
-    return render_template('add_subscriber.html', packages=packages_list)
+    routers_list = Router.query.order_by(Router.name).all()
+    return render_template(
+        'add_subscriber.html',
+        packages=packages_list,
+        routers=routers_list
+    )
+
+
+@app.route('/subscribers/toggle/<int:sub_id>')
+def toggle_subscriber(sub_id):
+    try:
+        sub = Subscriber.query.get_or_404(sub_id)
+        if sub.status == 'active':
+            sub.status = 'paused'
+            flash(f'⏸ تم إيقاف "{sub.username}"', 'warning')
+        else:
+            if sub.expires_at and sub.expires_at < datetime.utcnow():
+                flash(f'⚠️ لا يمكن التفعيل — اشتراك "{sub.username}" منتهي', 'danger')
+            else:
+                sub.status = 'active'
+                flash(f'▶ تم تفعيل "{sub.username}"', 'success')
+        db.session.commit()
+    except Exception as e:
+        db.session.rollback()
+        flash(f'❌ خطأ: {str(e)}', 'danger')
+    return redirect(url_for('subscribers'))
+
+
+@app.route('/subscribers/reset/<int:sub_id>')
+def reset_subscriber(sub_id):
+    try:
+        sub = Subscriber.query.get_or_404(sub_id)
+
+        if not sub.package:
+            flash(f'⚠️ لا يمكن التصفير — "{sub.username}" بلا باقة', 'danger')
+            return redirect(url_for('subscribers'))
+
+        pkg = Package.query.filter_by(name=sub.package).first()
+        if not pkg or not pkg.duration:
+            flash(f'⚠️ لا يمكن التصفير — الباقة "{sub.package}" بلا مدة', 'danger')
+            return redirect(url_for('subscribers'))
+
+        sub.expires_at = datetime.utcnow() + timedelta(days=pkg.duration)
+        sub.status = 'active'
+        db.session.commit()
+
+        flash(f'🔄 تم تصفير باقة "{sub.username}" — ينتهي في {sub.expires_at.strftime("%Y-%m-%d")}', 'success')
+    except Exception as e:
+        db.session.rollback()
+        flash(f'❌ خطأ: {str(e)}', 'danger')
+    return redirect(url_for('subscribers'))
+
+
+@app.route('/subscribers/extend/<int:sub_id>')
+def extend_subscriber(sub_id):
+    try:
+        sub = Subscriber.query.get_or_404(sub_id)
+
+        base = sub.expires_at if sub.expires_at and sub.expires_at > datetime.utcnow() else datetime.utcnow()
+        sub.expires_at = base + timedelta(days=30)
+        sub.status = 'active'
+        db.session.commit()
+
+        flash(f'➕ تم تمديد "{sub.username}" 30 يومًا — ينتهي في {sub.expires_at.strftime("%Y-%m-%d")}', 'success')
+    except Exception as e:
+        db.session.rollback()
+        flash(f'❌ خطأ: {str(e)}', 'danger')
+    return redirect(url_for('subscribers'))
+
+
+@app.route('/subscribers/update/<int:sub_id>', methods=['POST'])
+def update_subscriber(sub_id):
+    try:
+        sub = Subscriber.query.get_or_404(sub_id)
+
+        sub.name = request.form.get('name', '').strip() or sub.name
+        sub.username = request.form.get('username', '').strip() or sub.username
+
+        password = request.form.get('password', '').strip()
+        if password:
+            sub.password = password
+
+        package_name = request.form.get('package', '').strip()
+        if package_name and package_name != sub.package:
+            sub.package = package_name
+            pkg = Package.query.filter_by(name=package_name).first()
+            if pkg and pkg.duration:
+                sub.expires_at = datetime.utcnow() + timedelta(days=pkg.duration)
+
+        router_id = request.form.get('router_id', '').strip()
+        sub.router_id = int(router_id) if router_id else None
+
+        db.session.commit()
+        flash(f'✅ تم تحديث بيانات "{sub.username}"', 'success')
+    except Exception as e:
+        db.session.rollback()
+        flash(f'❌ خطأ: {str(e)}', 'danger')
+    return redirect(url_for('subscribers'))
 
 
 @app.route('/subscribers/delete/<int:sub_id>')
@@ -427,7 +625,7 @@ def delete_subscriber(sub_id):
     return redirect(url_for('subscribers'))
 
 
-# ============ إدارة الباقات ============
+# ============ الباقات ============
 
 @app.route('/packages')
 def packages():
@@ -471,6 +669,42 @@ def add_package():
     return redirect(url_for('packages'))
 
 
+@app.route('/packages/update/<int:pkg_id>', methods=['POST'])
+def update_package(pkg_id):
+    try:
+        pkg = Package.query.get_or_404(pkg_id)
+
+        name = request.form.get('name', '').strip()
+        speed = request.form.get('speed', '').strip()
+        price = request.form.get('price', '0').strip()
+        duration = request.form.get('duration', '30').strip()
+
+        if not name:
+            flash('❌ اسم الباقة مطلوب', 'danger')
+            return redirect(url_for('packages'))
+
+        existing = Package.query.filter(
+            Package.name == name,
+            Package.id != pkg_id
+        ).first()
+        if existing:
+            flash('❌ اسم الباقة موجود مسبقاً', 'danger')
+            return redirect(url_for('packages'))
+
+        pkg.name = name
+        pkg.speed = speed
+        pkg.price = float(price or 0)
+        pkg.duration = int(duration or 30)
+
+        db.session.commit()
+        flash(f'✅ تم تحديث باقة "{name}"', 'success')
+    except Exception as e:
+        db.session.rollback()
+        flash(f'❌ خطأ: {str(e)}', 'danger')
+
+    return redirect(url_for('packages'))
+
+
 @app.route('/packages/delete/<int:pkg_id>')
 def delete_package(pkg_id):
     try:
@@ -484,7 +718,7 @@ def delete_package(pkg_id):
     return redirect(url_for('packages'))
 
 
-# ============ إدارة الدفعات ============
+# ============ الدفعات ============
 
 @app.route('/payments')
 def payments():
@@ -509,51 +743,6 @@ def complete_payment(payment_id):
         return jsonify({'ok': True, 'message': 'تم تأكيد الدفعة'})
     except Exception as e:
         db.session.rollback()
-        return jsonify({'ok': False, 'error': str(e)}), 500
-
-
-# ============ إدارة حساب المدير ============
-
-@app.route('/admin/profile', methods=['POST'])
-def update_admin_profile():
-    """API لتحديث بيانات Admin."""
-    admin_id = session.get('admin_id')
-    if not admin_id:
-        return jsonify({'ok': False, 'error': 'غير مصرح'}), 401
-
-    admin = AdminUser.query.get(admin_id)
-    if not admin:
-        return jsonify({'ok': False, 'error': 'المستخدم غير موجود'}), 404
-
-    try:
-        data = request.get_json(silent=True) or request.form
-
-        new_username = (data.get('username') or '').strip()
-        new_email = (data.get('email') or '').strip()
-        new_password = (data.get('password') or '').strip()
-        old_password = (data.get('old_password') or '').strip()
-
-        if new_password:
-            if not old_password or not check_password_hash(admin.password, old_password):
-                return jsonify({'ok': False, 'error': 'كلمة المرور القديمة غير صحيحة'}), 400
-            admin.password = generate_password_hash(new_password)
-
-        if new_username and new_username != admin.username:
-            if AdminUser.query.filter_by(username=new_username).first():
-                return jsonify({'ok': False, 'error': 'اسم المستخدم مستخدم مسبقاً'}), 400
-            admin.username = new_username
-            session['admin_name'] = new_username
-
-        if new_email:
-            admin.email = new_email
-
-        db.session.commit()
-        return jsonify({'ok': True, 'message': 'تم تحديث البيانات بنجاح'})
-
-    except Exception as e:
-        db.session.rollback()
-        logger.error(f"❌ خطأ في update_admin_profile: {e}")
-        logger.error(traceback.format_exc())
         return jsonify({'ok': False, 'error': str(e)}), 500
 
 
