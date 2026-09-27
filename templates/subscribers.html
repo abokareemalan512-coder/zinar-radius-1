@@ -1,120 +1,57 @@
 {% extends "base.html" %}
-{% block title %}المشتركون{% endblock %}
+{% block title %}المشتركين{% endblock %}
+
 {% block content %}
-
-<div class="topline">
-    <h1><i class="fa-solid fa-users" style="color:var(--signal)"></i> إدارة المشتركين (مباشر من الراوتر)</h1>
-    <a href="{{ url_for('add_subscriber') }}" style="background:var(--signal); color:#04141A; font-weight:700; font-size:13.5px; padding:9px 16px; border-radius:8px; text-decoration:none;">
-        <i class="fa-solid fa-user-plus"></i> إضافة مشترك جديد
-    </a>
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h2>👥 المشتركين</h2>
+    <a href="{{ url_for('add_subscriber') }}" class="btn btn-primary">➕ إضافة مشترك</a>
 </div>
 
-<style>
-    .sb-search { display: flex; gap: 10px; margin-bottom: 16px; }
-    .sb-input {
-        flex: 1; background: var(--panel-2); border: 1px solid var(--border);
-        color: var(--text); padding: 10px 14px; border-radius: 8px; font-size: 14px;
-        font-family: 'Tajawal', sans-serif;
-    }
-    .sb-input:focus { outline: none; border-color: var(--signal); box-shadow: 0 0 0 3px var(--signal-dim); }
-    .sb-btn {
-        background: var(--signal); color: #04141A; border: none; padding: 0 18px;
-        border-radius: 8px; font-weight: 700; font-size: 13.5px; cursor: pointer;
-    }
-    .sb-btn-cancel {
-        background: none; border: 1px solid var(--border); color: var(--muted);
-        padding: 0 16px; border-radius: 8px; font-size: 13.5px; text-decoration: none;
-        display: flex; align-items: center;
-    }
-    table.sb-table { width: 100%; border-collapse: collapse; font-size: 13.5px; }
-    table.sb-table th { text-align: right; padding: 12px 18px; color: var(--muted); font-weight: 500; font-size: 12px; border-bottom: 1px solid var(--border); }
-    table.sb-table td { padding: 13px 18px; border-bottom: 1px solid var(--border); }
-    table.sb-table tr:last-child td { border-bottom: none; }
-    .sb-select, .sb-mini-input {
-        background: var(--panel-2); border: 1px solid var(--border); color: var(--text);
-        padding: 6px 9px; border-radius: 6px; font-size: 12.5px;
-    }
-    .sb-icon-btn {
-        background: none; border: 1px solid var(--border); color: var(--muted);
-        width: 28px; height: 28px; border-radius: 6px; cursor: pointer; font-size: 12px;
-        display: inline-flex; align-items: center; justify-content: center; text-decoration: none;
-    }
-    .sb-icon-btn.save:hover { color: var(--ok); border-color: var(--ok); }
-    .sb-icon-btn.danger:hover { color: var(--danger); border-color: var(--danger); }
-    .sb-empty { padding: 50px 20px; text-align: center; color: var(--muted); }
-</style>
-
-{% if error_message %}
-<div class="alert-flash" style="border-right-color:var(--warn);">
-    <i class="fa-solid fa-triangle-exclamation"></i> {{ error_message }}
-    {% if not has_master %}
-        <a href="{{ url_for('routers') }}" style="color:var(--signal)">روح لصفحة الراوترات</a>
-    {% endif %}
-</div>
-{% endif %}
-
-<form method="GET" class="sb-search">
-    <input type="text" name="q" class="sb-input" placeholder="ابحث باسم المستخدم..." value="{{ search_query or '' }}">
-    <button type="submit" class="sb-btn"><i class="fa-solid fa-magnifying-glass"></i> بحث</button>
-    {% if search_query %}
-    <a href="{{ url_for('subscribers') }}" class="sb-btn-cancel">إلغاء</a>
-    {% endif %}
+<form method="GET" class="mb-3">
+    <div class="input-group">
+        <input type="text" name="q" class="form-control" placeholder="بحث..." value="{{ search }}">
+        <button class="btn btn-primary" type="submit">🔍 بحث</button>
+    </div>
 </form>
 
 <div class="card">
-    {% if subscribers %}
-    <table class="sb-table">
-        <thead>
-            <tr>
-                <th>اسم المستخدم</th>
-                <th>الباقة</th>
-                <th>كلمة مرور جديدة</th>
-                <th>حفظ</th>
-                <th>حذف</th>
-            </tr>
-        </thead>
-        <tbody>
-            {% for sub in subscribers %}
-            <tr>
-                <td class="mono"><strong>{{ sub.username }}</strong></td>
-                <td>
-                    {% if profiles %}
-                    <select class="sb-select" name="profile" form="ef-{{ loop.index }}">
-                        {% for p in profiles %}
-                        <option value="{{ p.name }}" {{ 'selected' if p.name == sub.get('actual-profile') }}>{{ p.name }}</option>
-                        {% endfor %}
-                    </select>
-                    {% else %}
-                    <span class="mono">{{ sub.get('actual-profile', '—') }}</span>
-                    {% endif %}
-                </td>
-                <td>
-                    <input type="text" name="password" class="sb-mini-input" placeholder="بلا تغيير" form="ef-{{ loop.index }}">
-                </td>
-                <td>
-                    <button type="submit" form="ef-{{ loop.index }}" class="sb-icon-btn save" title="حفظ"><i class="fa-solid fa-check"></i></button>
-                </td>
-                <td>
-                    <a href="{{ url_for('delete_subscriber', username=sub.username) }}" class="sb-icon-btn danger" onclick="return confirm('هل أنت متأكد من الحذف؟')">
-                        <i class="fa-solid fa-trash"></i>
-                    </a>
-                </td>
-            </tr>
-            {% endfor %}
-        </tbody>
-    </table>
-    {% for sub in subscribers %}
-    <form id="ef-{{ loop.index }}" method="POST" action="{{ url_for('edit_subscriber', username=sub.username) }}" style="display:none;"></form>
-    {% endfor %}
-    {% else %}
-    <div class="sb-empty">
-        <i class="fa-solid fa-inbox" style="font-size:26px; margin-bottom:10px; display:block; color:var(--border);"></i>
-        {% if search_query %}
-            ما في نتائج مطابقة لـ "{{ search_query }}"
-        {% else %}
-            لا توجد أي اشتراكات مضافة حتى الآن.
-        {% endif %}
+    <div class="table-responsive">
+        <table class="table table-dark table-hover mb-0">
+            <thead>
+                <tr>
+                    <th>#</th>
+                    <th>اسم المستخدم</th>
+                    <th>الباقة</th>
+                    <th>الحالة</th>
+                    <th>تاريخ الإنشاء</th>
+                    <th>إجراءات</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for sub in subscribers %}
+                <tr>
+                    <td>{{ sub.id }}</td>
+                    <td>{{ sub.username }}</td>
+                    <td>{{ sub.package or '-' }}</td>
+                    <td>
+                        {% if sub.status == 'active' %}
+                            <span class="badge bg-success">نشط</span>
+                        {% else %}
+                            <span class="badge bg-secondary">{{ sub.status }}</span>
+                        {% endif %}
+                    </td>
+                    <td>{{ sub.created_at.strftime('%Y-%m-%d') if sub.created_at else '-' }}</td>
+                    <td>
+                        <a href="{{ url_for('delete_subscriber', sub_id=sub.id) }}"
+                           class="btn btn-sm btn-danger"
+                           onclick="return confirm('تأكيد الحذف؟')">🗑 حذف</a>
+                    </td>
+                </tr>
+                {% else %}
+                <tr><td colspan="6" class="text-center py-4">لا يوجد مشتركين</td></tr>
+                {% endfor %}
+            </tbody>
+        </table>
     </div>
-    {% endif %}
 </div>
 {% endblock %}
