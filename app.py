@@ -374,6 +374,7 @@ def subscribers():
     )
 
 
+@app.route('/add-subscriber', methods=['GET', 'POST'])
 @app.route('/subscribers/add', methods=['GET', 'POST'])
 def add_subscriber():
     if request.method == 'POST':
@@ -413,6 +414,21 @@ def delete_subscriber(sub_id):
         db.session.rollback()
         flash(f'❌ خطأ: {str(e)}', 'danger')
     return redirect(url_for('subscribers'))
+
+
+# ============ إدارة الباقات ============
+
+PACKAGES = [
+    {'id': 1, 'name': 'باقة 5 ميجا',  'speed': '5M/5M',   'price': 15000, 'duration': 'شهر'},
+    {'id': 2, 'name': 'باقة 10 ميجا', 'speed': '10M/10M', 'price': 25000, 'duration': 'شهر'},
+    {'id': 3, 'name': 'باقة 20 ميجا', 'speed': '20M/20M', 'price': 40000, 'duration': 'شهر'},
+    {'id': 4, 'name': 'باقة 50 ميجا', 'speed': '50M/50M', 'price': 80000, 'duration': 'شهر'},
+]
+
+
+@app.route('/packages')
+def packages():
+    return render_template('packages.html', packages=PACKAGES)
 
 
 # ============ إدارة الدفعات ============
