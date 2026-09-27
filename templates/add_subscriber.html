@@ -2,50 +2,51 @@
 {% block title %}إضافة مشترك{% endblock %}
 
 {% block content %}
-<div class="row justify-content-center">
-    <div class="col-md-8 col-lg-6">
-        <div class="d-flex justify-content-between align-items-center mb-4">
-            <h2>➕ إضافة مشترك جديد</h2>
-            <a href="{{ url_for('subscribers') }}" class="btn btn-secondary">↩ رجوع</a>
-        </div>
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h2>➕ إضافة مشترك جديد</h2>
+    <a href="{{ url_for('subscribers') }}" class="btn btn-secondary">
+        <i class="bi bi-arrow-right"></i> رجوع
+    </a>
+</div>
 
+<div class="row">
+    <div class="col-lg-7">
         <div class="card p-4">
             <form method="POST">
                 <div class="mb-3">
                     <label class="form-label">اسم المستخدم</label>
                     <input type="text" name="username" class="form-control"
-                           placeholder="اسم المشترك أو اسم البطاقة" required autofocus>
+                           placeholder="اسم المشترك" required autofocus>
                 </div>
 
                 <div class="mb-3">
                     <label class="form-label">كلمة المرور</label>
                     <input type="text" name="password" class="form-control"
-                           placeholder="كلمة مرور المشترك" required>
+                           placeholder="كلمة المرور" required>
                 </div>
 
                 <div class="mb-4">
                     <label class="form-label">الباقة</label>
                     <select name="package" class="form-select">
                         <option value="">— اختر باقة —</option>
-                        <option value="باقة 5 ميجا">باقة 5 ميجا</option>
-                        <option value="باقة 10 ميجا">باقة 10 ميجا</option>
-                        <option value="باقة 20 ميجا">باقة 20 ميجا</option>
-                        <option value="باقة 50 ميجا">باقة 50 ميجا</option>
+                        {% for pkg in packages %}
+                        <option value="{{ pkg.name }}">{{ pkg.name }} — {{ pkg.price }} ل.س</option>
+                        {% endfor %}
                     </select>
                 </div>
 
-                <div class="d-grid gap-2">
-                    <button type="submit" class="btn btn-primary py-2 fw-bold">
-                        💾 حفظ المشترك
+                <div class="d-flex gap-2">
+                    <button type="submit" class="btn btn-primary flex-grow-1">
+                        <i class="bi bi-save"></i> حفظ المشترك
                     </button>
-                    <a href="{{ url_for('subscribers') }}" class="btn btn-secondary">
-                        إلغاء
-                    </a>
+                    <a href="{{ url_for('subscribers') }}" class="btn btn-secondary">إلغاء</a>
                 </div>
             </form>
         </div>
+    </div>
 
-        <div class="alert alert-info mt-3 small">
+    <div class="col-lg-5">
+        <div class="alert alert-info">
             💡 <strong>ملاحظة:</strong> تأكد من كتابة اسم المستخدم وكلمة المرور
             بنفس الطريقة التي تريد إنشاءها على راوتر Mikrotik.
         </div>
