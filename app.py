@@ -276,13 +276,99 @@ def check_first_connections():
         return 0
 
 
+# ============ ✅ API للميكروتيك (قبل الحماية) ============
+
+@app.route('/api/auth', methods=['GET', 'POST'])
+def api_auth():
+    """
+    يتصل به Mikrotik عند كل محاولة اتصال
+    يقبل: user + pass (عبر GET أو POST)
+    يرد: JSON {result: allow/deny, reason, profile, expires}
+    """
+    # استقبل البيانات من أي طريقة
+    if request.method == 'POST':
+        data = request.form if request.form else (request.get_json(silent=True) or {})
+        username = (data.get('user') or data.get('username') or '').strip()
+        password = (data.get('pass') or data.get('password') or '').strip()
+    else:
+        username = request.args.get('user', '').strip()
+        password = request.args.get('pass', '').strip()
+
+    client_ip = request.remote_addr
+    logger.info(f"🔐 AUTH [{client_ip}]: user={username}")
+
+    if not username:
+        return jsonify({'result': 'deny', 'reason': 'no_username'})
+
+    # ابحث عن المشترك
+    sub = Subscriber.query.filter_by(username=username).first()
+    if not sub:
+        logger.warning(f"❌ AUTH: مستخدم غير موجود — {username}")
+        return jsonify({'result': 'deny', 'reason': 'user_not_found'})
+
+    # كلمة المرور
+    if password and sub.password != password:
+        logger.warning(f"❌ AUTH: كلمة مرور خاطئة — {username}")
+        return jsonify({'result': 'deny', 'reason': 'wrong_password'})
+
+    # الحالة
+    if sub.status == 'paused':
+        logger.info(f"⏸ AUTH: موقوف — {username}")
+        return jsonify({'result': 'deny', 'reason': 'suspended'})
+
+    if sub.status == 'expired':
+        logger.info(f"🔴 AUTH: منتهي — {username}")
+        return jsonify({'result': 'deny', 'reason': 'expired'})
+
+    # انتهاء الصلاحية
+    now = datetime.utcnow()
+    if sub.expires_at and sub.expires_at < now:
+        sub.status = 'expired'
+        db.session.commit()
+        logger.info(f"🔴 AUTH: انتهت الصلاحية — {username}")
+        return jsonify({'result': 'deny', 'reason': 'expired'})
+
+    # ✅ أول اتصال → فعّل التاريخ
+    if not sub.expires_at:
+        pkg = Package.query.filter_by(name=sub.package).first() if sub.package else None
+        if pkg and pkg.duration:
+            sub.first_used_at = now
+            sub.expires_at = calculate_expiry(pkg, now)
+            db.session.commit()
+            logger.info(f"✅ AUTH: أول اتصال — {username} ينتهي {sub.expires_at}")
+
+    # ✅ اسمح
+    profile = package_to_profile(sub.package) if sub.package else 'default'
+    expires_str = sub.expires_at.strftime('%Y-%m-%d %H:%M:%S') if sub.expires_at else ''
+
+    logger.info(f"✅ AUTH: مسموح — {username} profile={profile}")
+
+    return jsonify({
+        'result': 'allow',
+        'profile': profile,
+        'expires': expires_str,
+        'user_type': sub.user_type or 'pppoe',
+        'name': sub.name or sub.username
+    })
+
+
+@app.route('/api/log', methods=['POST'])
+def api_log():
+    """يستقبل رسائل من Mikrotik للتشخيص"""
+    data = request.form.to_dict() if request.form else (request.get_json(silent=True) or {})
+    logger.info(f"📡 Mikrotik: {data}")
+    return jsonify({'ok': True})
+
+
 # ============ Auth Guard ============
 
 @app.before_request
 def check_admin_login():
     if request.endpoint is None: return
     if request.endpoint.startswith('static'): return
-    if request.endpoint in ('login', 'logout'): return
+    # ✅ المسارات العامة
+    public = ('login', 'logout', 'api_auth', 'api_log')
+    if request.endpoint in public: return
     if not session.get('admin_id'):
         return redirect(url_for('login'))
 
@@ -1184,7 +1270,6 @@ def delete_subscriber(sub_id):
 
 @app.route('/subscribers/bulk-delete', methods=['POST'])
 def bulk_delete_subscribers():
-    """حذف مجموعة مختارة من المشتركين"""
     try:
         ids = request.form.get('ids', '').strip()
         if not ids:
@@ -1238,7 +1323,6 @@ def bulk_delete_subscribers():
 
 @app.route('/subscribers/delete-expired', methods=['POST'])
 def delete_expired_subscribers():
-    """حذف كل المشتركين المنتهية صلاحيتهم"""
     try:
         now = datetime.utcnow()
 
