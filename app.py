@@ -786,16 +786,15 @@ def add_subscriber():
     )
 
 
-# ============ إضافة جماعية ============
+# ============ إضافة جماعية (تعمل على كل الراوترات النشطة) ============
 
 @app.route('/subscribers/bulk-add', methods=['GET', 'POST'])
 def bulk_add():
     if request.method == 'POST':
-        router_id = request.form.get('router_id', '').strip()
         package_name = request.form.get('package', '').strip()
         user_type = request.form.get('user_type', 'pppoe').strip()
         prefix = request.form.get('prefix', '').strip()
-        char_mode = request.form.get('char_mode', 'mixed').strip()
+        char_mode = request.form.get('char_mode', 'numbers').strip()
         count = request.form.get('count', '1').strip()
         password_mode = request.form.get('password_mode', 'random')
         fixed_password = request.form.get('fixed_password', '').strip()
@@ -804,14 +803,12 @@ def bulk_add():
 
         if user_type not in ('pppoe', 'hotspot'):
             user_type = 'pppoe'
-
         if char_mode not in ('numbers', 'letters', 'mixed'):
-            char_mode = 'mixed'
-
+            char_mode = 'numbers'
         if password_mode not in ('random', 'same_as_username', 'fixed'):
             password_mode = 'random'
 
-        # طول كلمة المرور العشوائية
+        # طول كلمة المرور
         try:
             password_length = int(password_length)
             if password_length < 4 or password_length > 20:
@@ -819,27 +816,13 @@ def bulk_add():
         except ValueError:
             password_length = 6
 
-        # متغيرات حسب نوع التوليد
-        start_num = 1
-        number_length = 4
-        random_length = 6
-
-        if char_mode == 'numbers':
-            try:
-                start_num = int(request.form.get('start_num', '1'))
-                number_length = int(request.form.get('number_length', '4'))
-                if number_length < 1 or number_length > 10:
-                    number_length = 4
-            except ValueError:
-                flash('❌ أرقام غير صحيحة', 'danger')
-                return redirect(url_for('bulk_add'))
-        else:
-            try:
-                random_length = int(request.form.get('random_length', '6'))
-                if random_length < 4 or random_length > 20:
-                    random_length = 6
-            except ValueError:
+        # طول الاسم
+        try:
+            random_length = int(request.form.get('random_length', '6'))
+            if random_length < 4 or random_length > 20:
                 random_length = 6
+        except ValueError:
+            random_length = 6
 
         try:
             count = int(count)
@@ -851,41 +834,40 @@ def bulk_add():
             flash('❌ العدد يجب أن يكون بين 1 و 500', 'danger')
             return redirect(url_for('bulk_add'))
 
-        if not router_id:
-            flash('❌ اختر راوتر', 'danger')
-            return redirect(url_for('bulk_add'))
-
-        router = Router.query.get(int(router_id))
-        if not router:
-            flash('❌ الراوتر غير موجود', 'danger')
+        # ✅ جلب كل الراوترات النشطة
+        active_routers = Router.query.filter_by(is_active=True).all()
+        if not active_routers:
+            flash('❌ لا يوجد راوترات نشطة! أضف راوتر أولًا', 'danger')
             return redirect(url_for('bulk_add'))
 
         pkg = Package.query.filter_by(name=package_name).first() if package_name else None
         expires_at = calculate_expiry(pkg) if pkg else None
 
-        api = None
+        # الاتصال بكل راوتر
+        apis = {}
         if push_to_router:
-            try:
-                api = get_router_api(router)
-            except Exception as e:
-                flash(f'⚠️ فشل الاتصال بالراوتر: {e}', 'warning')
+            for router in active_routers:
+                try:
+                    apis[router.id] = get_router_api(router)
+                except Exception as e:
+                    logger.warning(f"⚠️ فشل الاتصال بـ {router.name}: {e}")
 
-        # مجموعات أحرف محسّنة (بدون ملبسات)
+        # مجموعات أحرف (بدون ملبسات)
         LETTERS = 'abcdefghijkmnpqrstuvwxyz'
         NUMS = '23456789'
         MIXED = LETTERS + NUMS
 
-        # توليد الأسماء
+        # توليد الأسماء العشوائية
         usernames = []
         if char_mode == 'numbers':
-            for i in range(start_num, start_num + count):
-                num_str = str(i).zfill(number_length)
-                usernames.append(f"{prefix}{num_str}")
+            for _ in range(count):
+                rand = ''.join(random.choices(NUMS, k=random_length))
+                usernames.append(f"{prefix}{rand}")
         elif char_mode == 'letters':
             for _ in range(count):
                 rand = ''.join(random.choices(LETTERS, k=random_length))
                 usernames.append(f"{prefix}{rand}")
-        else:  # mixed
+        else:
             for _ in range(count):
                 rand = ''.join(random.choices(MIXED, k=random_length))
                 usernames.append(f"{prefix}{rand}")
@@ -904,42 +886,47 @@ def bulk_add():
             else:
                 password = username
 
+            # التحقق من التكرار
             if Subscriber.query.filter_by(username=username).first():
                 errors.append(f"{username}: مكرر")
                 failed += 1
                 continue
 
-            try:
-                if api and pkg:
+            # ✅ إنشاء المستخدم على كل راوتر + حفظ سجل لكل واحد
+            for router in active_routers:
+                # رفع للراوتر
+                if push_to_router and router.id in apis:
                     try:
-                        api.user_create(
+                        apis[router.id].user_create(
                             username, password, user_type,
-                            profile=package_to_profile(pkg.name)
+                            profile=package_to_profile(pkg.name) if pkg else 'default'
                         )
                         push_ok += 1
                     except MikrotikError as e:
                         push_fail += 1
-                        errors.append(f"{username}: {str(e)[:30]}")
+                        errors.append(f"{username}@{router.name}: {str(e)[:30]}")
 
-                sub = Subscriber(
-                    name=username, username=username, password=password,
-                    package=package_name, user_type=user_type,
-                    router_id=router.id,
-                    expires_at=expires_at, status='active'
-                )
-                db.session.add(sub)
-                created += 1
-            except Exception as e:
-                failed += 1
-                errors.append(f"{username}: {str(e)[:30]}")
+                # حفظ السجل في قاعدة البيانات
+                try:
+                    sub = Subscriber(
+                        name=username, username=username, password=password,
+                        package=package_name, user_type=user_type,
+                        router_id=router.id,
+                        expires_at=expires_at, status='active'
+                    )
+                    db.session.add(sub)
+                    created += 1
+                except Exception as e:
+                    failed += 1
+                    errors.append(f"{username}@{router.name}: {str(e)[:30]}")
 
         db.session.commit()
 
-        msg = f'✅ تم إنشاء {created} مستخدم'
+        msg = f'✅ تم إنشاء {created} سجل على {len(active_routers)} راوتر'
         if failed:
             msg += f' — فشل {failed}'
         if push_to_router:
-            msg += f' — رُفع {push_ok} للراوتر'
+            msg += f' — رُفع {push_ok}'
             if push_fail:
                 msg += f' — فشل رفع {push_fail}'
 
@@ -950,11 +937,13 @@ def bulk_add():
 
         return redirect(url_for('subscribers'))
 
+    # GET
     packages_list = Package.query.order_by(Package.name).all()
-    routers_list = Router.query.order_by(Router.name).all()
+    active_routers = Router.query.filter_by(is_active=True).all()
     return render_template(
         'bulk_add.html',
-        packages=packages_list, routers=routers_list
+        packages=packages_list,
+        active_routers=active_routers
     )
 
 
