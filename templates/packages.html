@@ -2,12 +2,9 @@
 {% block title %}الباقات{% endblock %}
 
 {% block content %}
-<div class="d-flex justify-content-between align-items-center mb-4">
-    <h2>📦 الباقات المتاحة</h2>
-</div>
+<h2 class="mb-4">📦 الباقات المتاحة</h2>
 
 <div class="row g-4">
-    <!-- نموذج إضافة باقة -->
     <div class="col-lg-4">
         <div class="card p-4">
             <h5 class="text-accent mb-3">
@@ -17,62 +14,56 @@
                 <div class="mb-3">
                     <label class="form-label">اسم الباقة</label>
                     <input type="text" name="name" class="form-control"
-                           placeholder="مثال: باقة 5M" required>
+                           placeholder="مثال: شهرية 5M" required>
                 </div>
                 <div class="mb-3">
                     <label class="form-label">السرعة</label>
                     <input type="text" name="speed" class="form-control"
-                           placeholder="مثال: 5M/5M">
+                           placeholder="5M/5M">
+                </div>
+                <div class="mb-3">
+                    <label class="form-label">النوع</label>
+                    <select name="user_type" class="form-select">
+                        <option value="pppoe">🌐 برودباند (PPPoE)</option>
+                        <option value="hotspot">📶 هوت سبوت (Hotspot)</option>
+                    </select>
                 </div>
                 <div class="mb-3">
                     <label class="form-label">السعر</label>
                     <input type="number" name="price" class="form-control"
                            placeholder="0" step="0.01" required>
                 </div>
-
-                <!-- ✅ اختيار وحدة المدة -->
                 <div class="mb-3">
                     <label class="form-label">وحدة المدة</label>
                     <div class="d-flex gap-3">
                         <div class="form-check">
                             <input class="form-check-input" type="radio"
-                                   name="duration_unit" value="days"
-                                   id="unit_days_add" checked>
-                            <label class="form-check-label" for="unit_days_add">📅 أيام</label>
+                                   name="duration_unit" value="days" checked id="ud_add">
+                            <label class="form-check-label" for="ud_add">📅 أيام</label>
                         </div>
                         <div class="form-check">
                             <input class="form-check-input" type="radio"
-                                   name="duration_unit" value="months"
-                                   id="unit_months_add">
-                            <label class="form-check-label" for="unit_months_add">🗓️ أشهر</label>
+                                   name="duration_unit" value="months" id="um_add">
+                            <label class="form-check-label" for="um_add">🗓️ أشهر</label>
                         </div>
                     </div>
                 </div>
-
                 <div class="mb-3">
                     <label class="form-label">المدة</label>
                     <input type="number" name="duration" class="form-control"
-                           placeholder="1" value="1" min="1" required>
-                    <small class="text-muted">
-                        💡 <strong>أيام:</strong> 30 = شهر بـ 30 يوم |
-                        <strong>أشهر:</strong> 1 = شهر ميلادي (28-31 يوم حسب الشهر)
-                    </small>
+                           value="1" min="1" required>
                 </div>
-
                 <button type="submit" class="btn btn-primary w-100">
-                    <i class="bi bi-save"></i> حفظ الباقة
+                    <i class="bi bi-save"></i> حفظ
                 </button>
             </form>
         </div>
     </div>
 
-    <!-- جدول الباقات -->
     <div class="col-lg-8">
         <div class="card">
             <div class="card-header">
-                <h5 class="mb-0 text-accent">
-                    <i class="bi bi-list-ul"></i> الباقات الحالية
-                </h5>
+                <h5 class="mb-0 text-accent">📋 الباقات الحالية</h5>
             </div>
             <div class="table-responsive">
                 <table class="table table-hover mb-0">
@@ -80,6 +71,7 @@
                         <tr>
                             <th>#</th>
                             <th>الاسم</th>
+                            <th>النوع</th>
                             <th>السرعة</th>
                             <th>السعر</th>
                             <th>المدة</th>
@@ -91,6 +83,13 @@
                         <tr>
                             <td>{{ pkg.id }}</td>
                             <td class="text-accent fw-bold">{{ pkg.name }}</td>
+                            <td>
+                                {% if pkg.user_type == 'hotspot' %}
+                                    <span class="badge bg-warning">📶 هوت سبوت</span>
+                                {% else %}
+                                    <span class="badge bg-info">🌐 برودباند</span>
+                                {% endif %}
+                            </td>
                             <td>{{ pkg.speed or '-' }}</td>
                             <td>{{ pkg.price }} ل.س</td>
                             <td>
@@ -103,22 +102,12 @@
                             <td>
                                 <div class="d-flex gap-1">
                                     <button class="btn btn-sm btn-primary"
-                                            onclick='openPackageModal(
-                                                {{ pkg.id }},
-                                                "{{ pkg.name|e }}",
-                                                "{{ pkg.speed|e }}",
-                                                {{ pkg.price }},
-                                                {{ pkg.duration }},
-                                                "{{ pkg.duration_unit or "days" }}"
-                                            )'
-                                            title="تعديل">
+                                            onclick='openPackageModal({{ pkg.id }}, "{{ pkg.name|e }}", "{{ pkg.speed|e }}", {{ pkg.price }}, {{ pkg.duration }}, "{{ pkg.duration_unit or "days" }}", "{{ pkg.user_type or "pppoe" }}")'>
                                         <i class="bi bi-pencil"></i>
                                     </button>
-
                                     <a href="{{ url_for('delete_package', pkg_id=pkg.id) }}"
                                        class="btn btn-sm btn-danger"
-                                       onclick="return confirm('تأكيد حذف الباقة؟')"
-                                       title="حذف">
+                                       onclick="return confirm('تأكيد الحذف؟')">
                                         <i class="bi bi-trash"></i>
                                     </a>
                                 </div>
@@ -126,8 +115,8 @@
                         </tr>
                         {% else %}
                         <tr>
-                            <td colspan="6" class="text-center py-5 text-muted">
-                                📭 لا توجد باقات — أضف أول باقة من النموذج
+                            <td colspan="7" class="text-center py-5 text-muted">
+                                📭 لا توجد باقات
                             </td>
                         </tr>
                         {% endfor %}
@@ -138,7 +127,6 @@
     </div>
 </div>
 
-<!-- Modal تعديل الباقة -->
 <div class="modal fade" id="editPackageModal" tabindex="-1">
     <div class="modal-dialog modal-dialog-centered">
         <div class="modal-content">
@@ -149,10 +137,9 @@
                     </h5>
                     <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
                 </div>
-
                 <div class="modal-body">
                     <div class="mb-3">
-                        <label class="form-label">اسم الباقة</label>
+                        <label class="form-label">الاسم</label>
                         <input type="text" name="name" id="pkg_name" class="form-control" required>
                     </div>
                     <div class="mb-3">
@@ -160,41 +147,42 @@
                         <input type="text" name="speed" id="pkg_speed" class="form-control">
                     </div>
                     <div class="mb-3">
+                        <label class="form-label">النوع</label>
+                        <select name="user_type" id="pkg_user_type" class="form-select">
+                            <option value="pppoe">🌐 برودباند</option>
+                            <option value="hotspot">📶 هوت سبوت</option>
+                        </select>
+                    </div>
+                    <div class="mb-3">
                         <label class="form-label">السعر</label>
                         <input type="number" name="price" id="pkg_price"
                                class="form-control" step="0.01" required>
                     </div>
-
-                    <!-- ✅ اختيار وحدة المدة في التعديل -->
                     <div class="mb-3">
-                        <label class="form-label">وحدة المدة</label>
+                        <label class="form-label">الوحدة</label>
                         <div class="d-flex gap-3">
                             <div class="form-check">
                                 <input class="form-check-input" type="radio"
-                                       name="duration_unit" value="days"
-                                       id="unit_days_edit">
-                                <label class="form-check-label" for="unit_days_edit">📅 أيام</label>
+                                       name="duration_unit" value="days" id="ud_edit">
+                                <label class="form-check-label" for="ud_edit">📅 أيام</label>
                             </div>
                             <div class="form-check">
                                 <input class="form-check-input" type="radio"
-                                       name="duration_unit" value="months"
-                                       id="unit_months_edit">
-                                <label class="form-check-label" for="unit_months_edit">🗓️ أشهر</label>
+                                       name="duration_unit" value="months" id="um_edit">
+                                <label class="form-check-label" for="um_edit">🗓️ أشهر</label>
                             </div>
                         </div>
                     </div>
-
                     <div class="mb-3">
                         <label class="form-label">المدة</label>
                         <input type="number" name="duration" id="pkg_duration"
                                class="form-control" min="1" required>
                     </div>
                 </div>
-
                 <div class="modal-footer border-secondary">
                     <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">إلغاء</button>
                     <button type="submit" class="btn btn-primary">
-                        <i class="bi bi-save"></i> حفظ التعديلات
+                        <i class="bi bi-save"></i> حفظ
                     </button>
                 </div>
             </form>
@@ -203,22 +191,19 @@
 </div>
 
 <script>
-function openPackageModal(id, name, speed, price, duration, unit) {
+function openPackageModal(id, name, speed, price, duration, unit, utype) {
     document.getElementById('editPackageForm').action = '/packages/update/' + id;
     document.getElementById('pkg_name').value = name;
     document.getElementById('pkg_speed').value = speed;
     document.getElementById('pkg_price').value = price;
     document.getElementById('pkg_duration').value = duration;
-
-    // اختيار الوحدة المناسبة
+    document.getElementById('pkg_user_type').value = utype || 'pppoe';
     if (unit === 'months') {
-        document.getElementById('unit_months_edit').checked = true;
+        document.getElementById('um_edit').checked = true;
     } else {
-        document.getElementById('unit_days_edit').checked = true;
+        document.getElementById('ud_edit').checked = true;
     }
-
-    const modal = new bootstrap.Modal(document.getElementById('editPackageModal'));
-    modal.show();
+    new bootstrap.Modal(document.getElementById('editPackageModal')).show();
 }
 </script>
 {% endblock %}
