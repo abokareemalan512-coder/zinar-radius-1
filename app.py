@@ -1,4 +1,4 @@
-# app.py
+# app.py — النسخة النظيفة (DB + API فقط)
 import os
 import io
 import csv
@@ -8,7 +8,6 @@ import logging
 import traceback
 import calendar
 from datetime import datetime, timedelta
-from functools import wraps
 
 from flask import (
     Flask, render_template, request, redirect, url_for,
@@ -16,9 +15,6 @@ from flask import (
 )
 from flask_sqlalchemy import SQLAlchemy
 from werkzeug.security import generate_password_hash, check_password_hash
-import paramiko
-import socket
-from mikrotik_api import MikrotikAPI, MikrotikError, get_router_api, test_router_connection
 
 # ============ الإعدادات ============
 app = Flask(__name__)
@@ -78,13 +74,11 @@ class Subscriber(db.Model):
     password = db.Column(db.String(150), nullable=False)
     package = db.Column(db.String(100))
     user_type = db.Column(db.String(20), default='pppoe')
-    router_id = db.Column(db.Integer, db.ForeignKey('routers.id'))
+    router_id = db.Column(db.Integer)  # مرجع فقط — لا يلمس Mikrotik
     status = db.Column(db.String(20), default='active')
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     expires_at = db.Column(db.DateTime)
     first_used_at = db.Column(db.DateTime)
-    pushed_at = db.Column(db.DateTime)
-    pushed_router_id = db.Column(db.Integer)
 
 
 class Payment(db.Model):
@@ -158,7 +152,6 @@ def init_database():
             logger.info("✅ تم تهيئة قاعدة البيانات")
         except Exception as e:
             logger.error(f"❌ {e}")
-            logger.error(traceback.format_exc())
 
 
 def ensure_columns():
@@ -204,88 +197,14 @@ init_database()
 ensure_columns()
 
 
-def test_mikrotik_connection(router):
-    try:
-        success, _ = test_router_connection(router)
-        return success
-    except Exception as e:
-        logger.warning(f"⚠️ {router.name}: {e}")
-        return False
-
-
-def get_master_router():
-    try:
-        return Router.query.filter_by(is_master=True).first()
-    except Exception:
-        return None
-
-
-def check_first_connections():
-    try:
-        pending = Subscriber.query.filter(
-            Subscriber.expires_at.is_(None),
-            Subscriber.pushed_router_id.isnot(None),
-            Subscriber.status == 'active'
-        ).count()
-
-        if pending == 0:
-            return 0
-
-        routers = Router.query.filter_by(is_active=True).all()
-        activated = 0
-        now = datetime.utcnow()
-
-        for router in routers:
-            try:
-                api = get_router_api(router)
-                active_names = set()
-                try:
-                    for u in api.pppoe_active():
-                        n = u.get('name') or u.get('user')
-                        if n: active_names.add(n)
-                except Exception: pass
-                try:
-                    for u in api.hotspot_active():
-                        n = u.get('name') or u.get('user')
-                        if n: active_names.add(n)
-                except Exception: pass
-
-                if not active_names: continue
-
-                pending_subs = Subscriber.query.filter(
-                    Subscriber.pushed_router_id == router.id,
-                    Subscriber.expires_at.is_(None),
-                    Subscriber.status == 'active',
-                    Subscriber.username.in_(active_names)
-                ).all()
-
-                for sub in pending_subs:
-                    pkg = Package.query.filter_by(name=sub.package).first() if sub.package else None
-                    if pkg and pkg.duration:
-                        sub.first_used_at = now
-                        sub.expires_at = calculate_expiry(pkg, now)
-                        activated += 1
-            except Exception as e:
-                logger.warning(f"⚠️ {router.name}: {e}")
-
-        if activated > 0:
-            db.session.commit()
-        return activated
-    except Exception as e:
-        logger.warning(f"⚠️ check_first: {e}")
-        return 0
-
-
-# ============ ✅ API للميكروتيك (قبل الحماية) ============
+# ============ API للميكروتيك ============
 
 @app.route('/api/auth', methods=['GET', 'POST'])
 def api_auth():
     """
-    يتصل به Mikrotik عند كل محاولة اتصال
-    يقبل: user + pass (عبر GET أو POST)
-    يرد: JSON {result: allow/deny, reason, profile, expires}
+    يستقبل Mikrotik استعلام المصادقة عند كل اتصال.
+    يرد JSON بـ result: allow/deny
     """
-    # استقبل البيانات من أي طريقة
     if request.method == 'POST':
         data = request.form if request.form else (request.get_json(silent=True) or {})
         username = (data.get('user') or data.get('username') or '').strip()
@@ -300,32 +219,25 @@ def api_auth():
     if not username:
         return jsonify({'result': 'deny', 'reason': 'no_username'})
 
-    # ابحث عن المشترك
     sub = Subscriber.query.filter_by(username=username).first()
     if not sub:
         logger.warning(f"❌ AUTH: مستخدم غير موجود — {username}")
         return jsonify({'result': 'deny', 'reason': 'user_not_found'})
 
-    # كلمة المرور
     if password and sub.password != password:
         logger.warning(f"❌ AUTH: كلمة مرور خاطئة — {username}")
         return jsonify({'result': 'deny', 'reason': 'wrong_password'})
 
-    # الحالة
     if sub.status == 'paused':
-        logger.info(f"⏸ AUTH: موقوف — {username}")
         return jsonify({'result': 'deny', 'reason': 'suspended'})
 
     if sub.status == 'expired':
-        logger.info(f"🔴 AUTH: منتهي — {username}")
         return jsonify({'result': 'deny', 'reason': 'expired'})
 
-    # انتهاء الصلاحية
     now = datetime.utcnow()
     if sub.expires_at and sub.expires_at < now:
         sub.status = 'expired'
         db.session.commit()
-        logger.info(f"🔴 AUTH: انتهت الصلاحية — {username}")
         return jsonify({'result': 'deny', 'reason': 'expired'})
 
     # ✅ أول اتصال → فعّل التاريخ
@@ -337,7 +249,6 @@ def api_auth():
             db.session.commit()
             logger.info(f"✅ AUTH: أول اتصال — {username} ينتهي {sub.expires_at}")
 
-    # ✅ اسمح
     profile = package_to_profile(sub.package) if sub.package else 'default'
     expires_str = sub.expires_at.strftime('%Y-%m-%d %H:%M:%S') if sub.expires_at else ''
 
@@ -354,7 +265,6 @@ def api_auth():
 
 @app.route('/api/log', methods=['POST'])
 def api_log():
-    """يستقبل رسائل من Mikrotik للتشخيص"""
     data = request.form.to_dict() if request.form else (request.get_json(silent=True) or {})
     logger.info(f"📡 Mikrotik: {data}")
     return jsonify({'ok': True})
@@ -366,14 +276,13 @@ def api_log():
 def check_admin_login():
     if request.endpoint is None: return
     if request.endpoint.startswith('static'): return
-    # ✅ المسارات العامة
     public = ('login', 'logout', 'api_auth', 'api_log')
     if request.endpoint in public: return
     if not session.get('admin_id'):
         return redirect(url_for('login'))
 
 
-# ============ Auth Routes ============
+# ============ Auth ============
 
 @app.route('/')
 def index():
@@ -410,14 +319,10 @@ def logout():
 @app.route('/dashboard')
 def dashboard():
     try:
-        try: check_first_connections()
-        except Exception: pass
-
         routers_list = Router.query.all()
         routers_count = len(routers_list)
-        routers_online = sum(1 for r in routers_list if r.is_active and test_mikrotik_connection(r))
 
-        master = get_master_router()
+        master = Router.query.filter_by(is_master=True).first()
         sub_count = Subscriber.query.count()
         active_subs = Subscriber.query.filter_by(status='active').count()
         pending_pays = Payment.query.filter_by(status='pending').count()
@@ -438,7 +343,7 @@ def dashboard():
 
         return render_template(
             'dashboard.html',
-            routers_count=routers_count, routers_online=routers_online,
+            routers_count=routers_count, routers_online=routers_count,
             sub_count=sub_count, active_subs=active_subs, active_sessions=active_subs,
             today_revenue=today_revenue, active_vouchers=0,
             new_users_today=new_users_today, pending_pays=pending_pays,
@@ -498,7 +403,7 @@ def change_admin_credentials():
     return redirect(url_for('dashboard'))
 
 
-# ============ Routers ============
+# ============ Routers (DB only) ============
 
 @app.route('/routers', methods=['GET', 'POST'])
 def routers():
@@ -523,13 +428,10 @@ def routers():
         try:
             if is_master:
                 Router.query.update({Router.is_master: False}, synchronize_session=False)
-            r = Router(name=name, ip_address=ip, username=un, password=pw,
-                       port=port, is_master=is_master, is_active=True)
-            db.session.add(r)
+            db.session.add(Router(name=name, ip_address=ip, username=un,
+                                  password=pw, port=port, is_master=is_master, is_active=True))
             db.session.commit()
-            ok = test_mikrotik_connection(r)
-            flash(f'✅ الراوتر "{name}" أُضيف' if ok else '⚠️ أُضيف لكن الاتصال فشل',
-                  'success' if ok else 'warning')
+            flash(f'✅ الراوتر "{name}" أُضيف في قاعدة البيانات', 'success')
         except Exception as e:
             db.session.rollback()
             flash(f'❌ {str(e)}', 'danger')
@@ -546,48 +448,6 @@ def set_master_router(router_id):
         r.is_master = True
         db.session.commit()
         flash('✅ تم التحديث', 'success')
-    except Exception as e:
-        db.session.rollback()
-        flash(f'❌ {str(e)}', 'danger')
-    return redirect(url_for('routers'))
-
-
-@app.route('/routers/toggle/<int:router_id>')
-def toggle_router(router_id):
-    try:
-        router = Router.query.get_or_404(router_id)
-        router.is_active = not router.is_active
-        db.session.commit()
-
-        pushed_subs = Subscriber.query.filter_by(pushed_router_id=router.id).all()
-        success = fail = 0
-
-        try:
-            api = get_router_api(router)
-            for sub in pushed_subs:
-                ut = sub.user_type or 'pppoe'
-                try:
-                    if router.is_active:
-                        if sub.status == 'active':
-                            api.user_enable(sub.username, ut)
-                        else:
-                            api.user_disable(sub.username, ut)
-                    else:
-                        api.user_disable(sub.username, ut)
-                        api.user_kick(sub.username, ut)
-                    success += 1
-                except MikrotikError:
-                    fail += 1
-        except MikrotikError as e:
-            flash(f'⚠️ تحديث DB نجح لكن السيرفر فشل: {str(e)[:60]}', 'warning')
-            return redirect(url_for('routers'))
-
-        state = "▶ تشغيل" if router.is_active else "⏸ إيقاف"
-        msg = f'✅ {state} "{router.name}"'
-        if pushed_subs:
-            msg += f' — {success} مشترك'
-            if fail: msg += f' (فشل {fail})'
-        flash(msg, 'success' if not fail else 'warning')
     except Exception as e:
         db.session.rollback()
         flash(f'❌ {str(e)}', 'danger')
@@ -627,179 +487,25 @@ def update_router(router_id):
     return redirect(url_for('routers'))
 
 
-@app.route('/routers/test/<int:router_id>')
-def test_router(router_id):
-    try:
-        r = Router.query.get_or_404(router_id)
-        if test_mikrotik_connection(r):
-            flash('✅ الاتصال ناجح', 'success')
-        else:
-            flash('⚠️ فشل الاتصال', 'warning')
-    except Exception as e:
-        flash(f'❌ {str(e)}', 'danger')
-    return redirect(url_for('routers'))
-
-
 @app.route('/routers/delete/<int:router_id>')
 def delete_router(router_id):
     try:
         r = Router.query.get_or_404(router_id)
         db.session.delete(r)
         db.session.commit()
-        flash('✅ تم الحذف', 'success')
+        flash('✅ تم الحذف من قاعدة البيانات فقط', 'success')
     except Exception as e:
         db.session.rollback()
         flash(f'❌ {str(e)}', 'danger')
     return redirect(url_for('routers'))
 
 
-@app.route('/routers/<int:router_id>/users')
-def router_users(router_id):
-    router = Router.query.get_or_404(router_id)
-    ut = request.args.get('type', 'pppoe')
-    users = []; actives = []; profiles = []; error = None
-    try:
-        api = get_router_api(router)
-        if ut == 'hotspot':
-            users = api.hotspot_list()
-            actives = api.hotspot_active()
-            profiles = api.profiles_list('hotspot')
-        else:
-            users = api.pppoe_list()
-            actives = api.pppoe_active()
-            profiles = api.profiles_list('pppoe')
-    except MikrotikError as e:
-        error = str(e)
-    except Exception as e:
-        error = f"خطأ: {str(e)}"
-
-    return render_template('router_users.html', router=router, users=users,
-                           actives=actives, profiles=profiles, error=error,
-                           user_type=ut)
-
-
-@app.route('/routers/<int:router_id>/sync')
-def sync_router(router_id):
-    router = Router.query.get_or_404(router_id)
-    ut = request.args.get('type', 'pppoe')
-
-    try:
-        api = get_router_api(router)
-        if ut == 'hotspot':
-            existing = {u.get('name') for u in api.hotspot_list() if u.get('name')}
-        else:
-            existing = {u.get('name') for u in api.pppoe_list() if u.get('name')}
-
-        subs = Subscriber.query.filter_by(router_id=router_id, user_type=ut).all()
-        created = skipped = failed = 0
-        now = datetime.utcnow()
-
-        for sub in subs:
-            if sub.username in existing:
-                skipped += 1
-                sub.pushed_at = now
-                sub.pushed_router_id = router_id
-                continue
-            try:
-                api.user_create(sub.username, sub.password, ut,
-                                profile=package_to_profile(sub.package))
-                if sub.status != 'active':
-                    api.user_disable(sub.username, ut)
-                sub.pushed_at = now
-                sub.pushed_router_id = router_id
-                created += 1
-            except MikrotikError as e:
-                logger.warning(f"⚠️ {sub.username}: {e}")
-                failed += 1
-
-        db.session.commit()
-        flash(f'✅ المزامنة: {created} جديد، {skipped} موجود، {failed} فشل',
-              'success' if failed == 0 else 'warning')
-    except MikrotikError as e:
-        flash(f'❌ {e}', 'danger')
-
-    return redirect(url_for('router_users', router_id=router_id, type=ut))
-
-
-# ============ Import RSC ============
-
-@app.route('/routers/<int:router_id>/import', methods=['GET', 'POST'])
-def import_rsc(router_id):
-    router = Router.query.get_or_404(router_id)
-    if request.method == 'POST':
-        f = request.files.get('rsc_file')
-        push = request.form.get('push_to_router') == 'on'
-
-        if not f or not f.filename:
-            flash('❌ اختر ملف', 'danger')
-            return redirect(url_for('import_rsc', router_id=router_id))
-        if not f.filename.lower().endswith('.rsc'):
-            flash('❌ يجب .rsc', 'danger')
-            return redirect(url_for('import_rsc', router_id=router_id))
-
-        try:
-            content = f.read().decode('utf-8', errors='ignore')
-            api = get_router_api(router)
-            parsed = api.import_rsc_content(content)
-        except Exception as e:
-            flash(f'❌ {e}', 'danger')
-            return redirect(url_for('import_rsc', router_id=router_id))
-
-        all_users = []
-        for u in parsed.get('pppoe', []):
-            u['user_type'] = 'pppoe'; all_users.append(u)
-        for u in parsed.get('hotspot', []):
-            u['user_type'] = 'hotspot'; all_users.append(u)
-
-        if not all_users:
-            flash('⚠️ لا يوجد مستخدمون', 'warning')
-            return redirect(url_for('import_rsc', router_id=router_id))
-
-        added = skipped = pok = pf = 0
-        for u in all_users:
-            un = u.get('name')
-            if not un: continue
-            if Subscriber.query.filter_by(username=un, router_id=router_id).first():
-                skipped += 1; continue
-            try:
-                s = Subscriber(
-                    name=un, username=un, password=u.get('password', ''),
-                    package=u.get('profile', ''), user_type=u.get('user_type', 'pppoe'),
-                    router_id=router_id,
-                    status='paused' if u.get('disabled') == 'true' else 'active'
-                )
-                db.session.add(s); added += 1
-                if push:
-                    try:
-                        api.user_create(un, u.get('password', ''), u.get('user_type', 'pppoe'),
-                                        profile=u.get('profile', 'default'))
-                        pok += 1
-                    except MikrotikError: pf += 1
-            except Exception as e:
-                logger.error(f"⚠️ {un}: {e}")
-
-        db.session.commit()
-        msg = f'✅ استيراد {added}'
-        if skipped: msg += f' — تجاهل {skipped}'
-        if push:
-            msg += f' — رُفع {pok}'
-            if pf: msg += f' — فشل {pf}'
-        flash(msg, 'success' if not pf else 'warning')
-        return redirect(url_for('subscribers'))
-
-    return render_template('import_rsc.html', router=router)
-
-
-# ============ Subscribers List ============
+# ============ Subscribers ============
 
 @app.route('/subscribers')
 def subscribers():
-    try: check_first_connections()
-    except Exception: pass
-
     search = request.args.get('q', '').strip()
     ft = request.args.get('type', '').strip()
-    fp = request.args.get('push', '').strip()
     now = datetime.utcnow()
 
     try:
@@ -820,10 +526,6 @@ def subscribers():
             ))
         if ft in ('pppoe', 'hotspot'):
             q = q.filter_by(user_type=ft)
-        if fp == 'pushed':
-            q = q.filter(Subscriber.pushed_at.isnot(None))
-        elif fp == 'not_pushed':
-            q = q.filter(Subscriber.pushed_at.is_(None))
 
         subs = q.order_by(Subscriber.created_at.desc()).all()
     except Exception as e:
@@ -834,10 +536,8 @@ def subscribers():
         subscribers=subs,
         routers={r.id: r for r in Router.query.all()},
         packages=Package.query.order_by(Package.name).all(),
-        search=search, now=now, filter_type=ft, filter_push=fp)
+        search=search, now=now, filter_type=ft)
 
-
-# ============ Add Subscriber ============
 
 @app.route('/add-subscriber', methods=['GET', 'POST'])
 @app.route('/subscribers/add', methods=['GET', 'POST'])
@@ -848,7 +548,6 @@ def add_subscriber():
         pw = request.form.get('password', '').strip()
         pkg = request.form.get('package', '').strip()
         ut = request.form.get('user_type', 'pppoe').strip()
-        rid = request.form.get('router_id', '').strip()
 
         if ut not in ('pppoe', 'hotspot'): ut = 'pppoe'
         if not un or not pw:
@@ -859,15 +558,13 @@ def add_subscriber():
             return redirect(url_for('add_subscriber'))
 
         try:
-            s = Subscriber(
+            db.session.add(Subscriber(
                 name=name or un, username=un, password=pw,
                 package=pkg, user_type=ut,
-                router_id=int(rid) if rid else None,
                 expires_at=None, status='active'
-            )
-            db.session.add(s)
+            ))
             db.session.commit()
-            flash(f'✅ "{un}" — 📌 في DB فقط (اضغط 📤 للرفع)', 'success')
+            flash(f'✅ "{un}" أُضيف — 📌 في قاعدة البيانات فقط', 'success')
             return redirect(url_for('subscribers'))
         except Exception as e:
             db.session.rollback()
@@ -877,8 +574,6 @@ def add_subscriber():
         packages=Package.query.order_by(Package.name).all(),
         routers=Router.query.order_by(Router.name).all())
 
-
-# ============ Bulk Add ============
 
 @app.route('/subscribers/bulk-add', methods=['GET', 'POST'])
 def bulk_add():
@@ -891,7 +586,6 @@ def bulk_add():
         pm = request.form.get('password_mode', 'random')
         fp = request.form.get('fixed_password', '').strip()
         pl = request.form.get('password_length', '6').strip()
-        rid = request.form.get('router_id', '').strip()
 
         if ut not in ('pppoe', 'hotspot'): ut = 'pppoe'
         if cm not in ('numbers', 'letters', 'mixed'): cm = 'numbers'
@@ -932,38 +626,25 @@ def bulk_add():
                 usernames.append(f"{prefix}{''.join(random.choices(M, k=rl))}")
 
         created = failed = 0
-        errors = []
-
         for un in usernames:
-            if pm == 'same_as_username':
-                pw = un
-            elif pm == 'fixed':
-                pw = fp
-            elif pm == 'random':
-                pw = ''.join(random.choices(N, k=pl))
-            else:
-                pw = un
+            if pm == 'same_as_username': pw = un
+            elif pm == 'fixed': pw = fp
+            elif pm == 'random': pw = ''.join(random.choices(N, k=pl))
+            else: pw = un
 
             if Subscriber.query.filter_by(username=un).first():
-                errors.append(f"{un}: مكرر"); failed += 1; continue
+                failed += 1; continue
             try:
-                s = Subscriber(name=un, username=un, password=pw,
-                               package=pkg, user_type=ut,
-                               router_id=int(rid) if rid else None,
-                               expires_at=None, status='active')
-                db.session.add(s)
+                db.session.add(Subscriber(name=un, username=un, password=pw,
+                                          package=pkg, user_type=ut,
+                                          expires_at=None, status='active'))
                 created += 1
-            except Exception as e:
+            except Exception:
                 failed += 1
-                errors.append(f"{un}: {str(e)[:30]}")
 
         db.session.commit()
-        msg = f'✅ {created} مشترك في DB'
-        msg += ' — 📌 ارفعهم متى شئت'
-        if failed: msg += f' — فشل {failed}'
-        flash(msg, 'success' if not failed else 'warning')
-        for e in errors[:5]: flash(f'⚠️ {e}', 'warning')
-
+        flash(f'✅ {created} مشترك في قاعدة البيانات' + (f' — فشل {failed}' if failed else ''),
+              'success' if not failed else 'warning')
         return redirect(url_for('subscribers'))
 
     return render_template('bulk_add.html',
@@ -971,184 +652,19 @@ def bulk_add():
         routers=Router.query.order_by(Router.name).all())
 
 
-# ============ Push Single ============
-
-@app.route('/subscribers/push/<int:sub_id>')
-def push_subscriber(sub_id):
-    try:
-        sub = Subscriber.query.get_or_404(sub_id)
-        ut = sub.user_type or 'pppoe'
-
-        if not sub.router_id:
-            flash('⚠️ اختر راوتر أولًا', 'warning')
-            return redirect(url_for('subscribers'))
-
-        router = Router.query.get(sub.router_id)
-        if not router:
-            flash('❌ الراوتر غير موجود', 'danger')
-            return redirect(url_for('subscribers'))
-
-        try:
-            api = get_router_api(router)
-            check = (f'/ip hotspot user print where name="{sub.username}"' if ut == 'hotspot'
-                     else f'/ppp secret print where name="{sub.username}"')
-            exists = sub.username in api.execute(check)
-
-            if exists:
-                cmd = (f'/ip hotspot user set [find name="{sub.username}"] password="{sub.password}" profile="{package_to_profile(sub.package)}"'
-                       if ut == 'hotspot' else
-                       f'/ppp secret set [find name="{sub.username}"] password="{sub.password}" profile="{package_to_profile(sub.package)}"')
-                api.execute(cmd)
-                flash(f'✅ تم تحديث "{sub.username}"', 'success')
-            else:
-                api.user_create(sub.username, sub.password, ut,
-                                profile=package_to_profile(sub.package))
-                flash(f'✅ تم رفع "{sub.username}" إلى {router.name}', 'success')
-
-            sub.pushed_at = datetime.utcnow()
-            sub.pushed_router_id = router.id
-            db.session.commit()
-        except MikrotikError as e:
-            flash(f'❌ {e}', 'danger')
-    except Exception as e:
-        db.session.rollback()
-        flash(f'❌ {str(e)}', 'danger')
-    return redirect(url_for('subscribers'))
-
-
-# ============ Move Subscriber ============
-
-@app.route('/subscribers/move/<int:sub_id>', methods=['POST'])
-def move_subscriber(sub_id):
-    try:
-        sub = Subscriber.query.get_or_404(sub_id)
-        new_rid = request.form.get('new_router_id', '').strip()
-        if not new_rid:
-            flash('❌ اختر راوتر', 'danger')
-            return redirect(url_for('subscribers'))
-
-        new_rid = int(new_rid)
-        new_router = Router.query.get(new_rid)
-        if not new_router:
-            flash('❌ الراوتر غير موجود', 'danger')
-            return redirect(url_for('subscribers'))
-
-        old_rid = sub.router_id
-        ut = sub.user_type or 'pppoe'
-
-        if old_rid and old_rid != new_rid:
-            old = Router.query.get(old_rid)
-            if old:
-                try:
-                    api_old = get_router_api(old)
-                    api_old.user_kick(sub.username, ut)
-                    api_old.user_delete(sub.username, ut)
-                except MikrotikError:
-                    pass
-
-        msg = ''
-        try:
-            api_new = get_router_api(new_router)
-            api_new.user_create(sub.username, sub.password, ut,
-                                profile=package_to_profile(sub.package))
-            sub.pushed_at = datetime.utcnow()
-            sub.pushed_router_id = new_router.id
-            msg = f' ✅ + {new_router.name}'
-        except MikrotikError as e:
-            msg = f' ⚠️ ({str(e)[:40]})'
-
-        sub.router_id = new_rid
-        sub.expires_at = None
-        sub.first_used_at = None
-        sub.status = 'active'
-
-        db.session.commit()
-        flash(f'🔀 نُقل "{sub.username}" إلى {new_router.name}{msg}', 'success')
-    except Exception as e:
-        db.session.rollback()
-        flash(f'❌ {str(e)}', 'danger')
-    return redirect(url_for('subscribers'))
-
-
-# ============ Push Selected ============
-
-@app.route('/subscribers/push-selected', methods=['POST'])
-def push_selected():
-    try:
-        ids = request.form.get('ids', '').strip()
-        rid = request.form.get('router_id', '').strip()
-        if not ids or not rid:
-            flash('❌ اختر راوتر ومشتركين', 'danger')
-            return redirect(url_for('subscribers'))
-
-        ids_list = [int(x) for x in ids.split(',') if x.strip().isdigit()]
-        router = Router.query.get(int(rid))
-        if not router:
-            flash('❌ الراوتر غير موجود', 'danger')
-            return redirect(url_for('subscribers'))
-
-        try: api = get_router_api(router)
-        except MikrotikError as e:
-            flash(f'❌ {e}', 'danger')
-            return redirect(url_for('subscribers'))
-
-        subs = Subscriber.query.filter(Subscriber.id.in_(ids_list)).all()
-        ok = fail = 0
-        now = datetime.utcnow()
-
-        for sub in subs:
-            ut = sub.user_type or 'pppoe'
-            try:
-                api.user_create(sub.username, sub.password, ut,
-                                profile=package_to_profile(sub.package))
-                sub.pushed_at = now
-                sub.pushed_router_id = router.id
-                if not sub.router_id:
-                    sub.router_id = router.id
-                ok += 1
-            except MikrotikError:
-                fail += 1
-
-        db.session.commit()
-        flash(f'✅ رُفع {ok} إلى {router.name}' + (f' — فشل {fail}' if fail else ''),
-              'success' if not fail else 'warning')
-    except Exception as e:
-        db.session.rollback()
-        flash(f'❌ {str(e)}', 'danger')
-    return redirect(url_for('subscribers'))
-
-
-# ============ Toggle / Reset / Extend ============
-
 @app.route('/subscribers/toggle/<int:sub_id>')
 def toggle_subscriber(sub_id):
     try:
         sub = Subscriber.query.get_or_404(sub_id)
-        ut = sub.user_type or 'pppoe'
         if sub.status == 'active':
             sub.status = 'paused'
-            if sub.pushed_router_id:
-                r = Router.query.get(sub.pushed_router_id)
-                if r:
-                    try:
-                        api = get_router_api(r)
-                        api.user_disable(sub.username, ut)
-                        api.user_kick(sub.username, ut)
-                    except MikrotikError: pass
-            flash(f'⏸ تم إيقاف "{sub.username}"', 'warning')
+            flash(f'⏸ "{sub.username}" موقوف في قاعدة البيانات', 'warning')
         else:
             if sub.expires_at and sub.expires_at < datetime.utcnow():
                 flash('⚠️ منتهي', 'danger')
             else:
                 sub.status = 'active'
-                if sub.pushed_router_id:
-                    r = Router.query.get(sub.pushed_router_id)
-                    if r:
-                        try:
-                            api = get_router_api(r)
-                            api.user_enable(sub.username, ut)
-                        except MikrotikError: pass
-                flash(f'▶ تم تفعيل "{sub.username}"', 'success')
+                flash(f'▶ "{sub.username}" نشط في قاعدة البيانات', 'success')
         db.session.commit()
     except Exception as e:
         db.session.rollback()
@@ -1163,15 +679,6 @@ def reset_subscriber(sub_id):
         sub.expires_at = None
         sub.first_used_at = None
         sub.status = 'active'
-        ut = sub.user_type or 'pppoe'
-        if sub.pushed_router_id:
-            r = Router.query.get(sub.pushed_router_id)
-            if r:
-                try:
-                    api = get_router_api(r)
-                    api.user_enable(sub.username, ut)
-                    api.user_kick(sub.username, ut)
-                except MikrotikError: pass
         db.session.commit()
         flash('🔄 تم التصفير — ⏳ يبدأ من أول اتصال', 'success')
     except Exception as e:
@@ -1200,73 +707,33 @@ def extend_subscriber(sub_id):
 def update_subscriber(sub_id):
     try:
         sub = Subscriber.query.get_or_404(sub_id)
-        old_pw = sub.password
-        old_pkg = sub.package
-        old_un = sub.username
-
         sub.name = request.form.get('name', '').strip() or sub.name
         nun = request.form.get('username', '').strip()
         if nun: sub.username = nun
         pw = request.form.get('password', '').strip()
         if pw: sub.password = pw
-
         pkg = request.form.get('package', '').strip()
-        if pkg and pkg != sub.package:
-            sub.package = pkg
-
-        rid = request.form.get('router_id', '').strip()
-        sub.router_id = int(rid) if rid else None
-
-        if sub.pushed_router_id:
-            r = Router.query.get(sub.pushed_router_id)
-            if r:
-                ut = sub.user_type or 'pppoe'
-                try:
-                    api = get_router_api(r)
-                    if pw and pw != old_pw:
-                        api.user_update_password(sub.username, pw, ut)
-                    if pkg and pkg != old_pkg:
-                        api.user_update_profile(sub.username, package_to_profile(pkg), ut)
-                        api.user_kick(sub.username, ut)
-                    if nun and nun != old_un:
-                        api.user_delete(old_un, ut)
-                        api.user_create(nun, pw or old_pw, ut,
-                                        profile=package_to_profile(pkg or old_pkg))
-                except MikrotikError: pass
-
+        if pkg: sub.package = pkg
         db.session.commit()
-        flash('✅ تم التحديث', 'success')
+        flash('✅ تم التحديث في قاعدة البيانات', 'success')
     except Exception as e:
         db.session.rollback()
         flash(f'❌ {str(e)}', 'danger')
     return redirect(url_for('subscribers'))
 
-
-# ============ Delete Single ============
 
 @app.route('/subscribers/delete/<int:sub_id>')
 def delete_subscriber(sub_id):
     try:
         sub = Subscriber.query.get_or_404(sub_id)
-        if sub.pushed_router_id:
-            r = Router.query.get(sub.pushed_router_id)
-            if r:
-                ut = sub.user_type or 'pppoe'
-                try:
-                    api = get_router_api(r)
-                    api.user_kick(sub.username, ut)
-                    api.user_delete(sub.username, ut)
-                except MikrotikError: pass
         db.session.delete(sub)
         db.session.commit()
-        flash('✅ تم الحذف', 'success')
+        flash('✅ تم الحذف من قاعدة البيانات فقط', 'success')
     except Exception as e:
         db.session.rollback()
         flash(f'❌ {str(e)}', 'danger')
     return redirect(url_for('subscribers'))
 
-
-# ============ Delete Bulk ============
 
 @app.route('/subscribers/bulk-delete', methods=['POST'])
 def bulk_delete_subscribers():
@@ -1277,111 +744,52 @@ def bulk_delete_subscribers():
             return redirect(url_for('subscribers'))
 
         ids_list = [int(x) for x in ids.split(',') if x.strip().isdigit()]
-        if not ids_list:
-            flash('❌ معرّفات غير صالحة', 'danger')
-            return redirect(url_for('subscribers'))
-
         subs = Subscriber.query.filter(Subscriber.id.in_(ids_list)).all()
         deleted = 0
-        router_fail = 0
-        errors = []
-
         for sub in subs:
-            if sub.pushed_router_id:
-                r = Router.query.get(sub.pushed_router_id)
-                if r:
-                    ut = sub.user_type or 'pppoe'
-                    try:
-                        api = get_router_api(r)
-                        api.user_kick(sub.username, ut)
-                        api.user_delete(sub.username, ut)
-                    except Exception as e:
-                        router_fail += 1
-                        errors.append(f"{sub.username}: {str(e)[:30]}")
-
             db.session.delete(sub)
             deleted += 1
-
         db.session.commit()
-
-        msg = f'🗑 تم حذف {deleted} مشترك'
-        if router_fail:
-            msg += f' — فشل إزالة {router_fail} من السيرفر'
-        flash(msg, 'success' if not router_fail else 'warning')
-        for e in errors[:5]:
-            flash(f'⚠️ {e}', 'warning')
-
+        flash(f'🗑 تم حذف {deleted} مشترك من قاعدة البيانات', 'success')
     except Exception as e:
         db.session.rollback()
-        logger.error(f"❌ bulk_delete: {e}")
         flash(f'❌ {str(e)}', 'danger')
-
     return redirect(url_for('subscribers'))
 
-
-# ============ Delete Expired ============
 
 @app.route('/subscribers/delete-expired', methods=['POST'])
 def delete_expired_subscribers():
     try:
         now = datetime.utcnow()
-
         expired_subs = Subscriber.query.filter(
             Subscriber.expires_at.isnot(None),
             Subscriber.expires_at < now
         ).all()
-
         extra = Subscriber.query.filter(
             Subscriber.status == 'expired',
             Subscriber.expires_at.is_(None)
         ).all()
-
         all_expired = list(expired_subs) + list(extra)
         seen = set()
-        unique_expired = []
+        unique = []
         for s in all_expired:
             if s.id not in seen:
-                seen.add(s.id)
-                unique_expired.append(s)
+                seen.add(s.id); unique.append(s)
 
-        if not unique_expired:
-            flash('ℹ️ لا يوجد مشتركون منتهون', 'info')
+        if not unique:
+            flash('ℹ️ لا يوجد منتهون', 'info')
             return redirect(url_for('subscribers'))
 
         deleted = 0
-        router_fail = 0
-
-        for sub in unique_expired:
-            if sub.pushed_router_id:
-                r = Router.query.get(sub.pushed_router_id)
-                if r:
-                    ut = sub.user_type or 'pppoe'
-                    try:
-                        api = get_router_api(r)
-                        api.user_kick(sub.username, ut)
-                        api.user_delete(sub.username, ut)
-                    except Exception:
-                        router_fail += 1
-
-            db.session.delete(sub)
-            deleted += 1
-
+        for sub in unique:
+            db.session.delete(sub); deleted += 1
         db.session.commit()
-
-        msg = f'🗑 تم حذف {deleted} مشترك منتهي'
-        if router_fail:
-            msg += f' — فشل إزالة {router_fail} من السيرفر'
-        flash(msg, 'success' if not router_fail else 'warning')
-
+        flash(f'🗑 تم حذف {deleted} منتهي من قاعدة البيانات', 'success')
     except Exception as e:
         db.session.rollback()
-        logger.error(f"❌ delete_expired: {e}")
         flash(f'❌ {str(e)}', 'danger')
-
     return redirect(url_for('subscribers'))
 
-
-# ============ Export ============
 
 @app.route('/subscribers/export/<format>')
 def export_subscribers(format):
@@ -1554,8 +962,6 @@ def not_found(e):
 def server_error(e):
     return render_template('error.html', error='خطأ داخلي'), 500
 
-
-# ============ Run ============
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=int(os.environ.get('PORT', 5000)), debug=True)
