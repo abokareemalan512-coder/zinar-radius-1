@@ -715,6 +715,8 @@ def subscribers():
     )
 
 
+# ============ إضافة مشترك (يعمل على كل الراوترات النشطة) ============
+
 @app.route('/add-subscriber', methods=['GET', 'POST'])
 @app.route('/subscribers/add', methods=['GET', 'POST'])
 def add_subscriber():
@@ -723,7 +725,6 @@ def add_subscriber():
         username = request.form.get('username', '').strip()
         password = request.form.get('password', '').strip()
         package_name = request.form.get('package', '').strip()
-        router_id = request.form.get('router_id', '').strip()
         user_type = request.form.get('user_type', 'pppoe').strip()
 
         if user_type not in ('pppoe', 'hotspot'):
@@ -734,7 +735,13 @@ def add_subscriber():
             return redirect(url_for('add_subscriber'))
 
         if Subscriber.query.filter_by(username=username).first():
-            flash(f'❌ "{username}" موجود', 'danger')
+            flash(f'❌ "{username}" موجود مسبقًا', 'danger')
+            return redirect(url_for('add_subscriber'))
+
+        # ✅ جلب كل الراوترات النشطة
+        active_routers = Router.query.filter_by(is_active=True).all()
+        if not active_routers:
+            flash('❌ لا يوجد راوترات نشطة! أضف راوتر أولًا', 'danger')
             return redirect(url_for('add_subscriber'))
 
         try:
@@ -745,44 +752,69 @@ def add_subscriber():
                 if pkg:
                     expires_at = calculate_expiry(pkg)
 
-            router_message = ''
-            if router_id and pkg:
-                router = Router.query.get(int(router_id))
-                if router:
-                    try:
-                        api = get_router_api(router)
-                        api.user_create(
-                            username, password, user_type,
-                            profile=package_to_profile(pkg.name)
-                        )
-                        router_message = ' ✅ + على الراوتر'
-                    except MikrotikError as e:
-                        router_message = f' ⚠️ (الراوتر: {str(e)[:40]})'
+            # ✅ الاتصال بكل راوتر
+            apis = {}
+            for router in active_routers:
+                try:
+                    apis[router.id] = get_router_api(router)
+                except Exception as e:
+                    logger.warning(f"⚠️ فشل الاتصال بـ {router.name}: {e}")
 
-            sub = Subscriber(
-                name=name or username, username=username,
-                password=password, package=package_name,
-                user_type=user_type,
-                router_id=int(router_id) if router_id else None,
-                expires_at=expires_at, status='active'
-            )
-            db.session.add(sub)
+            # ✅ إنشاء المستخدم على كل راوتر
+            push_ok = push_fail = 0
+            errors = []
+
+            for router in active_routers:
+                if router.id in apis:
+                    try:
+                        apis[router.id].user_create(
+                            username, password, user_type,
+                            profile=package_to_profile(pkg.name) if pkg else 'default'
+                        )
+                        push_ok += 1
+                    except MikrotikError as e:
+                        push_fail += 1
+                        errors.append(f"{router.name}: {str(e)[:40]}")
+
+            # ✅ حفظ سجل لكل (مستخدم × راوتر)
+            for router in active_routers:
+                sub = Subscriber(
+                    name=name or username,
+                    username=username,
+                    password=password,
+                    package=package_name,
+                    user_type=user_type,
+                    router_id=router.id,
+                    expires_at=expires_at,
+                    status='active'
+                )
+                db.session.add(sub)
+
             db.session.commit()
 
+            msg = f'✅ تم إضافة "{username}" على {len(active_routers)} راوتر'
+            if push_fail:
+                msg += f' — فشل {push_fail}'
             if expires_at:
-                flash(f'✅ "{username}"{router_message} — ينتهي {expires_at.strftime("%Y-%m-%d")}', 'success')
-            else:
-                flash(f'✅ "{username}"{router_message}', 'success')
+                msg += f' — ينتهي {expires_at.strftime("%Y-%m-%d")}'
+
+            flash(msg, 'success' if push_fail == 0 else 'warning')
+            for err in errors[:5]:
+                flash(f'⚠️ {err}', 'warning')
+
             return redirect(url_for('subscribers'))
         except Exception as e:
             db.session.rollback()
+            logger.error(f"❌ add_subscriber: {e}")
             flash(f'❌ {str(e)}', 'danger')
 
+    # GET
     packages_list = Package.query.order_by(Package.name).all()
-    routers_list = Router.query.order_by(Router.name).all()
+    active_routers = Router.query.filter_by(is_active=True).all()
     return render_template(
         'add_subscriber.html',
-        packages=packages_list, routers=routers_list
+        packages=packages_list,
+        active_routers=active_routers
     )
 
 
@@ -808,7 +840,6 @@ def bulk_add():
         if password_mode not in ('random', 'same_as_username', 'fixed'):
             password_mode = 'random'
 
-        # طول كلمة المرور
         try:
             password_length = int(password_length)
             if password_length < 4 or password_length > 20:
@@ -816,7 +847,6 @@ def bulk_add():
         except ValueError:
             password_length = 6
 
-        # طول الاسم
         try:
             random_length = int(request.form.get('random_length', '6'))
             if random_length < 4 or random_length > 20:
@@ -834,7 +864,6 @@ def bulk_add():
             flash('❌ العدد يجب أن يكون بين 1 و 500', 'danger')
             return redirect(url_for('bulk_add'))
 
-        # ✅ جلب كل الراوترات النشطة
         active_routers = Router.query.filter_by(is_active=True).all()
         if not active_routers:
             flash('❌ لا يوجد راوترات نشطة! أضف راوتر أولًا', 'danger')
@@ -843,7 +872,6 @@ def bulk_add():
         pkg = Package.query.filter_by(name=package_name).first() if package_name else None
         expires_at = calculate_expiry(pkg) if pkg else None
 
-        # الاتصال بكل راوتر
         apis = {}
         if push_to_router:
             for router in active_routers:
@@ -852,12 +880,10 @@ def bulk_add():
                 except Exception as e:
                     logger.warning(f"⚠️ فشل الاتصال بـ {router.name}: {e}")
 
-        # مجموعات أحرف (بدون ملبسات)
         LETTERS = 'abcdefghijkmnpqrstuvwxyz'
         NUMS = '23456789'
         MIXED = LETTERS + NUMS
 
-        # توليد الأسماء العشوائية
         usernames = []
         if char_mode == 'numbers':
             for _ in range(count):
@@ -876,7 +902,6 @@ def bulk_add():
         errors = []
 
         for username in usernames:
-            # كلمة المرور
             if password_mode == 'same_as_username':
                 password = username
             elif password_mode == 'fixed':
@@ -886,15 +911,12 @@ def bulk_add():
             else:
                 password = username
 
-            # التحقق من التكرار
             if Subscriber.query.filter_by(username=username).first():
                 errors.append(f"{username}: مكرر")
                 failed += 1
                 continue
 
-            # ✅ إنشاء المستخدم على كل راوتر + حفظ سجل لكل واحد
             for router in active_routers:
-                # رفع للراوتر
                 if push_to_router and router.id in apis:
                     try:
                         apis[router.id].user_create(
@@ -906,7 +928,6 @@ def bulk_add():
                         push_fail += 1
                         errors.append(f"{username}@{router.name}: {str(e)[:30]}")
 
-                # حفظ السجل في قاعدة البيانات
                 try:
                     sub = Subscriber(
                         name=username, username=username, password=password,
@@ -937,7 +958,6 @@ def bulk_add():
 
         return redirect(url_for('subscribers'))
 
-    # GET
     packages_list = Package.query.order_by(Package.name).all()
     active_routers = Router.query.filter_by(is_active=True).all()
     return render_template(
