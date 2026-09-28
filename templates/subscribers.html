@@ -13,7 +13,7 @@
         </a>
         <form method="POST" action="{{ url_for('delete_expired_subscribers') }}"
               style="display: inline;"
-              onsubmit="return confirm('⚠️ سيتم حذف كل المشتركين المنتهية صلاحيتهم من الموقع والسيرفرات.\nهل أنت متأكد؟')">
+              onsubmit="return confirm('⚠️ سيتم حذف المنتهين من قاعدة البيانات فقط. متابعة؟')">
             <button type="submit" class="btn btn-danger">
                 <i class="bi bi-hourglass-bottom"></i> حذف المنتهية
             </button>
@@ -21,15 +21,21 @@
     </div>
 </div>
 
+<div class="alert alert-info small">
+    <i class="bi bi-info-circle"></i>
+    <strong>ملاحظة:</strong>
+    هذا الموقع <strong>لا يضيف/يحذف/يعدّل</strong> على السيرفرات.
+    السيرفرات تستعلم الموقع عند الاتصال فقط.
+</div>
+
 <!-- البحث والفلاتر -->
 <div class="card mb-3 p-3">
     <div class="row g-2 align-items-center">
-        <div class="col-md-4">
+        <div class="col-md-5">
             <form method="GET" class="d-flex gap-2">
                 <input type="text" name="q" class="form-control"
                        placeholder="بحث..." value="{{ search }}">
                 {% if filter_type %}<input type="hidden" name="type" value="{{ filter_type }}">{% endif %}
-                {% if filter_push %}<input type="hidden" name="push" value="{{ filter_push }}">{% endif %}
                 <button class="btn btn-primary" type="submit">
                     <i class="bi bi-search"></i>
                 </button>
@@ -51,10 +57,10 @@
                 </a>
             </div>
         </div>
-        <div class="col-md-4">
+        <div class="col-md-3">
             <div class="dropdown w-100">
                 <button class="btn btn-info w-100 dropdown-toggle" data-bs-toggle="dropdown">
-                    <i class="bi bi-download"></i> تصدير الكل
+                    <i class="bi bi-download"></i> تصدير
                 </button>
                 <ul class="dropdown-menu">
                     <li><a class="dropdown-item" href="{{ url_for('export_subscribers', format='csv', type=filter_type) }}">📊 CSV</a></li>
@@ -75,26 +81,16 @@
             تم تحديد <span id="selectedCount">0</span> مشترك
         </div>
         <div class="d-flex gap-2 flex-wrap">
-            <button class="btn btn-light btn-sm" onclick="printSelected()">
-                🖨️ طباعة
-            </button>
-            <button class="btn btn-light btn-sm" onclick="exportSelected('csv')">
-                📊 CSV
-            </button>
-            <button class="btn btn-light btn-sm" onclick="exportSelected('txt')">
-                📄 TXT
-            </button>
-            <button class="btn btn-danger btn-sm" onclick="deleteSelected()">
-                🗑 حذف المحدد
-            </button>
-            <button class="btn btn-light btn-sm" onclick="clearSelection()">
-                ✖ إلغاء
-            </button>
+            <button class="btn btn-light btn-sm" onclick="printSelected()">🖨️ طباعة</button>
+            <button class="btn btn-light btn-sm" onclick="exportSelected('csv')">📊 CSV</button>
+            <button class="btn btn-light btn-sm" onclick="exportSelected('txt')">📄 TXT</button>
+            <button class="btn btn-danger btn-sm" onclick="deleteSelected()">🗑 حذف المحدد</button>
+            <button class="btn btn-light btn-sm" onclick="clearSelection()">✖ إلغاء</button>
         </div>
     </div>
 </div>
 
-<!-- جدول المشتركين -->
+<!-- الجدول -->
 <div class="card">
     <div class="table-responsive">
         <table class="table table-hover mb-0">
@@ -185,24 +181,9 @@
                     </td>
                     <td>
                         <div class="d-flex gap-1 flex-wrap">
-                            {% if not sub.pushed_at or sub.pushed_router_id != sub.router_id %}
-                            <a href="{{ url_for('push_subscriber', sub_id=sub.id) }}"
-                               class="btn btn-sm btn-success"
-                               onclick="return confirm('رفع {{ sub.username }} إلى الراوتر؟')"
-                               title="رفع للراوتر">
-                                <i class="bi bi-cloud-upload"></i>
-                            </a>
-                            {% endif %}
-
-                            <button class="btn btn-sm btn-info"
-                                    onclick="openMoveModal({{ sub.id }}, '{{ sub.username }}')"
-                                    title="نقل">
-                                <i class="bi bi-arrow-left-right"></i>
-                            </button>
-
                             <a href="{{ url_for('toggle_subscriber', sub_id=sub.id) }}"
                                class="btn btn-sm {% if sub.status == 'active' %}btn-warning{% else %}btn-success{% endif %}"
-                               title="تفعيل/إيقاف">
+                               title="تفعيل/إيقاف في DB">
                                 {% if sub.status == 'active' %}
                                     <i class="bi bi-pause-fill"></i>
                                 {% else %}
@@ -223,14 +204,14 @@
                             </a>
 
                             <button class="btn btn-sm btn-secondary"
-                                    onclick='openEditSub({{ sub.id }}, "{{ (sub.name or sub.username)|e }}", "{{ sub.username|e }}", "{{ sub.package|e }}", {{ sub.router_id or 0 }})'
+                                    onclick='openEditSub({{ sub.id }}, "{{ (sub.name or sub.username)|e }}", "{{ sub.username|e }}", "{{ sub.package|e }}")'
                                     title="تعديل">
                                 <i class="bi bi-pencil"></i>
                             </button>
 
                             <a href="{{ url_for('delete_subscriber', sub_id=sub.id) }}"
                                class="btn btn-sm btn-danger"
-                               onclick="return confirm('تأكيد حذف {{ sub.username }}؟')" title="حذف">
+                               onclick="return confirm('تأكيد الحذف من قاعدة البيانات؟')" title="حذف">
                                 <i class="bi bi-trash"></i>
                             </a>
                         </div>
@@ -282,15 +263,6 @@
                             {% endfor %}
                         </select>
                     </div>
-                    <div class="mb-3">
-                        <label class="form-label">الراوتر</label>
-                        <select name="router_id" id="sub_router" class="form-select">
-                            <option value="">— بدون راوتر —</option>
-                            {% for r in routers.values() %}
-                            <option value="{{ r.id }}">{{ r.name }} — {{ r.ip_address }}</option>
-                            {% endfor %}
-                        </select>
-                    </div>
                 </div>
                 <div class="modal-footer border-secondary">
                     <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">إلغاء</button>
@@ -303,41 +275,7 @@
     </div>
 </div>
 
-<!-- Modal نقل -->
-<div class="modal fade" id="moveSubModal" tabindex="-1">
-    <div class="modal-dialog modal-dialog-centered">
-        <div class="modal-content">
-            <form method="POST" id="moveSubForm">
-                <div class="modal-header border-secondary">
-                    <h5 class="modal-title text-accent">
-                        <i class="bi bi-arrow-left-right"></i> نقل المشترك
-                    </h5>
-                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
-                </div>
-                <div class="modal-body">
-                    <p>نقل المشترك <strong id="moveSubName" class="text-accent"></strong> إلى:</p>
-                    <select name="new_router_id" class="form-select" required>
-                        <option value="">— اختر الراوتر الجديد —</option>
-                        {% for r in routers.values() %}
-                        <option value="{{ r.id }}">{{ r.name }} — {{ r.ip_address }}</option>
-                        {% endfor %}
-                    </select>
-                    <small class="text-muted d-block mt-2">
-                        ⚠️ سيُحذف من الراوتر القديم ويُضاف على الجديد.
-                    </small>
-                </div>
-                <div class="modal-footer border-secondary">
-                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">إلغاء</button>
-                    <button type="submit" class="btn btn-primary">
-                        <i class="bi bi-check2"></i> نقل
-                    </button>
-                </div>
-            </form>
-        </div>
-    </div>
-</div>
-
-<!-- نموذج حذف جماعي مخفي -->
+<!-- نموذج حذف جماعي -->
 <form method="POST" action="{{ url_for('bulk_delete_subscribers') }}"
       id="bulkDeleteForm" style="display: none;">
     <input type="hidden" name="ids" id="bulkDeleteIds">
@@ -356,20 +294,13 @@ function togglePassword(id, password) {
     }
 }
 
-function openEditSub(id, name, username, pkg, routerId) {
+function openEditSub(id, name, username, pkg) {
     document.getElementById('editSubForm').action = '/subscribers/update/' + id;
     document.getElementById('sub_name').value = name;
     document.getElementById('sub_username').value = username;
     document.getElementById('sub_password').value = '';
     document.getElementById('sub_package').value = pkg || '';
-    document.getElementById('sub_router').value = routerId || '';
     new bootstrap.Modal(document.getElementById('editSubModal')).show();
-}
-
-function openMoveModal(id, username) {
-    document.getElementById('moveSubForm').action = '/subscribers/move/' + id;
-    document.getElementById('moveSubName').textContent = username;
-    new bootstrap.Modal(document.getElementById('moveSubModal')).show();
 }
 
 function toggleAll(source) {
@@ -416,7 +347,7 @@ function exportSelected(format) {
 function deleteSelected() {
     const ids = getSelectedIds();
     if (ids.length === 0) return;
-    if (!confirm(`⚠️ سيتم حذف ${ids.length} مشترك من الموقع ومن السيرفرات.\nهل أنت متأكد؟`)) return;
+    if (!confirm(`⚠️ سيتم حذف ${ids.length} مشترك من قاعدة البيانات فقط.\nهل أنت متأكد؟`)) return;
     document.getElementById('bulkDeleteIds').value = ids.join(',');
     document.getElementById('bulkDeleteForm').submit();
 }
