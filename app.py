@@ -24,7 +24,7 @@ from mikrotik_api import MikrotikAPI, MikrotikError, get_router_api, test_router
 # ============ الإعدادات الأساسية ============
 app = Flask(__name__)
 app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', 'zinar-secret-key-2024')
-app.config['MAX_CONTENT_LENGTH'] = 5 * 1024 * 1024  # 5MB
+app.config['MAX_CONTENT_LENGTH'] = 5 * 1024 * 1024
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -795,19 +795,31 @@ def bulk_add():
         package_name = request.form.get('package', '').strip()
         user_type = request.form.get('user_type', 'pppoe').strip()
         prefix = request.form.get('prefix', '').strip()
-        char_mode = request.form.get('char_mode', 'numbers').strip()
+        char_mode = request.form.get('char_mode', 'mixed').strip()
         count = request.form.get('count', '1').strip()
-        password_mode = request.form.get('password_mode', 'same_as_username')
+        password_mode = request.form.get('password_mode', 'random')
         fixed_password = request.form.get('fixed_password', '').strip()
+        password_length = request.form.get('password_length', '6').strip()
         push_to_router = request.form.get('push_to_router') == 'on'
 
         if user_type not in ('pppoe', 'hotspot'):
             user_type = 'pppoe'
 
         if char_mode not in ('numbers', 'letters', 'mixed'):
-            char_mode = 'numbers'
+            char_mode = 'mixed'
 
-        # ✅ متغيرات حسب النوع
+        if password_mode not in ('random', 'same_as_username', 'fixed'):
+            password_mode = 'random'
+
+        # طول كلمة المرور العشوائية
+        try:
+            password_length = int(password_length)
+            if password_length < 4 or password_length > 20:
+                password_length = 6
+        except ValueError:
+            password_length = 6
+
+        # متغيرات حسب نوع التوليد
         start_num = 1
         number_length = 4
         random_length = 6
@@ -824,7 +836,7 @@ def bulk_add():
         else:
             try:
                 random_length = int(request.form.get('random_length', '6'))
-                if random_length < 3 or random_length > 20:
+                if random_length < 4 or random_length > 20:
                     random_length = 6
             except ValueError:
                 random_length = 6
@@ -858,7 +870,12 @@ def bulk_add():
             except Exception as e:
                 flash(f'⚠️ فشل الاتصال بالراوتر: {e}', 'warning')
 
-        # ✅ توليد الأسماء
+        # مجموعات أحرف محسّنة (بدون ملبسات)
+        LETTERS = 'abcdefghijkmnpqrstuvwxyz'
+        NUMS = '23456789'
+        MIXED = LETTERS + NUMS
+
+        # توليد الأسماء
         usernames = []
         if char_mode == 'numbers':
             for i in range(start_num, start_num + count):
@@ -866,11 +883,11 @@ def bulk_add():
                 usernames.append(f"{prefix}{num_str}")
         elif char_mode == 'letters':
             for _ in range(count):
-                rand = ''.join(random.choices(string.ascii_lowercase, k=random_length))
+                rand = ''.join(random.choices(LETTERS, k=random_length))
                 usernames.append(f"{prefix}{rand}")
         else:  # mixed
             for _ in range(count):
-                rand = ''.join(random.choices(string.ascii_lowercase + string.digits, k=random_length))
+                rand = ''.join(random.choices(MIXED, k=random_length))
                 usernames.append(f"{prefix}{rand}")
 
         created = failed = push_ok = push_fail = 0
@@ -882,6 +899,8 @@ def bulk_add():
                 password = username
             elif password_mode == 'fixed':
                 password = fixed_password
+            elif password_mode == 'random':
+                password = ''.join(random.choices(MIXED, k=password_length))
             else:
                 password = username
 
@@ -1129,11 +1148,9 @@ def delete_subscriber(sub_id):
 
 @app.route('/subscribers/export/<format>')
 def export_subscribers(format):
-    """تصدير المشتركين (csv / txt / print) — يدعم تحديد IDs"""
     filter_type = request.args.get('type', '').strip()
     ids_param = request.args.get('ids', '').strip()
 
-    # ✅ إذا حُدد مستخدمون — استخدمهم
     if ids_param:
         try:
             ids_list = [int(x) for x in ids_param.split(',') if x.strip().isdigit()]
@@ -1143,7 +1160,6 @@ def export_subscribers(format):
             logger.error(f"❌ ids parsing: {e}")
             subs = []
     else:
-        # وإلا — كل المشتركين حسب الفلتر
         query = Subscriber.query
         if filter_type in ('pppoe', 'hotspot'):
             query = query.filter_by(user_type=filter_type)
@@ -1151,22 +1167,16 @@ def export_subscribers(format):
 
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
 
-    # ============ CSV ============
     if format == 'csv':
         output = io.StringIO()
-        output.write('\ufeff')  # BOM
+        output.write('\ufeff')
         writer = csv.writer(output)
         writer.writerow(['#', 'الاسم', 'اسم المستخدم', 'كلمة المرور',
                          'الباقة', 'النوع', 'الحالة', 'الانتهاء'])
         for i, s in enumerate(subs, 1):
             writer.writerow([
-                i,
-                s.name or '',
-                s.username,
-                s.password,
-                s.package or '',
-                s.user_type or 'pppoe',
-                s.status,
+                i, s.name or '', s.username, s.password,
+                s.package or '', s.user_type or 'pppoe', s.status,
                 s.expires_at.strftime('%Y-%m-%d') if s.expires_at else ''
             ])
         output.seek(0)
@@ -1177,11 +1187,10 @@ def export_subscribers(format):
             download_name=f'subscribers_{timestamp}.csv'
         )
 
-    # ============ TXT ============
     elif format == 'txt':
         lines = []
         lines.append('=' * 60)
-        lines.append(f'  ZINAR — قائمة المشتركين')
+        lines.append('  ZINAR — قائمة المشتركين')
         lines.append(f'  {datetime.now().strftime("%Y-%m-%d %H:%M")}')
         lines.append(f'  العدد: {len(subs)}')
         lines.append('=' * 60)
@@ -1205,7 +1214,6 @@ def export_subscribers(format):
             download_name=f'subscribers_{timestamp}.txt'
         )
 
-    # ============ PRINT ============
     elif format == 'print':
         return render_template('print_subscribers.html',
                                subscribers=subs,
