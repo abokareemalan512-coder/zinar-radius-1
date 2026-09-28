@@ -2,151 +2,340 @@
 <html lang="ar" dir="rtl">
 <head>
     <meta charset="UTF-8">
-    <title>طباعة المشتركين</title>
+    <title>طباعة المشتركين | ZINAR</title>
+    <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700;900&display=swap" rel="stylesheet">
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
+
         body {
-            font-family: 'Segoe UI', Tahoma, sans-serif;
+            font-family: 'Cairo', 'Segoe UI', Tahoma, sans-serif;
+            background: #f3f4f6;
             padding: 20px;
-            color: #000;
+            color: #1e293b;
+        }
+
+        /* ============ شريط التحكم (لا يُطبع) ============ */
+        .controls {
+            max-width: 1200px;
+            margin: 0 auto 20px;
             background: #fff;
+            border-radius: 12px;
+            padding: 15px 20px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.08);
+            display: flex;
+            gap: 10px;
+            align-items: center;
+            justify-content: space-between;
+            flex-wrap: wrap;
         }
-        h1 {
-            text-align: center;
-            color: #0ea5e9;
-            margin-bottom: 10px;
-            font-size: 24px;
+        .controls .info {
+            color: #475569;
+            font-size: 14px;
         }
-        .subtitle {
-            text-align: center;
-            color: #666;
-            margin-bottom: 20px;
-            font-size: 13px;
-        }
-        table {
-            width: 100%;
-            border-collapse: collapse;
-            font-size: 12px;
-        }
-        th {
-            background: #0ea5e9;
-            color: #fff;
-            padding: 8px;
-            text-align: right;
-            border: 1px solid #0284c7;
-        }
-        td {
-            padding: 8px;
-            border: 1px solid #ccc;
-        }
-        tr:nth-child(even) { background: #f0f9ff; }
-        .footer {
-            margin-top: 30px;
-            text-align: center;
-            font-size: 11px;
-            color: #666;
-            border-top: 1px solid #ccc;
-            padding-top: 10px;
-        }
-        @media print {
-            body { padding: 10px; }
-            .no-print { display: none !important; }
-        }
-        .no-print {
-            text-align: center;
-            margin-bottom: 20px;
-        }
+        .controls .info strong { color: #0ea5e9; }
         .btn {
-            background: #0ea5e9;
-            color: #fff;
             border: none;
-            padding: 10px 20px;
+            padding: 10px 22px;
             border-radius: 8px;
             cursor: pointer;
             font-size: 14px;
-            margin: 0 5px;
+            font-weight: 600;
+            font-family: inherit;
+            transition: all 0.2s;
         }
-        .btn:hover { background: #0284c7; }
+        .btn-print { background: #0ea5e9; color: #fff; }
+        .btn-print:hover { background: #0284c7; transform: translateY(-1px); }
+        .btn-close { background: #e2e8f0; color: #475569; }
+        .btn-close:hover { background: #cbd5e1; }
+
+        /* ============ الحاوية الرئيسية ============ */
+        .page {
+            max-width: 1200px;
+            margin: 0 auto;
+            background: #fff;
+            border-radius: 12px;
+            padding: 40px;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.08);
+        }
+
+        /* ============ الترويسة ============ */
+        .header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding-bottom: 20px;
+            border-bottom: 3px solid #0ea5e9;
+            margin-bottom: 24px;
+        }
+        .logo {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+        .logo-icon {
+            width: 55px;
+            height: 55px;
+            background: linear-gradient(135deg, #0ea5e9, #38bdf8);
+            border-radius: 14px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 28px;
+            box-shadow: 0 4px 12px rgba(14, 165, 233, 0.3);
+        }
+        .logo-text h1 {
+            color: #0f172a;
+            font-size: 24px;
+            font-weight: 900;
+            margin-bottom: 2px;
+        }
+        .logo-text p {
+            color: #64748b;
+            font-size: 12px;
+        }
+        .header-info {
+            text-align: left;
+            color: #64748b;
+            font-size: 12px;
+            line-height: 1.8;
+        }
+        .header-info strong { color: #0f172a; }
+
+        /* ============ الإحصائيات ============ */
+        .stats {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 15px;
+            margin-bottom: 24px;
+        }
+        .stat-card {
+            background: linear-gradient(135deg, #f0f9ff, #e0f2fe);
+            border: 1px solid #bae6fd;
+            border-radius: 10px;
+            padding: 14px 18px;
+            text-align: center;
+        }
+        .stat-card .num {
+            font-size: 26px;
+            font-weight: 900;
+            color: #0284c7;
+            line-height: 1;
+            margin-bottom: 4px;
+        }
+        .stat-card .lbl {
+            font-size: 11px;
+            color: #0369a1;
+            font-weight: 600;
+        }
+
+        /* ============ الجدول ============ */
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 13px;
+            border-radius: 10px;
+            overflow: hidden;
+        }
+        thead {
+            background: linear-gradient(135deg, #0ea5e9, #0284c7);
+        }
+        th {
+            color: #fff;
+            padding: 12px 10px;
+            text-align: right;
+            font-weight: 700;
+            font-size: 12px;
+            border: none;
+        }
+        td {
+            padding: 11px 10px;
+            border-bottom: 1px solid #e2e8f0;
+            color: #334155;
+        }
+        tbody tr:nth-child(even) { background: #f8fafc; }
+        tbody tr:hover { background: #f0f9ff; }
+        tbody tr:last-child td { border-bottom: none; }
+
+        .username {
+            font-weight: 700;
+            color: #0284c7;
+            font-family: 'Courier New', monospace;
+            font-size: 13px;
+        }
+        .password {
+            font-family: 'Courier New', monospace;
+            background: #fef3c7;
+            color: #92400e;
+            padding: 3px 8px;
+            border-radius: 4px;
+            font-size: 12px;
+            font-weight: 600;
+        }
+        .name-cell { font-weight: 600; color: #0f172a; }
+
         .badge {
             display: inline-block;
-            padding: 2px 8px;
-            border-radius: 4px;
+            padding: 3px 9px;
+            border-radius: 20px;
             font-size: 10px;
-            font-weight: bold;
+            font-weight: 700;
         }
         .badge-pppoe { background: #dbeafe; color: #1e40af; }
         .badge-hotspot { background: #fef3c7; color: #92400e; }
+        .badge-active { background: #dcfce7; color: #166534; }
+        .badge-paused { background: #fed7aa; color: #9a3412; }
+        .badge-expired { background: #fee2e2; color: #991b1b; }
+
+        /* ============ التذييل ============ */
+        .footer {
+            margin-top: 30px;
+            padding-top: 20px;
+            border-top: 1px solid #e2e8f0;
+            display: flex;
+            justify-content: space-between;
+            font-size: 11px;
+            color: #94a3b8;
+        }
+
+        /* ============ الطباعة ============ */
+        @media print {
+            body { background: #fff; padding: 0; }
+            .controls { display: none !important; }
+            .page {
+                box-shadow: none;
+                border-radius: 0;
+                padding: 15px;
+                max-width: 100%;
+            }
+            .stat-card { background: #f0f9ff !important; -webkit-print-color-adjust: exact; }
+            thead { -webkit-print-color-adjust: exact; }
+            th { -webkit-print-color-adjust: exact; }
+            tbody tr:nth-child(even) { -webkit-print-color-adjust: exact; }
+            @page { margin: 1cm; size: A4 landscape; }
+        }
     </style>
 </head>
 <body>
 
-<div class="no-print">
-    <button class="btn" onclick="window.print()">🖨️ طباعة</button>
-    <button class="btn" onclick="window.close()">✖ إغلاق</button>
+<!-- شريط التحكم -->
+<div class="controls no-print">
+    <div class="info">
+        📋 سيتم طباعة <strong>{{ subscribers|length }}</strong> مشترك
+        {% if filter_type %}
+            — النوع: <strong>{{ 'برودباند' if filter_type == 'pppoe' else 'هوت سبوت' }}</strong>
+        {% endif %}
+    </div>
+    <div>
+        <button class="btn btn-print" onclick="window.print()">🖨️ طباعة</button>
+        <button class="btn btn-close" onclick="window.close()">✖ إغلاق</button>
+    </div>
 </div>
 
-<h1>⚡ ZINAR — قائمة المشتركين</h1>
-<div class="subtitle">
-    تاريخ الطباعة: {{ now.strftime('%Y-%m-%d %H:%M') }} —
-    العدد الكلي: {{ subscribers|length }} مشترك
-    {% if filter_type %}
-        — نوع: {{ 'برودباند' if filter_type == 'pppoe' else 'هوت سبوت' }}
-    {% endif %}
-</div>
+<!-- الصفحة -->
+<div class="page">
 
-<table>
-    <thead>
-        <tr>
-            <th style="width: 40px;">#</th>
-            <th>اسم المشترك</th>
-            <th>اسم المستخدم</th>
-            <th>كلمة المرور</th>
-            <th>الباقة</th>
-            <th>النوع</th>
-            <th>الحالة</th>
-            <th>تاريخ الانتهاء</th>
-        </tr>
-    </thead>
-    <tbody>
-        {% for s in subscribers %}
-        <tr>
-            <td>{{ loop.index }}</td>
-            <td>{{ s.name or s.username }}</td>
-            <td><strong>{{ s.username }}</strong></td>
-            <td>{{ s.password }}</td>
-            <td>{{ s.package or '-' }}</td>
-            <td>
-                <span class="badge badge-{{ s.user_type or 'pppoe' }}">
-                    {{ 'برودباند' if (s.user_type or 'pppoe') == 'pppoe' else 'هوت سبوت' }}
-                </span>
-            </td>
-            <td>
-                {% if s.status == 'active' %}نشط
-                {% elif s.status == 'paused' %}موقوف
-                {% elif s.status == 'expired' %}منتهي
-                {% else %}{{ s.status }}{% endif %}
-            </td>
-            <td>{{ s.expires_at.strftime('%Y-%m-%d') if s.expires_at else '—' }}</td>
-        </tr>
+    <!-- الترويسة -->
+    <div class="header">
+        <div class="logo">
+            <div class="logo-icon">⚡</div>
+            <div class="logo-text">
+                <h1>ZINAR</h1>
+                <p>نظام إدارة المشتركين</p>
+            </div>
+        </div>
+        <div class="header-info">
+            <div>📅 <strong>{{ now.strftime('%Y-%m-%d') }}</strong></div>
+            <div>🕐 <strong>{{ now.strftime('%H:%M') }}</strong></div>
+        </div>
+    </div>
+
+    <!-- العنوان -->
+    <h2 style="text-align: center; color: #0f172a; font-size: 20px; margin-bottom: 6px;">
+        📋 قائمة المشتركين
+    </h2>
+    <p style="text-align: center; color: #64748b; font-size: 12px; margin-bottom: 20px;">
+        {% if filter_type %}
+            {{ 'برودباند (PPPoE)' if filter_type == 'pppoe' else 'هوت سبوت (Hotspot)' }}
         {% else %}
-        <tr>
-            <td colspan="8" style="text-align: center; padding: 30px;">
-                لا يوجد مشتركون
-            </td>
-        </tr>
-        {% endfor %}
-    </tbody>
-</table>
+            كل الأنواع
+        {% endif %}
+    </p>
 
-<div class="footer">
-    ZINAR — نظام إدارة المشتركين © {{ now.strftime('%Y') }}
+    <!-- الإحصائيات -->
+    <div class="stats">
+        <div class="stat-card">
+            <div class="num">{{ subscribers|length }}</div>
+            <div class="lbl">إجمالي المشتركين</div>
+        </div>
+        <div class="stat-card">
+            <div class="num">{{ subscribers|selectattr('status', 'equalto', 'active')|list|length }}</div>
+            <div class="lbl">نشط</div>
+        </div>
+        <div class="stat-card">
+            <div class="num">{{ subscribers|selectattr('user_type', 'equalto', 'pppoe')|list|length }}</div>
+            <div class="lbl">برودباند</div>
+        </div>
+    </div>
+
+    <!-- الجدول -->
+    <table>
+        <thead>
+            <tr>
+                <th style="width: 35px;">#</th>
+                <th>اسم المشترك</th>
+                <th>اسم المستخدم</th>
+                <th>كلمة المرور</th>
+                <th>الباقة</th>
+                <th>النوع</th>
+                <th>الحالة</th>
+                <th>الانتهاء</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for s in subscribers %}
+            <tr>
+                <td style="text-align: center; color: #94a3b8; font-weight: 600;">{{ loop.index }}</td>
+                <td class="name-cell">{{ s.name or s.username }}</td>
+                <td><span class="username">{{ s.username }}</span></td>
+                <td><span class="password">{{ s.password }}</span></td>
+                <td>{{ s.package or '—' }}</td>
+                <td>
+                    <span class="badge badge-{{ s.user_type or 'pppoe' }}">
+                        {{ 'برودباند' if (s.user_type or 'pppoe') == 'pppoe' else 'هوت سبوت' }}
+                    </span>
+                </td>
+                <td>
+                    {% if s.status == 'active' %}
+                        <span class="badge badge-active">نشط</span>
+                    {% elif s.status == 'paused' %}
+                        <span class="badge badge-paused">موقوف</span>
+                    {% elif s.status == 'expired' %}
+                        <span class="badge badge-expired">منتهي</span>
+                    {% else %}
+                        <span class="badge">{{ s.status }}</span>
+                    {% endif %}
+                </td>
+                <td style="font-size: 11px; color: #64748b;">
+                    {{ s.expires_at.strftime('%Y-%m-%d') if s.expires_at else '—' }}
+                </td>
+            </tr>
+            {% else %}
+            <tr>
+                <td colspan="8" style="text-align: center; padding: 40px; color: #94a3b8;">
+                    📭 لا يوجد مشتركون للطباعة
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+
+    <!-- التذييل -->
+    <div class="footer">
+        <div>ZINAR — نظام إدارة المشتركين</div>
+        <div>© {{ now.strftime('%Y') }} جميع الحقوق محفوظة</div>
+    </div>
+
 </div>
-
-<script>
-window.addEventListener('load', () => {
-    setTimeout(() => window.print(), 500);
-});
-</script>
 
 </body>
 </html>
