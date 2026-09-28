@@ -1,21 +1,20 @@
 # mikrotik_api.py
 """
-خدمة الاتصال بـ Mikrotik RouterOS عبر SSH (Paramiko)
-تسمح بإنشاء/حذف/تفعيل/إيقاف مستخدمي PPPoE تلقائيًا
+خدمة الاتصال بـ Mikrotik RouterOS عبر SSH
+تدعم Hotspot و PPPoE
 """
 import logging
+import re
 import paramiko
 
 logger = logging.getLogger(__name__)
 
 
 class MikrotikError(Exception):
-    """خطأ في Mikrotik"""
     pass
 
 
 class MikrotikAPI:
-    """عميل SSH للتحكم في Mikrotik"""
 
     def __init__(self, host, username, password, port=22, timeout=10):
         self.host = host
@@ -25,29 +24,20 @@ class MikrotikAPI:
         self.timeout = timeout
         self.client = None
 
-    # ============ الاتصال ============
-
     def connect(self):
-        """فتح اتصال SSH"""
         try:
             self.client = paramiko.SSHClient()
             self.client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
             self.client.connect(
-                hostname=self.host,
-                port=self.port,
-                username=self.username,
-                password=self.password,
-                timeout=self.timeout,
-                allow_agent=False,
-                look_for_keys=False,
+                hostname=self.host, port=self.port,
+                username=self.username, password=self.password,
+                timeout=self.timeout, allow_agent=False, look_for_keys=False,
             )
             return True
         except Exception as e:
-            logger.error(f"❌ فشل الاتصال بـ {self.host}: {e}")
             raise MikrotikError(f"فشل الاتصال: {str(e)}")
 
     def disconnect(self):
-        """إغلاق الاتصال"""
         if self.client:
             try:
                 self.client.close()
@@ -59,193 +49,262 @@ class MikrotikAPI:
         self.connect()
         return self
 
-    def __exit__(self, exc_type, exc_val, exc_tb):
+    def __exit__(self, *args):
         self.disconnect()
 
-    # ============ تنفيذ الأوامر ============
-
     def execute(self, command):
-        """تنفيذ أمر RouterOS وإرجاع النتيجة"""
         if not self.client:
-            raise MikrotikError("لا يوجد اتصال نشط")
+            raise MikrotikError("لا يوجد اتصال")
         try:
-            stdin, stdout, stderr = self.client.exec_command(command)
-            output = stdout.read().decode('utf-8', errors='ignore')
-            error = stderr.read().decode('utf-8', errors='ignore')
-            if error and 'failure' in error.lower():
-                raise MikrotikError(error.strip())
-            return output.strip()
+            _, stdout, stderr = self.client.exec_command(command)
+            out = stdout.read().decode('utf-8', errors='ignore')
+            err = stderr.read().decode('utf-8', errors='ignore')
+            if err and 'failure' in err.lower():
+                raise MikrotikError(err.strip())
+            return out.strip()
         except MikrotikError:
             raise
         except Exception as e:
-            raise MikrotikError(f"خطأ في التنفيذ: {str(e)}")
-
-    # ============ اختبار الاتصال ============
+            raise MikrotikError(f"خطأ: {str(e)}")
 
     def test_connection(self):
-        """اختبار سريع للاتصال"""
         try:
             with self:
-                result = self.execute('/system identity print')
-                return True, result
+                return True, self.execute('/system identity print')
         except MikrotikError as e:
             return False, str(e)
 
-    # ============ معلومات النظام ============
+    # ============ PPPoE (برودباند) ============
 
-    def get_identity(self):
-        """اسم الراوتر"""
+    def pppoe_create(self, username, password, profile='default'):
         with self:
-            return self.execute('/system identity print')
-
-    def get_resource(self):
-        """موارد النظام (CPU, RAM, Uptime)"""
-        with self:
-            return self.execute('/system resource print')
-
-    # ============ إدارة المستخدمين (PPPoE Secrets) ============
-
-    def list_users(self):
-        """قائمة كل مستخدمي PPPoE"""
-        with self:
-            output = self.execute('/ppp secret print detail')
-            users = []
-            current = {}
-            for line in output.split('\n'):
-                line = line.strip()
-                # بداية مستخدم جديد
-                if line and (line[0].isdigit()) and 'name=' in line:
-                    if current:
-                        users.append(current)
-                    current = {}
-                for part in line.split():
-                    if part.startswith('name='):
-                        current['name'] = part.replace('name=', '').strip('"')
-                    elif part.startswith('service='):
-                        current['service'] = part.replace('service=', '').strip('"')
-                    elif part.startswith('profile='):
-                        current['profile'] = part.replace('profile=', '').strip('"')
-                    elif part.startswith('disabled='):
-                        current['disabled'] = part.replace('disabled=', '').strip('"')
-            if current:
-                users.append(current)
-            return users
-
-    def user_exists(self, username):
-        """هل المستخدم موجود؟"""
-        with self:
-            output = self.execute(f'/ppp secret print where name="{username}"')
-            return username in output
-
-    def create_user(self, username, password, profile='default', service='pppoe'):
-        """إنشاء مستخدم PPPoE جديد"""
-        with self:
-            if self.user_exists(username):
-                raise MikrotikError(f"المستخدم '{username}' موجود مسبقًا")
-
-            cmd = (
-                f'/ppp secret add '
-                f'name="{username}" '
-                f'password="{password}" '
-                f'service={service} '
-                f'profile="{profile}"'
-            )
+            if self.pppoe_exists(username):
+                raise MikrotikError(f"'{username}' موجود مسبقًا")
+            cmd = (f'/ppp secret add name="{username}" '
+                   f'password="{password}" service=pppoe profile="{profile}"')
             return self.execute(cmd)
 
-    def delete_user(self, username):
-        """حذف مستخدم"""
+    def pppoe_delete(self, username):
         with self:
-            cmd = f'/ppp secret remove [find name="{username}"]'
+            return self.execute(f'/ppp secret remove [find name="{username}"]')
+
+    def pppoe_enable(self, username):
+        with self:
+            return self.execute(f'/ppp secret enable [find name="{username}"]')
+
+    def pppoe_disable(self, username):
+        with self:
+            return self.execute(f'/ppp secret disable [find name="{username}"]')
+
+    def pppoe_exists(self, username):
+        with self:
+            return username in self.execute(f'/ppp secret print where name="{username}"')
+
+    def pppoe_list(self):
+        with self:
+            return self._parse_users(self.execute('/ppp secret print detail'))
+
+    def pppoe_active(self):
+        with self:
+            return self._parse_actives(self.execute('/ppp active print detail'))
+
+    def pppoe_kick(self, username):
+        with self:
+            return self.execute(f'/ppp active remove [find name="{username}"]')
+
+    # ============ Hotspot ============
+
+    def hotspot_create(self, username, password, profile='default'):
+        with self:
+            if self.hotspot_exists(username):
+                raise MikrotikError(f"'{username}' موجود مسبقًا")
+            cmd = (f'/ip hotspot user add name="{username}" '
+                   f'password="{password}" profile="{profile}"')
             return self.execute(cmd)
 
-    def enable_user(self, username):
-        """تفعيل مستخدم"""
+    def hotspot_delete(self, username):
         with self:
-            cmd = f'/ppp secret enable [find name="{username}"]'
-            return self.execute(cmd)
+            return self.execute(f'/ip hotspot user remove [find name="{username}"]')
 
-    def disable_user(self, username):
-        """إيقاف مستخدم"""
+    def hotspot_enable(self, username):
         with self:
-            cmd = f'/ppp secret disable [find name="{username}"]'
-            return self.execute(cmd)
+            return self.execute(f'/ip hotspot user enable [find name="{username}"]')
 
-    def update_user_password(self, username, new_password):
-        """تغيير كلمة مرور مستخدم"""
+    def hotspot_disable(self, username):
         with self:
-            cmd = f'/ppp secret set [find name="{username}"] password="{new_password}"'
-            return self.execute(cmd)
+            return self.execute(f'/ip hotspot user disable [find name="{username}"]')
 
-    def update_user_profile(self, username, new_profile):
-        """تغيير باقة (profile) مستخدم"""
+    def hotspot_exists(self, username):
         with self:
-            cmd = f'/ppp secret set [find name="{username}"] profile="{new_profile}"'
-            return self.execute(cmd)
+            return username in self.execute(f'/ip hotspot user print where name="{username}"')
 
-    def disconnect_active_user(self, username):
-        """قطع الاتصال النشط لمستخدم"""
+    def hotspot_list(self):
         with self:
-            cmd = f'/ppp active remove [find name="{username}"]'
-            return self.execute(cmd)
+            return self._parse_users(self.execute('/ip hotspot user print detail'))
 
-    # ============ الباقات (Profiles) ============
-
-    def list_profiles(self):
-        """قائمة الباقات المتاحة"""
+    def hotspot_active(self):
         with self:
-            output = self.execute('/ppp profile print detail')
+            return self._parse_actives(self.execute('/ip hotspot active print detail'))
+
+    def hotspot_kick(self, username):
+        with self:
+            return self.execute(f'/ip hotspot active remove [find user="{username}"]')
+
+    # ============ Universal (حسب النوع) ============
+
+    def user_create(self, username, password, user_type='pppoe', profile='default'):
+        if user_type == 'hotspot':
+            return self.hotspot_create(username, password, profile)
+        return self.pppoe_create(username, password, profile)
+
+    def user_delete(self, username, user_type='pppoe'):
+        if user_type == 'hotspot':
+            return self.hotspot_delete(username)
+        return self.pppoe_delete(username)
+
+    def user_enable(self, username, user_type='pppoe'):
+        if user_type == 'hotspot':
+            return self.hotspot_enable(username)
+        return self.pppoe_enable(username)
+
+    def user_disable(self, username, user_type='pppoe'):
+        if user_type == 'hotspot':
+            return self.hotspot_disable(username)
+        return self.pppoe_disable(username)
+
+    def user_kick(self, username, user_type='pppoe'):
+        if user_type == 'hotspot':
+            return self.hotspot_kick(username)
+        return self.pppoe_kick(username)
+
+    def user_update_password(self, username, new_password, user_type='pppoe'):
+        if user_type == 'hotspot':
+            with self:
+                return self.execute(f'/ip hotspot user set [find name="{username}"] password="{new_password}"')
+        with self:
+            return self.execute(f'/ppp secret set [find name="{username}"] password="{new_password}"')
+
+    def user_update_profile(self, username, new_profile, user_type='pppoe'):
+        if user_type == 'hotspot':
+            with self:
+                return self.execute(f'/ip hotspot user set [find name="{username}"] profile="{new_profile}"')
+        with self:
+            return self.execute(f'/ppp secret set [find name="{username}"] profile="{new_profile}"')
+
+    def profiles_list(self, user_type='pppoe'):
+        if user_type == 'hotspot':
+            cmd = '/ip hotspot user profile print detail'
+        else:
+            cmd = '/ppp profile print detail'
+        with self:
+            output = self.execute(cmd)
             profiles = []
             for line in output.split('\n'):
-                line = line.strip()
-                if 'name=' in line:
-                    for part in line.split():
-                        if part.startswith('name='):
-                            name = part.replace('name=', '').strip('"')
-                            if name and name not in profiles:
-                                profiles.append(name)
-            return profiles
-
-    # ============ الاتصالات النشطة ============
-
-    def list_active(self):
-        """قائمة الاتصالات النشطة"""
-        with self:
-            output = self.execute('/ppp active print detail')
-            actives = []
-            current = {}
-            for line in output.split('\n'):
-                line = line.strip()
-                if line and (line[0].isdigit()) and 'name=' in line:
-                    if current:
-                        actives.append(current)
-                    current = {}
                 for part in line.split():
                     if part.startswith('name='):
-                        current['name'] = part.replace('name=', '').strip('"')
-                    elif part.startswith('address='):
-                        current['address'] = part.replace('address=', '').strip('"')
-                    elif part.startswith('uptime='):
-                        current['uptime'] = part.replace('uptime=', '').strip('"')
-                    elif part.startswith('service='):
-                        current['service'] = part.replace('service=', '').strip('"')
-            if current:
-                actives.append(current)
-            return actives
+                        name = part.replace('name=', '').strip('"')
+                        if name and name not in profiles:
+                            profiles.append(name)
+            return profiles
 
-    def count_active(self):
-        """عدد الاتصالات النشطة"""
-        with self:
-            output = self.execute('/ppp active print count-only')
-            try:
-                return int(output.strip())
-            except ValueError:
-                return 0
+    # ============ Parsing ============
+
+    def _parse_users(self, output):
+        users = []
+        current = {}
+        for line in output.split('\n'):
+            line = line.strip()
+            if line and line[0].isdigit() and 'name=' in line:
+                if current:
+                    users.append(current)
+                current = {}
+            for part in line.split():
+                for key in ('name', 'password', 'profile', 'service', 'disabled', 'limit-uptime'):
+                    if part.startswith(f'{key}='):
+                        current[key] = part.replace(f'{key}=', '').strip('"')
+        if current:
+            users.append(current)
+        return users
+
+    def _parse_actives(self, output):
+        actives = []
+        current = {}
+        for line in output.split('\n'):
+            line = line.strip()
+            if line and line[0].isdigit():
+                if current:
+                    actives.append(current)
+                current = {}
+            for part in line.split():
+                for key in ('name', 'user', 'address', 'uptime', 'service', 'mac-address'):
+                    if part.startswith(f'{key}='):
+                        current[key] = part.replace(f'{key}=', '').strip('"')
+        if current:
+            actives.append(current)
+        return actives
+
+    # ============ استيراد من ملف .rsc ============
+
+    def import_rsc_content(self, content):
+        """
+        تحليل محتوى ملف .rsc من Mikrotik
+        يعيد: {'pppoe': [...], 'hotspot': [...]}
+        """
+        result = {'pppoe': [], 'hotspot': []}
+        current_section = None
+
+        for raw_line in content.split('\n'):
+            line = raw_line.strip()
+            if not line or line.startswith('#'):
+                continue
+
+            # تحديد القسم
+            if line.startswith('/ppp secret'):
+                current_section = 'pppoe'
+                # قد يحتوي على add على نفس السطر
+                if ' add ' in line:
+                    user = self._parse_rsc_add(line)
+                    if user:
+                        result['pppoe'].append(user)
+                continue
+            elif line.startswith('/ip hotspot user'):
+                current_section = 'hotspot'
+                if ' add ' in line:
+                    user = self._parse_rsc_add(line)
+                    if user:
+                        result['hotspot'].append(user)
+                continue
+
+            # أسطر إضافية
+            if line.startswith('add ') and current_section:
+                user = self._parse_rsc_add(line)
+                if user:
+                    result[current_section].append(user)
+
+        return result
+
+    def _parse_rsc_add(self, line):
+        """تحليل سطر add من ملف .rsc"""
+        user = {}
+        # البحث عن name="xxx"
+        patterns = {
+            'name': r'name=("([^"]+)"|\S+)',
+            'password': r'password=("([^"]+)"|\S+)',
+            'profile': r'profile=("([^"]+)"|\S+)',
+            'service': r'service=("([^"]+)"|\S+)',
+            'disabled': r'disabled=("([^"]+)"|\S+)',
+        }
+        for key, pattern in patterns.items():
+            m = re.search(pattern, line)
+            if m:
+                val = m.group(2) or m.group(1)
+                user[key] = val.strip('"')
+        return user if user.get('name') else None
 
 
 # ============ دوال مساعدة ============
 
 def get_router_api(router):
-    """إنشاء كائن API من نموذج Router"""
     return MikrotikAPI(
         host=router.ip_address,
         username=router.username,
@@ -256,7 +315,6 @@ def get_router_api(router):
 
 
 def test_router_connection(router):
-    """اختبار الاتصال بالراوتر"""
     try:
         api = get_router_api(router)
         return api.test_connection()
