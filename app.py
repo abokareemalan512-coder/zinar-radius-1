@@ -1,4 +1,4 @@
-# app.py — النسخة النظيفة (DB + API فقط)
+# app.py — DB Master + API + Automatic Kick
 import os
 import io
 import csv
@@ -15,6 +15,7 @@ from flask import (
 )
 from flask_sqlalchemy import SQLAlchemy
 from werkzeug.security import generate_password_hash, check_password_hash
+import paramiko
 
 # ============ الإعدادات ============
 app = Flask(__name__)
@@ -74,7 +75,7 @@ class Subscriber(db.Model):
     password = db.Column(db.String(150), nullable=False)
     package = db.Column(db.String(100))
     user_type = db.Column(db.String(20), default='pppoe')
-    router_id = db.Column(db.Integer)  # مرجع فقط — لا يلمس Mikrotik
+    router_id = db.Column(db.Integer)
     status = db.Column(db.String(20), default='active')
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     expires_at = db.Column(db.DateTime)
@@ -136,6 +137,68 @@ def _day_bounds(day=None):
     return start, start + timedelta(days=1)
 
 
+# ============ Kick via SSH ============
+
+def kick_user_via_ssh(router, username, user_type='pppoe'):
+    """
+    قطع اتصال مستخدم نشط على الراوتر عبر SSH.
+    لا يحذف الحساب — فقط kick.
+    """
+    if not router:
+        return False, "no router"
+
+    try:
+        ssh = paramiko.SSHClient()
+        ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
+        ssh.connect(
+            hostname=router.ip_address,
+            port=router.port or 22,
+            username=router.username,
+            password=router.password,
+            timeout=8,
+            allow_agent=False,
+            look_for_keys=False,
+        )
+
+        if user_type == 'hotspot':
+            cmd = f'/ip hotspot active remove [find user="{username}"]'
+        else:
+            cmd = f'/ppp active remove [find name="{username}"]'
+
+        stdin, stdout, stderr = ssh.exec_command(cmd)
+        stdout.read()
+        ssh.close()
+
+        logger.info(f"👢 KICK: {username} on {router.name}")
+        return True, "kicked"
+    except Exception as e:
+        logger.warning(f"⚠️ KICK فشل {username}: {e}")
+        return False, str(e)
+
+
+def kick_subscriber(sub):
+    """kick مشترك على كل الراوترات النشطة (لأنه قد يكون متصلًا بأي راوتر)"""
+    if not sub:
+        return
+
+    # kick على الراوتر المرتبط (إن وُجد)
+    if sub.router_id:
+        r = Router.query.get(sub.router_id)
+        if r:
+            kick_user_via_ssh(r, sub.username, sub.user_type or 'pppoe')
+
+    # kick على كل الراوترات النشطة الأخرى (لتغطية كل الحالات)
+    other_routers = Router.query.filter(
+        Router.is_active == True,
+        Router.id != (sub.router_id or 0)
+    ).all()
+    for r in other_routers:
+        try:
+            kick_user_via_ssh(r, sub.username, sub.user_type or 'pppoe')
+        except Exception:
+            pass
+
+
 # ============ Init ============
 
 def init_database():
@@ -172,8 +235,6 @@ def ensure_columns():
                         ('name', "ALTER TABLE subscribers ADD COLUMN name VARCHAR(100)"),
                         ('user_type', "ALTER TABLE subscribers ADD COLUMN user_type VARCHAR(20) DEFAULT 'pppoe'"),
                         ('first_used_at', "ALTER TABLE subscribers ADD COLUMN first_used_at TIMESTAMP"),
-                        ('pushed_at', "ALTER TABLE subscribers ADD COLUMN pushed_at TIMESTAMP"),
-                        ('pushed_router_id', "ALTER TABLE subscribers ADD COLUMN pushed_router_id INTEGER"),
                     ]:
                         if col not in cols:
                             conn.execute(text(sql))
@@ -201,10 +262,6 @@ ensure_columns()
 
 @app.route('/api/auth', methods=['GET', 'POST'])
 def api_auth():
-    """
-    يستقبل Mikrotik استعلام المصادقة عند كل اتصال.
-    يرد JSON بـ result: allow/deny
-    """
     if request.method == 'POST':
         data = request.form if request.form else (request.get_json(silent=True) or {})
         username = (data.get('user') or data.get('username') or '').strip()
@@ -221,11 +278,9 @@ def api_auth():
 
     sub = Subscriber.query.filter_by(username=username).first()
     if not sub:
-        logger.warning(f"❌ AUTH: مستخدم غير موجود — {username}")
         return jsonify({'result': 'deny', 'reason': 'user_not_found'})
 
     if password and sub.password != password:
-        logger.warning(f"❌ AUTH: كلمة مرور خاطئة — {username}")
         return jsonify({'result': 'deny', 'reason': 'wrong_password'})
 
     if sub.status == 'paused':
@@ -240,19 +295,15 @@ def api_auth():
         db.session.commit()
         return jsonify({'result': 'deny', 'reason': 'expired'})
 
-    # ✅ أول اتصال → فعّل التاريخ
     if not sub.expires_at:
         pkg = Package.query.filter_by(name=sub.package).first() if sub.package else None
         if pkg and pkg.duration:
             sub.first_used_at = now
             sub.expires_at = calculate_expiry(pkg, now)
             db.session.commit()
-            logger.info(f"✅ AUTH: أول اتصال — {username} ينتهي {sub.expires_at}")
 
     profile = package_to_profile(sub.package) if sub.package else 'default'
     expires_str = sub.expires_at.strftime('%Y-%m-%d %H:%M:%S') if sub.expires_at else ''
-
-    logger.info(f"✅ AUTH: مسموح — {username} profile={profile}")
 
     return jsonify({
         'result': 'allow',
@@ -321,7 +372,6 @@ def dashboard():
     try:
         routers_list = Router.query.all()
         routers_count = len(routers_list)
-
         master = Router.query.filter_by(is_master=True).first()
         sub_count = Subscriber.query.count()
         active_subs = Subscriber.query.filter_by(status='active').count()
@@ -431,7 +481,7 @@ def routers():
             db.session.add(Router(name=name, ip_address=ip, username=un,
                                   password=pw, port=port, is_master=is_master, is_active=True))
             db.session.commit()
-            flash(f'✅ الراوتر "{name}" أُضيف في قاعدة البيانات', 'success')
+            flash(f'✅ الراوتر "{name}" أُضيف', 'success')
         except Exception as e:
             db.session.rollback()
             flash(f'❌ {str(e)}', 'danger')
@@ -493,7 +543,7 @@ def delete_router(router_id):
         r = Router.query.get_or_404(router_id)
         db.session.delete(r)
         db.session.commit()
-        flash('✅ تم الحذف من قاعدة البيانات فقط', 'success')
+        flash('✅ تم الحذف من قاعدة البيانات', 'success')
     except Exception as e:
         db.session.rollback()
         flash(f'❌ {str(e)}', 'danger')
@@ -516,6 +566,10 @@ def subscribers():
         ).all()
         for s in expired:
             s.status = 'expired'
+            try:
+                kick_subscriber(s)
+            except Exception:
+                pass
         if expired: db.session.commit()
 
         q = Subscriber.query
@@ -643,7 +697,7 @@ def bulk_add():
                 failed += 1
 
         db.session.commit()
-        flash(f'✅ {created} مشترك في قاعدة البيانات' + (f' — فشل {failed}' if failed else ''),
+        flash(f'✅ {created} مشترك' + (f' — فشل {failed}' if failed else ''),
               'success' if not failed else 'warning')
         return redirect(url_for('subscribers'))
 
@@ -658,14 +712,17 @@ def toggle_subscriber(sub_id):
         sub = Subscriber.query.get_or_404(sub_id)
         if sub.status == 'active':
             sub.status = 'paused'
-            flash(f'⏸ "{sub.username}" موقوف في قاعدة البيانات', 'warning')
+            db.session.commit()
+            # 👢 kick فوري
+            kick_subscriber(sub)
+            flash(f'⏸ "{sub.username}" موقوف وتم قطعه', 'warning')
         else:
             if sub.expires_at and sub.expires_at < datetime.utcnow():
                 flash('⚠️ منتهي', 'danger')
             else:
                 sub.status = 'active'
-                flash(f'▶ "{sub.username}" نشط في قاعدة البيانات', 'success')
-        db.session.commit()
+                db.session.commit()
+                flash(f'▶ "{sub.username}" نشط', 'success')
     except Exception as e:
         db.session.rollback()
         flash(f'❌ {str(e)}', 'danger')
@@ -680,7 +737,9 @@ def reset_subscriber(sub_id):
         sub.first_used_at = None
         sub.status = 'active'
         db.session.commit()
-        flash('🔄 تم التصفير — ⏳ يبدأ من أول اتصال', 'success')
+        # 👢 kick لإعادة الاتصال من جديد
+        kick_subscriber(sub)
+        flash('🔄 تم التصفير — ⏳ سيبدأ من جديد', 'success')
     except Exception as e:
         db.session.rollback()
         flash(f'❌ {str(e)}', 'danger')
@@ -726,9 +785,11 @@ def update_subscriber(sub_id):
 def delete_subscriber(sub_id):
     try:
         sub = Subscriber.query.get_or_404(sub_id)
+        # 👢 kick قبل الحذف
+        kick_subscriber(sub)
         db.session.delete(sub)
         db.session.commit()
-        flash('✅ تم الحذف من قاعدة البيانات فقط', 'success')
+        flash('✅ تم الحذف وقطع الاتصال', 'success')
     except Exception as e:
         db.session.rollback()
         flash(f'❌ {str(e)}', 'danger')
@@ -746,11 +807,17 @@ def bulk_delete_subscribers():
         ids_list = [int(x) for x in ids.split(',') if x.strip().isdigit()]
         subs = Subscriber.query.filter(Subscriber.id.in_(ids_list)).all()
         deleted = 0
+        kicked = 0
         for sub in subs:
+            try:
+                if kick_subscriber(sub):
+                    kicked += 1
+            except Exception:
+                pass
             db.session.delete(sub)
             deleted += 1
         db.session.commit()
-        flash(f'🗑 تم حذف {deleted} مشترك من قاعدة البيانات', 'success')
+        flash(f'🗑 تم حذف {deleted} مشترك — تم قطع {kicked}', 'success')
     except Exception as e:
         db.session.rollback()
         flash(f'❌ {str(e)}', 'danger')
@@ -782,9 +849,13 @@ def delete_expired_subscribers():
 
         deleted = 0
         for sub in unique:
+            try:
+                kick_subscriber(sub)
+            except Exception:
+                pass
             db.session.delete(sub); deleted += 1
         db.session.commit()
-        flash(f'🗑 تم حذف {deleted} منتهي من قاعدة البيانات', 'success')
+        flash(f'🗑 تم حذف {deleted} منتهي', 'success')
     except Exception as e:
         db.session.rollback()
         flash(f'❌ {str(e)}', 'danger')
