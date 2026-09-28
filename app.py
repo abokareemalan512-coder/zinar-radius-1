@@ -14,6 +14,7 @@ from flask_sqlalchemy import SQLAlchemy
 from werkzeug.security import generate_password_hash, check_password_hash
 import paramiko
 import socket
+from mikrotik_api import MikrotikAPI, MikrotikError, get_router_api, test_router_connection
 
 # ============ الإعدادات الأساسية ============
 app = Flask(__name__)
@@ -92,8 +93,8 @@ class Package(db.Model):
     name = db.Column(db.String(100), nullable=False, unique=True)
     speed = db.Column(db.String(50))
     price = db.Column(db.Float, default=0)
-    duration = db.Column(db.Integer, default=30)               # الرقم
-    duration_unit = db.Column(db.String(10), default='days')    # 'days' أو 'months'
+    duration = db.Column(db.Integer, default=30)
+    duration_unit = db.Column(db.String(10), default='days')
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
 
 
@@ -118,6 +119,13 @@ def calculate_expiry(pkg, start_date=None):
     if pkg.duration_unit == 'months':
         return add_months(start_date, pkg.duration)
     return start_date + timedelta(days=pkg.duration)
+
+
+def package_to_profile(package_name):
+    """تحويل اسم الباقة إلى اسم Profile صالح في Mikrotik"""
+    if not package_name:
+        return 'default'
+    return package_name.strip().replace(' ', '_')
 
 
 # ============ تهيئة قاعدة البيانات ============
@@ -148,7 +156,6 @@ def ensure_columns():
             existing_tables = inspector.get_table_names()
 
             with db.engine.connect() as conn:
-                # routers.is_active
                 if 'routers' in existing_tables:
                     cols = [c['name'] for c in inspector.get_columns('routers')]
                     if 'is_active' not in cols:
@@ -157,7 +164,6 @@ def ensure_columns():
                         ))
                         logger.info("✅ تم إضافة routers.is_active")
 
-                # subscribers.name
                 if 'subscribers' in existing_tables:
                     cols = [c['name'] for c in inspector.get_columns('subscribers')]
                     if 'name' not in cols:
@@ -166,7 +172,6 @@ def ensure_columns():
                         ))
                         logger.info("✅ تم إضافة subscribers.name")
 
-                # packages.duration_unit
                 if 'packages' in existing_tables:
                     cols = [c['name'] for c in inspector.get_columns('packages')]
                     if 'duration_unit' not in cols:
@@ -186,20 +191,10 @@ ensure_columns()
 
 
 def test_mikrotik_connection(router):
+    """اختبار الاتصال بالراوتر"""
     try:
-        ssh = paramiko.SSHClient()
-        ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
-        ssh.connect(
-            hostname=router.ip_address,
-            port=router.port or 22,
-            username=router.username,
-            password=router.password,
-            timeout=5,
-            allow_agent=False,
-            look_for_keys=False,
-        )
-        ssh.close()
-        return True
+        success, _ = test_router_connection(router)
+        return success
     except Exception as e:
         logger.warning(f"⚠️ فشل الاتصال بـ {router.name}: {e}")
         return False
@@ -553,6 +548,79 @@ def delete_router(router_id):
     return redirect(url_for('routers'))
 
 
+@app.route('/routers/<int:router_id>/users')
+def router_users(router_id):
+    """عرض مستخدمي الراوتر من Mikrotik"""
+    router = Router.query.get_or_404(router_id)
+    users = []
+    actives = []
+    profiles = []
+    error = None
+
+    try:
+        api = get_router_api(router)
+        users = api.list_users()
+        actives = api.list_active()
+        profiles = api.list_profiles()
+    except MikrotikError as e:
+        error = str(e)
+    except Exception as e:
+        error = f"خطأ غير متوقع: {str(e)}"
+
+    return render_template(
+        'router_users.html',
+        router=router,
+        users=users,
+        actives=actives,
+        profiles=profiles,
+        error=error
+    )
+
+
+@app.route('/routers/<int:router_id>/sync')
+def sync_router(router_id):
+    """مزامنة المشتركين من الموقع إلى الراوتر"""
+    router = Router.query.get_or_404(router_id)
+
+    try:
+        api = get_router_api(router)
+        existing_users = {u.get('name') for u in api.list_users() if u.get('name')}
+        subscribers = Subscriber.query.filter_by(router_id=router_id).all()
+
+        created = 0
+        skipped = 0
+        failed = 0
+
+        for sub in subscribers:
+            if sub.username in existing_users:
+                skipped += 1
+                continue
+            try:
+                profile_name = package_to_profile(sub.package)
+                api.create_user(
+                    username=sub.username,
+                    password=sub.password,
+                    profile=profile_name,
+                )
+                if sub.status != 'active':
+                    api.disable_user(sub.username)
+                created += 1
+            except MikrotikError as e:
+                logger.warning(f"⚠️ فشل إنشاء {sub.username}: {e}")
+                failed += 1
+
+        flash(
+            f'✅ المزامنة: {created} جديد، {skipped} موجود، {failed} فشل',
+            'success' if failed == 0 else 'warning'
+        )
+    except MikrotikError as e:
+        flash(f'❌ فشل الاتصال بالراوتر: {e}', 'danger')
+    except Exception as e:
+        flash(f'❌ خطأ: {str(e)}', 'danger')
+
+    return redirect(url_for('router_users', router_id=router_id))
+
+
 # ============ المشتركين ============
 
 @app.route('/subscribers')
@@ -610,12 +678,34 @@ def add_subscriber():
             flash('❌ اسم المستخدم وكلمة المرور مطلوبان', 'danger')
             return redirect(url_for('add_subscriber'))
 
+        if Subscriber.query.filter_by(username=username).first():
+            flash(f'❌ اسم المستخدم "{username}" موجود مسبقاً', 'danger')
+            return redirect(url_for('add_subscriber'))
+
         try:
             expires_at = None
+            pkg = None
             if package_name:
                 pkg = Package.query.filter_by(name=package_name).first()
                 if pkg:
                     expires_at = calculate_expiry(pkg)
+
+            router_message = ''
+            if router_id and pkg:
+                router = Router.query.get(int(router_id))
+                if router:
+                    try:
+                        api = get_router_api(router)
+                        api.create_user(
+                            username=username,
+                            password=password,
+                            profile=package_to_profile(pkg.name),
+                        )
+                        router_message = ' ✅ + على الراوتر'
+                        logger.info(f"✅ تم إنشاء {username} على {router.name}")
+                    except MikrotikError as e:
+                        logger.warning(f"⚠️ فشل الإنشاء على الراوتر: {e}")
+                        router_message = f' ⚠️ (فشل الراوتر: {str(e)[:50]})'
 
             sub = Subscriber(
                 name=name or username,
@@ -630,12 +720,13 @@ def add_subscriber():
             db.session.commit()
 
             if expires_at:
-                flash(f'✅ تم إضافة "{username}" — ينتهي في {expires_at.strftime("%Y-%m-%d")}', 'success')
+                flash(f'✅ تم إضافة "{username}"{router_message} — ينتهي في {expires_at.strftime("%Y-%m-%d")}', 'success')
             else:
-                flash(f'✅ تم إضافة "{username}" بنجاح', 'success')
+                flash(f'✅ تم إضافة "{username}"{router_message}', 'success')
             return redirect(url_for('subscribers'))
         except Exception as e:
             db.session.rollback()
+            logger.error(f"❌ خطأ: {e}")
             flash(f'❌ خطأ: {str(e)}', 'danger')
 
     packages_list = Package.query.order_by(Package.name).all()
@@ -651,18 +742,40 @@ def add_subscriber():
 def toggle_subscriber(sub_id):
     try:
         sub = Subscriber.query.get_or_404(sub_id)
+        router_msg = ''
+
         if sub.status == 'active':
             sub.status = 'paused'
-            flash(f'⏸ تم إيقاف "{sub.username}"', 'warning')
+            if sub.router_id:
+                router = Router.query.get(sub.router_id)
+                if router:
+                    try:
+                        api = get_router_api(router)
+                        api.disable_user(sub.username)
+                        api.disconnect_active_user(sub.username)
+                        router_msg = ' وتم إيقافه على الراوتر'
+                    except MikrotikError as e:
+                        router_msg = f' (فشل على الراوتر: {str(e)[:40]})'
+            flash(f'⏸ تم إيقاف "{sub.username}"{router_msg}', 'warning')
         else:
             if sub.expires_at and sub.expires_at < datetime.utcnow():
                 flash(f'⚠️ لا يمكن التفعيل — اشتراك "{sub.username}" منتهي', 'danger')
             else:
                 sub.status = 'active'
-                flash(f'▶ تم تفعيل "{sub.username}"', 'success')
+                if sub.router_id:
+                    router = Router.query.get(sub.router_id)
+                    if router:
+                        try:
+                            api = get_router_api(router)
+                            api.enable_user(sub.username)
+                            router_msg = ' وتم تفعيله على الراوتر'
+                        except MikrotikError as e:
+                            router_msg = f' (فشل على الراوتر: {str(e)[:40]})'
+                flash(f'▶ تم تفعيل "{sub.username}"{router_msg}', 'success')
         db.session.commit()
     except Exception as e:
         db.session.rollback()
+        logger.error(f"❌ خطأ في toggle_subscriber: {e}")
         flash(f'❌ خطأ: {str(e)}', 'danger')
     return redirect(url_for('subscribers'))
 
@@ -683,9 +796,21 @@ def reset_subscriber(sub_id):
 
         sub.expires_at = calculate_expiry(pkg)
         sub.status = 'active'
-        db.session.commit()
+        router_msg = ''
 
-        flash(f'🔄 تم تصفير باقة "{sub.username}" — ينتهي في {sub.expires_at.strftime("%Y-%m-%d")}', 'success')
+        if sub.router_id:
+            router = Router.query.get(sub.router_id)
+            if router:
+                try:
+                    api = get_router_api(router)
+                    api.enable_user(sub.username)
+                    api.disconnect_active_user(sub.username)
+                    router_msg = ' وتم تفعيله على الراوتر'
+                except MikrotikError as e:
+                    router_msg = f' (فشل على الراوتر: {str(e)[:40]})'
+
+        db.session.commit()
+        flash(f'🔄 تم تصفير باقة "{sub.username}"{router_msg} — ينتهي في {sub.expires_at.strftime("%Y-%m-%d")}', 'success')
     except Exception as e:
         db.session.rollback()
         flash(f'❌ خطأ: {str(e)}', 'danger')
@@ -697,13 +822,12 @@ def extend_subscriber(sub_id):
     try:
         sub = Subscriber.query.get_or_404(sub_id)
 
-        # التمديد حسب نوع الباقة
         pkg = Package.query.filter_by(name=sub.package).first() if sub.package else None
+        base = sub.expires_at if sub.expires_at and sub.expires_at > datetime.utcnow() else datetime.utcnow()
+
         if pkg:
-            base = sub.expires_at if sub.expires_at and sub.expires_at > datetime.utcnow() else datetime.utcnow()
             sub.expires_at = calculate_expiry(pkg, base)
         else:
-            base = sub.expires_at if sub.expires_at and sub.expires_at > datetime.utcnow() else datetime.utcnow()
             sub.expires_at = base + timedelta(days=30)
 
         sub.status = 'active'
@@ -721,8 +845,15 @@ def update_subscriber(sub_id):
     try:
         sub = Subscriber.query.get_or_404(sub_id)
 
+        old_password = sub.password
+        old_package = sub.package
+        old_username = sub.username
+
         sub.name = request.form.get('name', '').strip() or sub.name
-        sub.username = request.form.get('username', '').strip() or sub.username
+
+        new_username = request.form.get('username', '').strip()
+        if new_username:
+            sub.username = new_username
 
         password = request.form.get('password', '').strip()
         if password:
@@ -738,10 +869,41 @@ def update_subscriber(sub_id):
         router_id = request.form.get('router_id', '').strip()
         sub.router_id = int(router_id) if router_id else None
 
+        router_msg = ''
+
+        if sub.router_id:
+            router = Router.query.get(sub.router_id)
+            if router:
+                try:
+                    api = get_router_api(router)
+
+                    if password and password != old_password:
+                        api.update_user_password(sub.username, password)
+
+                    if package_name and package_name != old_package:
+                        api.update_user_profile(sub.username, package_to_profile(package_name))
+                        api.disconnect_active_user(sub.username)
+
+                    if new_username and new_username != old_username:
+                        api.delete_user(old_username)
+                        pkg = Package.query.filter_by(name=package_name or old_package).first()
+                        profile_name = package_to_profile(pkg.name) if pkg else 'default'
+                        api.create_user(
+                            username=new_username,
+                            password=password or old_password,
+                            profile=profile_name,
+                        )
+
+                    router_msg = ' ✅ + على الراوتر'
+                except MikrotikError as e:
+                    logger.warning(f"⚠️ فشل التحديث على الراوتر: {e}")
+                    router_msg = f' ⚠️ (فشل الراوتر: {str(e)[:40]})'
+
         db.session.commit()
-        flash(f'✅ تم تحديث بيانات "{sub.username}"', 'success')
+        flash(f'✅ تم تحديث بيانات "{sub.username}"{router_msg}', 'success')
     except Exception as e:
         db.session.rollback()
+        logger.error(f"❌ خطأ في update_subscriber: {e}")
         flash(f'❌ خطأ: {str(e)}', 'danger')
     return redirect(url_for('subscribers'))
 
@@ -750,11 +912,25 @@ def update_subscriber(sub_id):
 def delete_subscriber(sub_id):
     try:
         sub = Subscriber.query.get_or_404(sub_id)
+        router_msg = ''
+
+        if sub.router_id:
+            router = Router.query.get(sub.router_id)
+            if router:
+                try:
+                    api = get_router_api(router)
+                    api.disconnect_active_user(sub.username)
+                    api.delete_user(sub.username)
+                    router_msg = ' وحُذف من الراوتر'
+                except MikrotikError as e:
+                    router_msg = f' (فشل على الراوتر: {str(e)[:40]})'
+
         db.session.delete(sub)
         db.session.commit()
-        flash('✅ تم حذف المشترك', 'success')
+        flash(f'✅ تم حذف المشترك{router_msg}', 'success')
     except Exception as e:
         db.session.rollback()
+        logger.error(f"❌ خطأ في delete_subscriber: {e}")
         flash(f'❌ خطأ: {str(e)}', 'danger')
     return redirect(url_for('subscribers'))
 
