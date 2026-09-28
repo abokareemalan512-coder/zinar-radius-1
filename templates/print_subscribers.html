@@ -1,0 +1,152 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <title>طباعة المشتركين</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: 'Segoe UI', Tahoma, sans-serif;
+            padding: 20px;
+            color: #000;
+            background: #fff;
+        }
+        h1 {
+            text-align: center;
+            color: #0ea5e9;
+            margin-bottom: 10px;
+            font-size: 24px;
+        }
+        .subtitle {
+            text-align: center;
+            color: #666;
+            margin-bottom: 20px;
+            font-size: 13px;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 12px;
+        }
+        th {
+            background: #0ea5e9;
+            color: #fff;
+            padding: 8px;
+            text-align: right;
+            border: 1px solid #0284c7;
+        }
+        td {
+            padding: 8px;
+            border: 1px solid #ccc;
+        }
+        tr:nth-child(even) { background: #f0f9ff; }
+        .footer {
+            margin-top: 30px;
+            text-align: center;
+            font-size: 11px;
+            color: #666;
+            border-top: 1px solid #ccc;
+            padding-top: 10px;
+        }
+        @media print {
+            body { padding: 10px; }
+            .no-print { display: none !important; }
+        }
+        .no-print {
+            text-align: center;
+            margin-bottom: 20px;
+        }
+        .btn {
+            background: #0ea5e9;
+            color: #fff;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 14px;
+            margin: 0 5px;
+        }
+        .btn:hover { background: #0284c7; }
+        .badge {
+            display: inline-block;
+            padding: 2px 8px;
+            border-radius: 4px;
+            font-size: 10px;
+            font-weight: bold;
+        }
+        .badge-pppoe { background: #dbeafe; color: #1e40af; }
+        .badge-hotspot { background: #fef3c7; color: #92400e; }
+    </style>
+</head>
+<body>
+
+<div class="no-print">
+    <button class="btn" onclick="window.print()">🖨️ طباعة</button>
+    <button class="btn" onclick="window.close()">✖ إغلاق</button>
+</div>
+
+<h1>⚡ ZINAR — قائمة المشتركين</h1>
+<div class="subtitle">
+    تاريخ الطباعة: {{ now.strftime('%Y-%m-%d %H:%M') }} —
+    العدد الكلي: {{ subscribers|length }} مشترك
+    {% if filter_type %}
+        — نوع: {{ 'برودباند' if filter_type == 'pppoe' else 'هوت سبوت' }}
+    {% endif %}
+</div>
+
+<table>
+    <thead>
+        <tr>
+            <th style="width: 40px;">#</th>
+            <th>اسم المشترك</th>
+            <th>اسم المستخدم</th>
+            <th>كلمة المرور</th>
+            <th>الباقة</th>
+            <th>النوع</th>
+            <th>الحالة</th>
+            <th>تاريخ الانتهاء</th>
+        </tr>
+    </thead>
+    <tbody>
+        {% for s in subscribers %}
+        <tr>
+            <td>{{ loop.index }}</td>
+            <td>{{ s.name or s.username }}</td>
+            <td><strong>{{ s.username }}</strong></td>
+            <td>{{ s.password }}</td>
+            <td>{{ s.package or '-' }}</td>
+            <td>
+                <span class="badge badge-{{ s.user_type or 'pppoe' }}">
+                    {{ 'برودباند' if (s.user_type or 'pppoe') == 'pppoe' else 'هوت سبوت' }}
+                </span>
+            </td>
+            <td>
+                {% if s.status == 'active' %}نشط
+                {% elif s.status == 'paused' %}موقوف
+                {% elif s.status == 'expired' %}منتهي
+                {% else %}{{ s.status }}{% endif %}
+            </td>
+            <td>{{ s.expires_at.strftime('%Y-%m-%d') if s.expires_at else '—' }}</td>
+        </tr>
+        {% else %}
+        <tr>
+            <td colspan="8" style="text-align: center; padding: 30px;">
+                لا يوجد مشتركون
+            </td>
+        </tr>
+        {% endfor %}
+    </tbody>
+</table>
+
+<div class="footer">
+    ZINAR — نظام إدارة المشتركين © {{ now.strftime('%Y') }}
+</div>
+
+<script>
+window.addEventListener('load', () => {
+    setTimeout(() => window.print(), 500);
+});
+</script>
+
+</body>
+</html>
