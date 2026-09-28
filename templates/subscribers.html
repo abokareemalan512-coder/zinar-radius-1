@@ -11,19 +11,25 @@
         <a href="{{ url_for('bulk_add') }}" class="btn btn-warning">
             <i class="bi bi-people-fill"></i> إضافة جماعية
         </a>
+        <form method="POST" action="{{ url_for('delete_expired_subscribers') }}"
+              style="display: inline;"
+              onsubmit="return confirm('⚠️ سيتم حذف كل المشتركين المنتهية صلاحيتهم من الموقع والسيرفرات.\nهل أنت متأكد؟')">
+            <button type="submit" class="btn btn-danger">
+                <i class="bi bi-hourglass-bottom"></i> حذف المنتهية
+            </button>
+        </form>
     </div>
 </div>
 
-<!-- شريط البحث والفلاتر -->
+<!-- البحث والفلاتر -->
 <div class="card mb-3 p-3">
     <div class="row g-2 align-items-center">
         <div class="col-md-4">
             <form method="GET" class="d-flex gap-2">
                 <input type="text" name="q" class="form-control"
                        placeholder="بحث..." value="{{ search }}">
-                {% if filter_type %}
-                    <input type="hidden" name="type" value="{{ filter_type }}">
-                {% endif %}
+                {% if filter_type %}<input type="hidden" name="type" value="{{ filter_type }}">{% endif %}
+                {% if filter_push %}<input type="hidden" name="push" value="{{ filter_push }}">{% endif %}
                 <button class="btn btn-primary" type="submit">
                     <i class="bi bi-search"></i>
                 </button>
@@ -31,15 +37,15 @@
         </div>
         <div class="col-md-4">
             <div class="btn-group w-100" role="group">
-                <a href="{{ url_for('subscribers') }}"
+                <a href="{{ url_for('subscribers', q=search) }}"
                    class="btn {% if not filter_type %}btn-primary{% else %}btn-secondary{% endif %}">
                     الكل
                 </a>
-                <a href="{{ url_for('subscribers', type='pppoe') }}"
+                <a href="{{ url_for('subscribers', q=search, type='pppoe') }}"
                    class="btn {% if filter_type == 'pppoe' %}btn-primary{% else %}btn-secondary{% endif %}">
                     🌐 برودباند
                 </a>
-                <a href="{{ url_for('subscribers', type='hotspot') }}"
+                <a href="{{ url_for('subscribers', q=search, type='hotspot') }}"
                    class="btn {% if filter_type == 'hotspot' %}btn-primary{% else %}btn-secondary{% endif %}">
                     📶 هوت سبوت
                 </a>
@@ -51,30 +57,18 @@
                     <i class="bi bi-download"></i> تصدير الكل
                 </button>
                 <ul class="dropdown-menu">
-                    <li>
-                        <a class="dropdown-item" href="{{ url_for('export_subscribers', format='csv', type=filter_type) }}">
-                            📊 CSV (Excel)
-                        </a>
-                    </li>
-                    <li>
-                        <a class="dropdown-item" href="{{ url_for('export_subscribers', format='txt', type=filter_type) }}">
-                            📄 ملف نصي (TXT)
-                        </a>
-                    </li>
-                    <li>
-                        <a class="dropdown-item" href="{{ url_for('export_subscribers', format='print', type=filter_type) }}"
-                           target="_blank">
-                            🖨️ طباعة الكل
-                        </a>
-                    </li>
+                    <li><a class="dropdown-item" href="{{ url_for('export_subscribers', format='csv', type=filter_type) }}">📊 CSV</a></li>
+                    <li><a class="dropdown-item" href="{{ url_for('export_subscribers', format='txt', type=filter_type) }}">📄 TXT</a></li>
+                    <li><a class="dropdown-item" href="{{ url_for('export_subscribers', format='print', type=filter_type) }}" target="_blank">🖨️ طباعة</a></li>
                 </ul>
             </div>
         </div>
     </div>
 </div>
 
-<!-- شريط الإجراءات الجماعية (يظهر عند التحديد) -->
-<div class="card mb-3 p-3" id="bulkBar" style="display: none; background: linear-gradient(135deg, #0ea5e9, #0284c7);">
+<!-- شريط الإجراءات الجماعية -->
+<div class="card mb-3 p-3" id="bulkBar"
+     style="display: none; background: linear-gradient(135deg, #0ea5e9, #0284c7);">
     <div class="d-flex justify-content-between align-items-center flex-wrap gap-2">
         <div class="text-white fw-bold">
             <i class="bi bi-check2-square"></i>
@@ -82,7 +76,7 @@
         </div>
         <div class="d-flex gap-2 flex-wrap">
             <button class="btn btn-light btn-sm" onclick="printSelected()">
-                🖨️ طباعة المحدد
+                🖨️ طباعة
             </button>
             <button class="btn btn-light btn-sm" onclick="exportSelected('csv')">
                 📊 CSV
@@ -90,13 +84,17 @@
             <button class="btn btn-light btn-sm" onclick="exportSelected('txt')">
                 📄 TXT
             </button>
+            <button class="btn btn-danger btn-sm" onclick="deleteSelected()">
+                🗑 حذف المحدد
+            </button>
             <button class="btn btn-light btn-sm" onclick="clearSelection()">
-                ✖ إلغاء التحديد
+                ✖ إلغاء
             </button>
         </div>
     </div>
 </div>
 
+<!-- جدول المشتركين -->
 <div class="card">
     <div class="table-responsive">
         <table class="table table-hover mb-0">
@@ -104,13 +102,12 @@
                 <tr>
                     <th style="width: 40px;">
                         <input type="checkbox" id="selectAll"
-                               class="form-check-input"
-                               onchange="toggleAll(this)">
+                               class="form-check-input" onchange="toggleAll(this)">
                     </th>
                     <th>#</th>
                     <th>اسم المشترك</th>
                     <th>المستخدم</th>
-                    <th>كلمة المرور</th>
+                    <th>المرور</th>
                     <th>النوع</th>
                     <th>الباقة</th>
                     <th>IP الراوتر</th>
@@ -130,7 +127,6 @@
                     <td>{{ sub.id }}</td>
                     <td class="text-accent fw-bold">{{ sub.name or sub.username }}</td>
                     <td>{{ sub.username }}</td>
-
                     <td>
                         <span class="password-field" data-id="{{ sub.id }}">••••••</span>
                         <button class="btn btn-sm btn-outline-light py-0 px-1"
@@ -138,7 +134,6 @@
                             <i class="bi bi-eye" id="eye-{{ sub.id }}"></i>
                         </button>
                     </td>
-
                     <td>
                         {% if sub.user_type == 'hotspot' %}
                             <span class="badge bg-warning">📶 هوت سبوت</span>
@@ -146,9 +141,7 @@
                             <span class="badge bg-info">🌐 برودباند</span>
                         {% endif %}
                     </td>
-
                     <td>{{ sub.package or '-' }}</td>
-
                     <td>
                         {% if sub.router_id and sub.router_id in routers %}
                             <span class="text-accent">{{ routers[sub.router_id].ip_address }}</span>
@@ -156,7 +149,6 @@
                             <span class="text-muted">—</span>
                         {% endif %}
                     </td>
-
                     <td>
                         {% if sub.status == 'active' %}
                             <span class="badge bg-success">🟢 نشط</span>
@@ -168,9 +160,13 @@
                             <span class="badge bg-secondary">{{ sub.status }}</span>
                         {% endif %}
                     </td>
-
-                    <td>{{ sub.expires_at.strftime('%Y-%m-%d') if sub.expires_at else '—' }}</td>
-
+                    <td>
+                        {% if sub.expires_at %}
+                            {{ sub.expires_at.strftime('%Y-%m-%d') }}
+                        {% else %}
+                            <span class="badge bg-info">⏳ في انتظار</span>
+                        {% endif %}
+                    </td>
                     <td>
                         {% if sub.expires_at %}
                             {% set days_left = (sub.expires_at - now).days %}
@@ -184,12 +180,26 @@
                                 <span class="badge bg-secondary">انتهى</span>
                             {% endif %}
                         {% else %}
-                            <span class="text-muted">—</span>
+                            <span class="badge bg-secondary">لم يبدأ</span>
                         {% endif %}
                     </td>
-
                     <td>
                         <div class="d-flex gap-1 flex-wrap">
+                            {% if not sub.pushed_at or sub.pushed_router_id != sub.router_id %}
+                            <a href="{{ url_for('push_subscriber', sub_id=sub.id) }}"
+                               class="btn btn-sm btn-success"
+                               onclick="return confirm('رفع {{ sub.username }} إلى الراوتر؟')"
+                               title="رفع للراوتر">
+                                <i class="bi bi-cloud-upload"></i>
+                            </a>
+                            {% endif %}
+
+                            <button class="btn btn-sm btn-info"
+                                    onclick="openMoveModal({{ sub.id }}, '{{ sub.username }}')"
+                                    title="نقل">
+                                <i class="bi bi-arrow-left-right"></i>
+                            </button>
+
                             <a href="{{ url_for('toggle_subscriber', sub_id=sub.id) }}"
                                class="btn btn-sm {% if sub.status == 'active' %}btn-warning{% else %}btn-success{% endif %}"
                                title="تفعيل/إيقاف">
@@ -220,7 +230,7 @@
 
                             <a href="{{ url_for('delete_subscriber', sub_id=sub.id) }}"
                                class="btn btn-sm btn-danger"
-                               onclick="return confirm('تأكيد الحذف؟')" title="حذف">
+                               onclick="return confirm('تأكيد حذف {{ sub.username }}؟')" title="حذف">
                                 <i class="bi bi-trash"></i>
                             </a>
                         </div>
@@ -293,8 +303,47 @@
     </div>
 </div>
 
+<!-- Modal نقل -->
+<div class="modal fade" id="moveSubModal" tabindex="-1">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <form method="POST" id="moveSubForm">
+                <div class="modal-header border-secondary">
+                    <h5 class="modal-title text-accent">
+                        <i class="bi bi-arrow-left-right"></i> نقل المشترك
+                    </h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <p>نقل المشترك <strong id="moveSubName" class="text-accent"></strong> إلى:</p>
+                    <select name="new_router_id" class="form-select" required>
+                        <option value="">— اختر الراوتر الجديد —</option>
+                        {% for r in routers.values() %}
+                        <option value="{{ r.id }}">{{ r.name }} — {{ r.ip_address }}</option>
+                        {% endfor %}
+                    </select>
+                    <small class="text-muted d-block mt-2">
+                        ⚠️ سيُحذف من الراوتر القديم ويُضاف على الجديد.
+                    </small>
+                </div>
+                <div class="modal-footer border-secondary">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">إلغاء</button>
+                    <button type="submit" class="btn btn-primary">
+                        <i class="bi bi-check2"></i> نقل
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- نموذج حذف جماعي مخفي -->
+<form method="POST" action="{{ url_for('bulk_delete_subscribers') }}"
+      id="bulkDeleteForm" style="display: none;">
+    <input type="hidden" name="ids" id="bulkDeleteIds">
+</form>
+
 <script>
-// ============ كلمة المرور ============
 function togglePassword(id, password) {
     const span = document.querySelector(`.password-field[data-id="${id}"]`);
     const eye = document.getElementById(`eye-${id}`);
@@ -307,7 +356,6 @@ function togglePassword(id, password) {
     }
 }
 
-// ============ تعديل ============
 function openEditSub(id, name, username, pkg, routerId) {
     document.getElementById('editSubForm').action = '/subscribers/update/' + id;
     document.getElementById('sub_name').value = name;
@@ -318,11 +366,14 @@ function openEditSub(id, name, username, pkg, routerId) {
     new bootstrap.Modal(document.getElementById('editSubModal')).show();
 }
 
-// ============ التحديد الجماعي ============
+function openMoveModal(id, username) {
+    document.getElementById('moveSubForm').action = '/subscribers/move/' + id;
+    document.getElementById('moveSubName').textContent = username;
+    new bootstrap.Modal(document.getElementById('moveSubModal')).show();
+}
+
 function toggleAll(source) {
-    document.querySelectorAll('.sub-checkbox').forEach(cb => {
-        cb.checked = source.checked;
-    });
+    document.querySelectorAll('.sub-checkbox').forEach(cb => { cb.checked = source.checked; });
     updateBulkBar();
 }
 
@@ -346,24 +397,28 @@ function clearSelection() {
 
 function getSelectedIds() {
     const ids = [];
-    document.querySelectorAll('.sub-checkbox:checked').forEach(cb => {
-        ids.push(cb.value);
-    });
+    document.querySelectorAll('.sub-checkbox:checked').forEach(cb => { ids.push(cb.value); });
     return ids;
 }
 
 function printSelected() {
     const ids = getSelectedIds();
     if (ids.length === 0) return;
-    const url = '/subscribers/export/print?ids=' + ids.join(',');
-    window.open(url, '_blank');
+    window.open('/subscribers/export/print?ids=' + ids.join(','), '_blank');
 }
 
 function exportSelected(format) {
     const ids = getSelectedIds();
     if (ids.length === 0) return;
-    const url = `/subscribers/export/${format}?ids=` + ids.join(',');
-    window.location.href = url;
+    window.location.href = `/subscribers/export/${format}?ids=` + ids.join(',');
+}
+
+function deleteSelected() {
+    const ids = getSelectedIds();
+    if (ids.length === 0) return;
+    if (!confirm(`⚠️ سيتم حذف ${ids.length} مشترك من الموقع ومن السيرفرات.\nهل أنت متأكد؟`)) return;
+    document.getElementById('bulkDeleteIds').value = ids.join(',');
+    document.getElementById('bulkDeleteForm').submit();
 }
 </script>
 {% endblock %}
