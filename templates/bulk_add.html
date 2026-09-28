@@ -35,31 +35,31 @@
                     </div>
                 </div>
 
-                <!-- نوع الأحرف -->
+                <!-- نوع التوليد -->
                 <div class="mb-3">
                     <label class="form-label">
-                        <i class="bi bi-shuffle text-accent"></i> نوع الأحرف *
+                        <i class="bi bi-shuffle text-accent"></i> طريقة توليد الأسماء *
                     </label>
                     <div class="d-flex gap-3 flex-wrap">
                         <div class="form-check">
                             <input class="form-check-input" type="radio"
-                                   name="char_mode" value="numbers" checked id="cm_numbers">
-                            <label class="form-check-label fw-bold" for="cm_numbers">
-                                🔢 أرقام فقط
-                            </label>
-                        </div>
-                        <div class="form-check">
-                            <input class="form-check-input" type="radio"
-                                   name="char_mode" value="mixed" id="cm_mixed">
+                                   name="char_mode" value="mixed" checked id="cm_mixed">
                             <label class="form-check-label fw-bold" for="cm_mixed">
-                                🔤 أحرف وأرقام
+                                🎲 عشوائي (أحرف + أرقام)
                             </label>
                         </div>
                         <div class="form-check">
                             <input class="form-check-input" type="radio"
                                    name="char_mode" value="letters" id="cm_letters">
                             <label class="form-check-label fw-bold" for="cm_letters">
-                                🔡 أحرف فقط
+                                🔡 عشوائي (أحرف فقط)
+                            </label>
+                        </div>
+                        <div class="form-check">
+                            <input class="form-check-input" type="radio"
+                                   name="char_mode" value="numbers" id="cm_numbers">
+                            <label class="form-check-label fw-bold" for="cm_numbers">
+                                🔢 تسلسل أرقام
                             </label>
                         </div>
                     </div>
@@ -69,40 +69,18 @@
                 <div class="mb-3">
                     <label class="form-label">بادئة الأسماء (Prefix)</label>
                     <input type="text" name="prefix" class="form-control"
-                           placeholder="مثال: user_ أو 0055 أو P">
-                    <small class="text-muted">اتركها فارغة إذا لا تريد بادئة</small>
+                           placeholder="اتركها فارغة للأسماء العشوائية تمامًا">
+                    <small class="text-muted">اختياري — مثال: user_ أو P</small>
                 </div>
 
-                <!-- حقول "أرقام فقط" -->
-                <div id="numbersFields">
-                    <div class="row">
-                        <div class="col-md-4 mb-3">
-                            <label class="form-label">من رقم *</label>
-                            <input type="number" name="start_num" id="start_num"
-                                   class="form-control" value="1" min="1">
-                        </div>
-                        <div class="col-md-4 mb-3">
-                            <label class="form-label">عدد الأرقام (طول) *</label>
-                            <input type="number" name="number_length" id="number_length"
-                                   class="form-control" value="4" min="1" max="10">
-                            <small class="text-muted">مثال: 4 → 0001, 0100, 1000</small>
-                        </div>
-                        <div class="col-md-4 mb-3">
-                            <label class="form-label">العدد الكلي *</label>
-                            <input type="number" name="count" id="count_num"
-                                   class="form-control" value="10" min="1" max="500">
-                        </div>
-                    </div>
-                </div>
-
-                <!-- حقول "أحرف / مختلط" -->
-                <div id="randomFields" style="display: none;">
+                <!-- حقول عشوائي -->
+                <div id="randomFields">
                     <div class="row">
                         <div class="col-md-6 mb-3">
-                            <label class="form-label">طول الاسم *</label>
+                            <label class="form-label">طول اسم المستخدم *</label>
                             <input type="number" name="random_length" id="random_length"
-                                   class="form-control" value="6" min="3" max="20">
-                            <small class="text-muted">مثال: 6 → abc123</small>
+                                   class="form-control" value="6" min="4" max="20">
+                            <small class="text-muted">مثال: 6 → <code>a3b7k9</code></small>
                         </div>
                         <div class="col-md-6 mb-3">
                             <label class="form-label">العدد الكلي *</label>
@@ -112,10 +90,74 @@
                     </div>
                 </div>
 
+                <!-- حقول تسلسل -->
+                <div id="numbersFields" style="display: none;">
+                    <div class="row">
+                        <div class="col-md-4 mb-3">
+                            <label class="form-label">من رقم *</label>
+                            <input type="number" name="start_num" id="start_num"
+                                   class="form-control" value="1" min="1">
+                        </div>
+                        <div class="col-md-4 mb-3">
+                            <label class="form-label">عدد الأرقام (طول)</label>
+                            <input type="number" name="number_length" id="number_length"
+                                   class="form-control" value="4" min="1" max="10">
+                        </div>
+                        <div class="col-md-4 mb-3">
+                            <label class="form-label">العدد الكلي *</label>
+                            <input type="number" name="count" id="count_num"
+                                   class="form-control" value="10" min="1" max="500">
+                        </div>
+                    </div>
+                </div>
+
                 <!-- معاينة -->
-                <div class="alert alert-info small" id="preview">
-                    <strong>معاينة:</strong>
-                    <span id="previewText"></span>
+                <div class="alert alert-info small">
+                    <strong>📋 معاينة (3 عينات):</strong>
+                    <div id="previewText" class="mt-2" style="font-family: monospace; font-size: 13px;"></div>
+                </div>
+
+                <!-- كلمة المرور -->
+                <div class="mb-3">
+                    <label class="form-label">طريقة كلمة المرور *</label>
+                    <div class="d-flex gap-3 flex-wrap">
+                        <div class="form-check">
+                            <input class="form-check-input" type="radio"
+                                   name="password_mode" value="random"
+                                   id="pm_random" checked>
+                            <label class="form-check-label fw-bold" for="pm_random">
+                                🎲 عشوائية
+                            </label>
+                        </div>
+                        <div class="form-check">
+                            <input class="form-check-input" type="radio"
+                                   name="password_mode" value="same_as_username"
+                                   id="pm_same">
+                            <label class="form-check-label" for="pm_same">
+                                نفس اسم المستخدم
+                            </label>
+                        </div>
+                        <div class="form-check">
+                            <input class="form-check-input" type="radio"
+                                   name="password_mode" value="fixed" id="pm_fixed">
+                            <label class="form-check-label" for="pm_fixed">
+                                ثابتة للجميع
+                            </label>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="mb-3" id="random_pass_div">
+                    <label class="form-label">طول كلمة المرور العشوائية</label>
+                    <input type="number" name="password_length" id="password_length"
+                           class="form-control" value="6" min="4" max="20">
+                    <small class="text-muted">يُنصح بـ 6-8 أحرف</small>
+                </div>
+
+                <div class="mb-3" id="fixed_password_div" style="display: none;">
+                    <label class="form-label">كلمة المرور الثابتة</label>
+                    <input type="text" name="fixed_password" class="form-control"
+                           placeholder="كلمة المرور للجميع">
                 </div>
 
                 <!-- الباقة -->
@@ -144,34 +186,6 @@
                     </select>
                 </div>
 
-                <!-- كلمة المرور -->
-                <div class="mb-3">
-                    <label class="form-label">طريقة كلمة المرور</label>
-                    <div class="d-flex gap-3 flex-wrap">
-                        <div class="form-check">
-                            <input class="form-check-input" type="radio"
-                                   name="password_mode" value="same_as_username"
-                                   id="pm_same" checked>
-                            <label class="form-check-label" for="pm_same">
-                                نفس اسم المستخدم
-                            </label>
-                        </div>
-                        <div class="form-check">
-                            <input class="form-check-input" type="radio"
-                                   name="password_mode" value="fixed" id="pm_fixed">
-                            <label class="form-check-label" for="pm_fixed">
-                                كلمة مرور ثابتة
-                            </label>
-                        </div>
-                    </div>
-                </div>
-
-                <div class="mb-3" id="fixed_password_div" style="display: none;">
-                    <label class="form-label">كلمة المرور الثابتة</label>
-                    <input type="text" name="fixed_password" class="form-control"
-                           placeholder="كلمة المرور لكل المستخدمين">
-                </div>
-
                 <!-- رفع للراوتر -->
                 <div class="form-check mb-4">
                     <input type="checkbox" name="push_to_router"
@@ -195,64 +209,26 @@
             <ul class="list-unstyled mb-0" style="line-height: 2;">
                 <li>🔢 <strong>الحد الأقصى:</strong> 500 مستخدم</li>
                 <li>⚡ <strong>السرعة:</strong> ~1 مستخدم/ثانية</li>
-                <li>💾 <strong>الحفظ:</strong> تلقائي في قاعدة البيانات</li>
+                <li>💾 <strong>الحفظ:</strong> تلقائي</li>
                 <li>📡 <strong>الراوتر:</strong> إنشاء تلقائي</li>
+            </ul>
+        </div>
+
+        <div class="alert alert-info small mt-3">
+            💡 <strong>ملاحظة:</strong>
+            <ul class="mb-0 mt-2">
+                <li>الأسماء العشوائية مثل: <code>a3b7k9</code></li>
+                <li>كلمات المرور العشوائية: <code>x2m5p8</code></li>
+                <li>يمكن حفظها لاحقًا عبر التصدير 📊</li>
             </ul>
         </div>
     </div>
 </div>
 
 <script>
-// ============ تبديل الحقول ============
-function updateFields() {
-    const mode = document.querySelector('input[name="char_mode"]:checked').value;
-    const numbersFields = document.getElementById('numbersFields');
-    const randomFields = document.getElementById('randomFields');
-
-    if (mode === 'numbers') {
-        numbersFields.style.display = 'block';
-        randomFields.style.display = 'none';
-        document.getElementById('start_num').setAttribute('required', '');
-        document.getElementById('number_length').setAttribute('required', '');
-        document.getElementById('random_length').removeAttribute('required');
-    } else {
-        numbersFields.style.display = 'none';
-        randomFields.style.display = 'block';
-        document.getElementById('start_num').removeAttribute('required');
-        document.getElementById('number_length').removeAttribute('required');
-        document.getElementById('random_length').setAttribute('required', '');
-    }
-    updatePreview();
-}
-
-// ============ المعاينة ============
-function updatePreview() {
-    const mode = document.querySelector('input[name="char_mode"]:checked').value;
-    const prefix = document.querySelector('input[name="prefix"]').value || '';
-    let sample = '';
-
-    if (mode === 'numbers') {
-        const start = parseInt(document.getElementById('start_num').value) || 1;
-        const len = parseInt(document.getElementById('number_length').value) || 4;
-        sample = prefix + String(start).padStart(len, '0') + ', '
-               + prefix + String(start + 1).padStart(len, '0') + ', '
-               + prefix + String(start + 2).padStart(len, '0') + '...';
-    } else {
-        const len = parseInt(document.getElementById('random_length').value) || 6;
-        if (mode === 'mixed') {
-            sample = prefix + randomString(len, 'mixed') + ', '
-                   + prefix + randomString(len, 'mixed') + ', ...';
-        } else {
-            sample = prefix + randomString(len, 'letters') + ', '
-                   + prefix + randomString(len, 'letters') + ', ...';
-        }
-    }
-    document.getElementById('previewText').textContent = sample;
-}
-
 function randomString(len, mode) {
-    const letters = 'abcdefghijklmnopqrstuvwxyz';
-    const numbers = '0123456789';
+    const letters = 'abcdefghijkmnpqrstuvwxyz';  // بدون l, o لتجنب الالتباس
+    const numbers = '23456789';                  // بدون 0, 1
     let chars = '';
     if (mode === 'letters') chars = letters;
     else if (mode === 'mixed') chars = letters + numbers;
@@ -263,19 +239,53 @@ function randomString(len, mode) {
     return out;
 }
 
-// ============ الأحداث ============
+function updateFields() {
+    const mode = document.querySelector('input[name="char_mode"]:checked').value;
+    document.getElementById('numbersFields').style.display =
+        (mode === 'numbers') ? 'block' : 'none';
+    document.getElementById('randomFields').style.display =
+        (mode === 'numbers') ? 'none' : 'block';
+    updatePreview();
+}
+
+function updatePreview() {
+    const mode = document.querySelector('input[name="char_mode"]:checked').value;
+    const prefix = document.querySelector('input[name="prefix"]').value || '';
+    const samples = [];
+
+    if (mode === 'numbers') {
+        const start = parseInt(document.getElementById('start_num').value) || 1;
+        const len = parseInt(document.getElementById('number_length').value) || 4;
+        for (let i = 0; i < 3; i++) {
+            samples.push(prefix + String(start + i).padStart(len, '0'));
+        }
+    } else {
+        const len = parseInt(document.getElementById('random_length').value) || 6;
+        for (let i = 0; i < 3; i++) {
+            samples.push(prefix + randomString(len, mode));
+        }
+    }
+    document.getElementById('previewText').textContent = samples.join('  |  ');
+}
+
+// تبديل نوع التوليد
 document.querySelectorAll('input[name="char_mode"]').forEach(el => {
     el.addEventListener('change', updateFields);
 });
+
+// تحديث المعاينة
 document.querySelectorAll('input[name="prefix"], input[name="start_num"], input[name="number_length"], input[name="random_length"]').forEach(el => {
     el.addEventListener('input', updatePreview);
 });
 
-// كلمة المرور الثابتة
+// كلمة المرور
 document.querySelectorAll('input[name="password_mode"]').forEach(el => {
     el.addEventListener('change', () => {
+        const mode = document.querySelector('input[name="password_mode"]:checked').value;
+        document.getElementById('random_pass_div').style.display =
+            (mode === 'random') ? 'block' : 'none';
         document.getElementById('fixed_password_div').style.display =
-            document.getElementById('pm_fixed').checked ? 'block' : 'none';
+            (mode === 'fixed') ? 'block' : 'none';
     });
 });
 
