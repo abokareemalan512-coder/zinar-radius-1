@@ -12,6 +12,14 @@
 <div class="row g-4">
     <div class="col-lg-8">
         <div class="card p-4">
+
+            <!-- تنبيه: يطبق على كل الراوترات -->
+            <div class="alert alert-info mb-4">
+                <i class="bi bi-info-circle"></i>
+                <strong>ملاحظة مهمة:</strong>
+                سيتم إنشاء كل مستخدم على <strong>جميع الراوترات النشطة</strong> تلقائيًا.
+            </div>
+
             <form method="POST" id="bulkForm">
 
                 <div class="mb-3">
@@ -142,26 +150,16 @@
                     </select>
                 </div>
 
-                <div class="mb-3">
-                    <label class="form-label">الراوتر *</label>
-                    <select name="router_id" class="form-select" required>
-                        <option value="">— اختر راوتر —</option>
-                        {% for r in routers %}
-                        <option value="{{ r.id }}">{{ r.name }} — {{ r.ip_address }}</option>
-                        {% endfor %}
-                    </select>
-                </div>
-
                 <div class="form-check mb-4">
                     <input type="checkbox" name="push_to_router"
                            class="form-check-input" id="push_r" checked>
                     <label class="form-check-label fw-bold" for="push_r">
-                        <i class="bi bi-cloud-upload"></i> رفع تلقائي إلى الراوتر
+                        <i class="bi bi-cloud-upload"></i> رفع تلقائي إلى جميع الراوترات
                     </label>
                 </div>
 
                 <button type="submit" class="btn btn-primary w-100 py-2 fw-bold"
-                        onclick="return confirm('إنشاء المستخدمين؟')">
+                        onclick="return confirm('إنشاء المستخدمين على كل الراوترات النشطة؟')">
                     <i class="bi bi-magic"></i> إنشاء المستخدمين
                 </button>
             </form>
@@ -170,12 +168,27 @@
 
     <div class="col-lg-4">
         <div class="card p-4">
+            <h5 class="text-accent mb-3">📡 الراوترات النشطة</h5>
+            {% if active_routers %}
+            <ul class="list-unstyled mb-0" style="line-height: 2;">
+                {% for r in active_routers %}
+                <li>✅ <strong>{{ r.name }}</strong> — <small class="text-muted">{{ r.ip_address }}</small></li>
+                {% endfor %}
+            </ul>
+            {% else %}
+            <div class="alert alert-warning mb-0">
+                ⚠️ لا يوجد راوترات نشطة! أضف راوتر أولًا.
+            </div>
+            {% endif %}
+        </div>
+
+        <div class="card p-4 mt-3">
             <h5 class="text-accent mb-3">📊 الإحصائيات</h5>
             <ul class="list-unstyled mb-0" style="line-height: 2;">
                 <li>🔢 <strong>الحد الأقصى:</strong> 500 مستخدم</li>
                 <li>⚡ <strong>السرعة:</strong> ~1 مستخدم/ثانية</li>
                 <li>💾 <strong>الحفظ:</strong> تلقائي</li>
-                <li>📡 <strong>الراوتر:</strong> إنشاء تلقائي</li>
+                <li>📡 <strong>الراوترات:</strong> {{ active_routers|length }}</li>
             </ul>
         </div>
     </div>
