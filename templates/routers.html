@@ -32,31 +32,23 @@
                     <td>{{ r.ip_address }}</td>
                     <td>{{ r.port }}</td>
                     <td>{{ r.username }}</td>
-
                     <td>
                         {% if r.is_active %}
-                            <span class="badge bg-success">
-                                <i class="bi bi-check-circle"></i> نشط
-                            </span>
+                            <span class="badge bg-success">✅ نشط</span>
                         {% else %}
-                            <span class="badge bg-secondary">
-                                <i class="bi bi-pause-circle"></i> متوقف
-                            </span>
+                            <span class="badge bg-secondary">⏸ متوقف</span>
                         {% endif %}
                     </td>
-
                     <td>
                         {% if r.is_master %}
                             <span class="badge bg-success">⭐ رئيسي</span>
                         {% else %}
                             <a href="{{ url_for('set_master_router', router_id=r.id) }}"
-                               class="btn btn-sm btn-outline-primary"
-                               title="تعيين كرئيسي">
+                               class="btn btn-sm btn-outline-primary">
                                 <i class="bi bi-star"></i>
                             </a>
                         {% endif %}
                     </td>
-
                     <td>
                         <div class="d-flex gap-1 flex-wrap">
                             <a href="{{ url_for('toggle_router', router_id=r.id) }}"
@@ -70,21 +62,28 @@
                             </a>
 
                             <a href="{{ url_for('test_router', router_id=r.id) }}"
-                               class="btn btn-sm btn-info"
-                               title="اختبار الاتصال">
+                               class="btn btn-sm btn-info" title="اختبار">
                                 <i class="bi bi-wifi"></i>
                             </a>
 
+                            <a href="{{ url_for('router_users', router_id=r.id, type='pppoe') }}"
+                               class="btn btn-sm btn-outline-info" title="مستخدمو الراوتر">
+                                <i class="bi bi-people"></i>
+                            </a>
+
+                            <a href="{{ url_for('import_rsc', router_id=r.id) }}"
+                               class="btn btn-sm btn-outline-warning" title="استيراد .rsc">
+                                <i class="bi bi-upload"></i>
+                            </a>
+
                             <button class="btn btn-sm btn-primary"
-                                    onclick='openEditModal({{ r.id }}, "{{ r.name|e }}", "{{ r.ip_address|e }}", "{{ r.username|e }}", {{ r.port }})'
-                                    title="تعديل">
+                                    onclick='openEditModal({{ r.id }}, "{{ r.name|e }}", "{{ r.ip_address|e }}", "{{ r.username|e }}", {{ r.port }})'>
                                 <i class="bi bi-pencil"></i>
                             </button>
 
                             <a href="{{ url_for('delete_router', router_id=r.id) }}"
                                class="btn btn-sm btn-danger"
-                               onclick="return confirm('تأكيد حذف الراوتر {{ r.name }}؟')"
-                               title="حذف">
+                               onclick="return confirm('تأكيد الحذف؟')">
                                 <i class="bi bi-trash"></i>
                             </a>
                         </div>
@@ -93,7 +92,7 @@
                 {% else %}
                 <tr>
                     <td colspan="8" class="text-center py-5 text-muted">
-                        📭 لا يوجد راوترات — أضف أول راوتر من الزر أعلاه
+                        📭 لا يوجد راوترات
                     </td>
                 </tr>
                 {% endfor %}
@@ -109,51 +108,40 @@
             <form method="POST" action="{{ url_for('routers') }}">
                 <div class="modal-header border-secondary">
                     <h5 class="modal-title text-accent">
-                        <i class="bi bi-plus-circle"></i> إضافة راوتر جديد
+                        <i class="bi bi-plus-circle"></i> إضافة راوتر
                     </h5>
                     <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
                 </div>
-
                 <div class="modal-body">
                     <div class="mb-3">
                         <label class="form-label">اسم الراوتر</label>
-                        <input type="text" name="name" class="form-control"
-                               placeholder="مثال: Router-Main" required>
+                        <input type="text" name="name" class="form-control" required>
                     </div>
-
                     <div class="mb-3">
                         <label class="form-label">عنوان IP</label>
                         <input type="text" name="ip_address" class="form-control"
                                placeholder="192.168.88.1" required>
                     </div>
-
                     <div class="row">
                         <div class="col-md-6 mb-3">
-                            <label class="form-label">اسم المستخدم</label>
-                            <input type="text" name="username" class="form-control"
-                                   placeholder="admin" required>
+                            <label class="form-label">المستخدم</label>
+                            <input type="text" name="username" class="form-control" required>
                         </div>
                         <div class="col-md-6 mb-3">
                             <label class="form-label">كلمة المرور</label>
                             <input type="password" name="password" class="form-control" required>
                         </div>
                     </div>
-
                     <div class="mb-3">
                         <label class="form-label">منفذ SSH</label>
                         <input type="number" name="port" class="form-control"
                                value="22" min="1" max="65535">
-                        <small class="text-muted">الافتراضي: 22 (SSH)</small>
                     </div>
-
                     <div class="form-check">
                         <input type="checkbox" name="is_master" class="form-check-input" id="isMaster">
-                        <label class="form-check-label" for="isMaster">
-                            ⭐ تعيين كراوتر رئيسي
-                        </label>
+                        <label class="form-check-label" for="isMaster">⭐ رئيسي</label>
                     </div>
                 </div>
-
                 <div class="modal-footer border-secondary">
                     <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">إلغاء</button>
                     <button type="submit" class="btn btn-primary">
@@ -176,41 +164,36 @@
                     </h5>
                     <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
                 </div>
-
                 <div class="modal-body">
                     <div class="mb-3">
-                        <label class="form-label">اسم الراوتر</label>
+                        <label class="form-label">الاسم</label>
                         <input type="text" name="name" id="edit_name" class="form-control" required>
                     </div>
-
                     <div class="mb-3">
-                        <label class="form-label">عنوان IP</label>
+                        <label class="form-label">IP</label>
                         <input type="text" name="ip_address" id="edit_ip" class="form-control" required>
                     </div>
-
                     <div class="row">
                         <div class="col-md-6 mb-3">
-                            <label class="form-label">اسم المستخدم</label>
+                            <label class="form-label">المستخدم</label>
                             <input type="text" name="username" id="edit_username" class="form-control" required>
                         </div>
                         <div class="col-md-6 mb-3">
                             <label class="form-label">كلمة المرور</label>
                             <input type="password" name="password" id="edit_password"
-                                   class="form-control" placeholder="اتركها فارغة للإبقاء">
+                                   class="form-control" placeholder="اتركها فارغة">
                         </div>
                     </div>
-
                     <div class="mb-3">
-                        <label class="form-label">منفذ SSH</label>
+                        <label class="form-label">المنفذ</label>
                         <input type="number" name="port" id="edit_port" class="form-control"
                                min="1" max="65535">
                     </div>
                 </div>
-
                 <div class="modal-footer border-secondary">
                     <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">إلغاء</button>
                     <button type="submit" class="btn btn-primary">
-                        <i class="bi bi-save"></i> حفظ التعديلات
+                        <i class="bi bi-save"></i> حفظ
                     </button>
                 </div>
             </form>
@@ -226,9 +209,7 @@ function openEditModal(id, name, ip, username, port) {
     document.getElementById('edit_username').value = username;
     document.getElementById('edit_port').value = port;
     document.getElementById('edit_password').value = '';
-
-    const modal = new bootstrap.Modal(document.getElementById('editRouterModal'));
-    modal.show();
+    new bootstrap.Modal(document.getElementById('editRouterModal')).show();
 }
 </script>
 {% endblock %}
