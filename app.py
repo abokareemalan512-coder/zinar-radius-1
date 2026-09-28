@@ -82,7 +82,8 @@ class Subscriber(db.Model):
     router_id = db.Column(db.Integer, db.ForeignKey('routers.id'))
     status = db.Column(db.String(20), default='active')
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
-    expires_at = db.Column(db.DateTime)
+    expires_at = db.Column(db.DateTime)  # None = في انتظار أول اتصال
+    first_used_at = db.Column(db.DateTime)  # ✅ جديد: تاريخ أول اتصال
 
 
 class Payment(db.Model):
@@ -175,6 +176,9 @@ def ensure_columns():
                     if 'user_type' not in cols:
                         conn.execute(text("ALTER TABLE subscribers ADD COLUMN user_type VARCHAR(20) DEFAULT 'pppoe'"))
                         logger.info("✅ subscribers.user_type")
+                    if 'first_used_at' not in cols:
+                        conn.execute(text("ALTER TABLE subscribers ADD COLUMN first_used_at TIMESTAMP"))
+                        logger.info("✅ subscribers.first_used_at")
 
                 if 'packages' in existing_tables:
                     cols = [c['name'] for c in inspector.get_columns('packages')]
@@ -217,6 +221,81 @@ def _day_bounds(day=None):
     start = day.replace(hour=0, minute=0, second=0, microsecond=0)
     end = start + timedelta(days=1)
     return start, end
+
+
+# ============ ✅ فحص أول اتصال ============
+
+def check_first_connections():
+    """
+    فحص الاتصالات النشطة على كل الراوترات.
+    إذا وُجد مشترك بدون تاريخ انتهاء (لم يستخدم بعد) وظهر في الاتصالات النشطة:
+        → تاريخ الانتهاء = الآن + مدة الباقة
+    """
+    try:
+        # عدد المشتركين بانتظار التفعيل
+        pending_count = Subscriber.query.filter(
+            Subscriber.expires_at.is_(None),
+            Subscriber.router_id.isnot(None),
+            Subscriber.status == 'active'
+        ).count()
+
+        if pending_count == 0:
+            return 0
+
+        routers = Router.query.filter_by(is_active=True).all()
+        activated = 0
+        now = datetime.utcnow()
+
+        for router in routers:
+            try:
+                api = get_router_api(router)
+
+                # جلب أسماء المستخدمين المتصلين حاليًا
+                active_names = set()
+                try:
+                    for u in api.pppoe_active():
+                        n = u.get('name') or u.get('user')
+                        if n:
+                            active_names.add(n)
+                except Exception:
+                    pass
+                try:
+                    for u in api.hotspot_active():
+                        n = u.get('name') or u.get('user')
+                        if n:
+                            active_names.add(n)
+                except Exception:
+                    pass
+
+                if not active_names:
+                    continue
+
+                # المشتركون بانتظار التفعيل على هذا الراوتر
+                pending_subs = Subscriber.query.filter(
+                    Subscriber.router_id == router.id,
+                    Subscriber.expires_at.is_(None),
+                    Subscriber.status == 'active',
+                    Subscriber.username.in_(active_names)
+                ).all()
+
+                for sub in pending_subs:
+                    pkg = Package.query.filter_by(name=sub.package).first() if sub.package else None
+                    if pkg and pkg.duration:
+                        sub.first_used_at = now
+                        sub.expires_at = calculate_expiry(pkg, now)
+                        activated += 1
+                        logger.info(f"✅ تفعيل اشتراك {sub.username} — ينتهي {sub.expires_at}")
+
+            except Exception as e:
+                logger.warning(f"⚠️ فشل فحص {router.name}: {e}")
+
+        if activated > 0:
+            db.session.commit()
+
+        return activated
+    except Exception as e:
+        logger.warning(f"⚠️ check_first_connections: {e}")
+        return 0
 
 
 # ============ حماية المسارات ============
@@ -275,6 +354,12 @@ def logout():
 @app.route('/dashboard')
 def dashboard():
     try:
+        # ✅ فحص أول اتصال
+        try:
+            check_first_connections()
+        except Exception:
+            pass
+
         routers_list = Router.query.all()
         routers_count = len(routers_list)
         routers_online = sum(1 for r in routers_list if r.is_active and test_mikrotik_connection(r))
@@ -674,11 +759,18 @@ def import_rsc(router_id):
 
 @app.route('/subscribers')
 def subscribers():
+    # ✅ فحص أول اتصال
+    try:
+        check_first_connections()
+    except Exception:
+        pass
+
     search = request.args.get('q', '').strip()
     filter_type = request.args.get('type', '').strip()
     now = datetime.utcnow()
 
     try:
+        # تحديث الحالات المنتهية
         expired = Subscriber.query.filter(
             Subscriber.expires_at.isnot(None),
             Subscriber.expires_at < now,
@@ -715,7 +807,7 @@ def subscribers():
     )
 
 
-# ============ إضافة مشترك (يعمل على كل الراوترات النشطة) ============
+# ============ إضافة مشترك (بدون تاريخ — يبدأ من أول اتصال) ============
 
 @app.route('/add-subscriber', methods=['GET', 'POST'])
 @app.route('/subscribers/add', methods=['GET', 'POST'])
@@ -738,21 +830,18 @@ def add_subscriber():
             flash(f'❌ "{username}" موجود مسبقًا', 'danger')
             return redirect(url_for('add_subscriber'))
 
-        # ✅ جلب كل الراوترات النشطة
         active_routers = Router.query.filter_by(is_active=True).all()
         if not active_routers:
-            flash('❌ لا يوجد راوترات نشطة! أضف راوتر أولًا', 'danger')
+            flash('❌ لا يوجد راوترات نشطة!', 'danger')
             return redirect(url_for('add_subscriber'))
 
         try:
-            expires_at = None
-            pkg = None
-            if package_name:
-                pkg = Package.query.filter_by(name=package_name).first()
-                if pkg:
-                    expires_at = calculate_expiry(pkg)
+            pkg = Package.query.filter_by(name=package_name).first() if package_name else None
 
-            # ✅ الاتصال بكل راوتر
+            # ✅ لا نحسب تاريخ الانتهاء الآن — يبدأ من أول اتصال
+            expires_at = None
+
+            # الاتصال بكل راوتر
             apis = {}
             for router in active_routers:
                 try:
@@ -760,7 +849,6 @@ def add_subscriber():
                 except Exception as e:
                     logger.warning(f"⚠️ فشل الاتصال بـ {router.name}: {e}")
 
-            # ✅ إنشاء المستخدم على كل راوتر
             push_ok = push_fail = 0
             errors = []
 
@@ -776,7 +864,7 @@ def add_subscriber():
                         push_fail += 1
                         errors.append(f"{router.name}: {str(e)[:40]}")
 
-            # ✅ حفظ سجل لكل (مستخدم × راوتر)
+            # حفظ سجل لكل راوتر
             for router in active_routers:
                 sub = Subscriber(
                     name=name or username,
@@ -785,7 +873,7 @@ def add_subscriber():
                     package=package_name,
                     user_type=user_type,
                     router_id=router.id,
-                    expires_at=expires_at,
+                    expires_at=None,
                     status='active'
                 )
                 db.session.add(sub)
@@ -793,10 +881,9 @@ def add_subscriber():
             db.session.commit()
 
             msg = f'✅ تم إضافة "{username}" على {len(active_routers)} راوتر'
+            msg += ' — ⏳ يبدأ من أول اتصال'
             if push_fail:
                 msg += f' — فشل {push_fail}'
-            if expires_at:
-                msg += f' — ينتهي {expires_at.strftime("%Y-%m-%d")}'
 
             flash(msg, 'success' if push_fail == 0 else 'warning')
             for err in errors[:5]:
@@ -808,7 +895,6 @@ def add_subscriber():
             logger.error(f"❌ add_subscriber: {e}")
             flash(f'❌ {str(e)}', 'danger')
 
-    # GET
     packages_list = Package.query.order_by(Package.name).all()
     active_routers = Router.query.filter_by(is_active=True).all()
     return render_template(
@@ -818,7 +904,7 @@ def add_subscriber():
     )
 
 
-# ============ إضافة جماعية (تعمل على كل الراوترات النشطة) ============
+# ============ إضافة جماعية ============
 
 @app.route('/subscribers/bulk-add', methods=['GET', 'POST'])
 def bulk_add():
@@ -866,11 +952,10 @@ def bulk_add():
 
         active_routers = Router.query.filter_by(is_active=True).all()
         if not active_routers:
-            flash('❌ لا يوجد راوترات نشطة! أضف راوتر أولًا', 'danger')
+            flash('❌ لا يوجد راوترات نشطة!', 'danger')
             return redirect(url_for('bulk_add'))
 
         pkg = Package.query.filter_by(name=package_name).first() if package_name else None
-        expires_at = calculate_expiry(pkg) if pkg else None
 
         apis = {}
         if push_to_router:
@@ -884,6 +969,7 @@ def bulk_add():
         NUMS = '23456789'
         MIXED = LETTERS + NUMS
 
+        # توليد الأسماء
         usernames = []
         if char_mode == 'numbers':
             for _ in range(count):
@@ -902,12 +988,13 @@ def bulk_add():
         errors = []
 
         for username in usernames:
+            # ✅ كلمة المرور — حصراً أرقام
             if password_mode == 'same_as_username':
                 password = username
             elif password_mode == 'fixed':
                 password = fixed_password
             elif password_mode == 'random':
-                password = ''.join(random.choices(MIXED, k=password_length))
+                password = ''.join(random.choices(NUMS, k=password_length))
             else:
                 password = username
 
@@ -933,7 +1020,8 @@ def bulk_add():
                         name=username, username=username, password=password,
                         package=package_name, user_type=user_type,
                         router_id=router.id,
-                        expires_at=expires_at, status='active'
+                        expires_at=None,  # ✅ يبدأ من أول اتصال
+                        status='active'
                     )
                     db.session.add(sub)
                     created += 1
@@ -944,6 +1032,7 @@ def bulk_add():
         db.session.commit()
 
         msg = f'✅ تم إنشاء {created} سجل على {len(active_routers)} راوتر'
+        msg += ' — ⏳ يبدأ من أول اتصال'
         if failed:
             msg += f' — فشل {failed}'
         if push_to_router:
@@ -1020,12 +1109,9 @@ def reset_subscriber(sub_id):
             flash('⚠️ بلا باقة', 'danger')
             return redirect(url_for('subscribers'))
 
-        pkg = Package.query.filter_by(name=sub.package).first()
-        if not pkg:
-            flash('⚠️ الباقة غير موجودة', 'danger')
-            return redirect(url_for('subscribers'))
-
-        sub.expires_at = calculate_expiry(pkg)
+        # ✅ تصفير: إعادة البدء من أول اتصال
+        sub.expires_at = None
+        sub.first_used_at = None
         sub.status = 'active'
         router_msg = ''
         ut = sub.user_type or 'pppoe'
@@ -1042,7 +1128,7 @@ def reset_subscriber(sub_id):
                     router_msg = f' (راوتر: {str(e)[:30]})'
 
         db.session.commit()
-        flash(f'🔄 تم التصفير{router_msg} — ينتهي {sub.expires_at.strftime("%Y-%m-%d")}', 'success')
+        flash(f'🔄 تم التصفير{router_msg} — ⏳ يبدأ من أول اتصال جديد', 'success')
     except Exception as e:
         db.session.rollback()
         flash(f'❌ {str(e)}', 'danger')
@@ -1089,9 +1175,9 @@ def update_subscriber(sub_id):
         package_name = request.form.get('package', '').strip()
         if package_name and package_name != sub.package:
             sub.package = package_name
-            pkg = Package.query.filter_by(name=package_name).first()
-            if pkg:
-                sub.expires_at = calculate_expiry(pkg)
+            # ✅ إعادة التعيين لأول اتصال
+            sub.expires_at = None
+            sub.first_used_at = None
 
         router_id = request.form.get('router_id', '').strip()
         sub.router_id = int(router_id) if router_id else None
@@ -1186,7 +1272,7 @@ def export_subscribers(format):
             writer.writerow([
                 i, s.name or '', s.username, s.password,
                 s.package or '', s.user_type or 'pppoe', s.status,
-                s.expires_at.strftime('%Y-%m-%d') if s.expires_at else ''
+                s.expires_at.strftime('%Y-%m-%d') if s.expires_at else '⏳ في انتظار'
             ])
         output.seek(0)
         return send_file(
@@ -1213,6 +1299,8 @@ def export_subscribers(format):
             lines.append(f'   Status  : {s.status}')
             if s.expires_at:
                 lines.append(f'   Expires : {s.expires_at.strftime("%Y-%m-%d")}')
+            else:
+                lines.append(f'   Expires : ⏳ في انتظار أول اتصال')
             lines.append('-' * 60)
 
         content = '\n'.join(lines)
