@@ -2,6 +2,7 @@
 import os
 import logging
 import traceback
+import calendar
 from datetime import datetime, timedelta
 from functools import wraps
 
@@ -34,7 +35,6 @@ else:
 app.config['SQLALCHEMY_DATABASE_URI'] = database_url
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 
-# ✅ تشخيص: عرض أي قاعدة بيانات نتصل بها
 _masked_url = database_url.split('@')[-1] if '@' in database_url else database_url
 logger.info(f"📊 قاعدة البيانات: ...@{_masked_url}")
 
@@ -92,8 +92,32 @@ class Package(db.Model):
     name = db.Column(db.String(100), nullable=False, unique=True)
     speed = db.Column(db.String(50))
     price = db.Column(db.Float, default=0)
-    duration = db.Column(db.Integer, default=30)
+    duration = db.Column(db.Integer, default=30)               # الرقم
+    duration_unit = db.Column(db.String(10), default='days')    # 'days' أو 'months'
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+
+# ============ دوال مساعدة ============
+
+def add_months(source_date, months):
+    """إضافة أشهر بشكل صحيح — يحترم عدد أيام كل شهر"""
+    month = source_date.month - 1 + months
+    year = source_date.year + month // 12
+    month = month % 12 + 1
+    last_day = calendar.monthrange(year, month)[1]
+    day = min(source_date.day, last_day)
+    return source_date.replace(year=year, month=month, day=day)
+
+
+def calculate_expiry(pkg, start_date=None):
+    """حساب تاريخ الانتهاء حسب نوع المدة (أيام أو أشهر)"""
+    if start_date is None:
+        start_date = datetime.utcnow()
+    if not pkg or not pkg.duration:
+        return None
+    if pkg.duration_unit == 'months':
+        return add_months(start_date, pkg.duration)
+    return start_date + timedelta(days=pkg.duration)
 
 
 # ============ تهيئة قاعدة البيانات ============
@@ -124,6 +148,7 @@ def ensure_columns():
             existing_tables = inspector.get_table_names()
 
             with db.engine.connect() as conn:
+                # routers.is_active
                 if 'routers' in existing_tables:
                     cols = [c['name'] for c in inspector.get_columns('routers')]
                     if 'is_active' not in cols:
@@ -132,6 +157,7 @@ def ensure_columns():
                         ))
                         logger.info("✅ تم إضافة routers.is_active")
 
+                # subscribers.name
                 if 'subscribers' in existing_tables:
                     cols = [c['name'] for c in inspector.get_columns('subscribers')]
                     if 'name' not in cols:
@@ -139,6 +165,15 @@ def ensure_columns():
                             "ALTER TABLE subscribers ADD COLUMN name VARCHAR(100)"
                         ))
                         logger.info("✅ تم إضافة subscribers.name")
+
+                # packages.duration_unit
+                if 'packages' in existing_tables:
+                    cols = [c['name'] for c in inspector.get_columns('packages')]
+                    if 'duration_unit' not in cols:
+                        conn.execute(text(
+                            "ALTER TABLE packages ADD COLUMN duration_unit VARCHAR(10) DEFAULT 'days'"
+                        ))
+                        logger.info("✅ تم إضافة packages.duration_unit")
 
                 conn.commit()
             logger.info("✅ فحص الأعمدة اكتمل")
@@ -149,8 +184,6 @@ def ensure_columns():
 init_database()
 ensure_columns()
 
-
-# ============ دوال مساعدة ============
 
 def test_mikrotik_connection(router):
     try:
@@ -301,7 +334,6 @@ def dashboard():
 
 @app.route('/admin/change-credentials', methods=['POST'])
 def change_admin_credentials():
-    """تغيير اسم المستخدم وكلمة المرور للمدير."""
     admin_id = session.get('admin_id')
     if not admin_id:
         flash('❌ غير مصرح', 'danger')
@@ -318,7 +350,6 @@ def change_admin_credentials():
         new_password = request.form.get('new_password', '').strip()
         confirm_password = request.form.get('confirm_password', '').strip()
 
-        # التحقق من كلمة المرور الحالية (إلزامي)
         if not current_password:
             flash('❌ يجب إدخال كلمة المرور الحالية', 'danger')
             return redirect(url_for('dashboard'))
@@ -327,7 +358,6 @@ def change_admin_credentials():
             flash('❌ كلمة المرور الحالية غير صحيحة', 'danger')
             return redirect(url_for('dashboard'))
 
-        # تغيير اسم المستخدم
         if new_username and new_username != admin.username:
             existing = AdminUser.query.filter(
                 AdminUser.username == new_username,
@@ -339,7 +369,6 @@ def change_admin_credentials():
             admin.username = new_username
             session['admin_name'] = new_username
 
-        # تغيير كلمة المرور
         if new_password:
             if new_password != confirm_password:
                 flash('❌ كلمتا المرور الجديدتان غير متطابقتين', 'danger')
@@ -585,8 +614,8 @@ def add_subscriber():
             expires_at = None
             if package_name:
                 pkg = Package.query.filter_by(name=package_name).first()
-                if pkg and pkg.duration:
-                    expires_at = datetime.utcnow() + timedelta(days=pkg.duration)
+                if pkg:
+                    expires_at = calculate_expiry(pkg)
 
             sub = Subscriber(
                 name=name or username,
@@ -648,11 +677,11 @@ def reset_subscriber(sub_id):
             return redirect(url_for('subscribers'))
 
         pkg = Package.query.filter_by(name=sub.package).first()
-        if not pkg or not pkg.duration:
-            flash(f'⚠️ لا يمكن التصفير — الباقة "{sub.package}" بلا مدة', 'danger')
+        if not pkg:
+            flash(f'⚠️ لا يمكن التصفير — الباقة "{sub.package}" غير موجودة', 'danger')
             return redirect(url_for('subscribers'))
 
-        sub.expires_at = datetime.utcnow() + timedelta(days=pkg.duration)
+        sub.expires_at = calculate_expiry(pkg)
         sub.status = 'active'
         db.session.commit()
 
@@ -668,12 +697,19 @@ def extend_subscriber(sub_id):
     try:
         sub = Subscriber.query.get_or_404(sub_id)
 
-        base = sub.expires_at if sub.expires_at and sub.expires_at > datetime.utcnow() else datetime.utcnow()
-        sub.expires_at = base + timedelta(days=30)
+        # التمديد حسب نوع الباقة
+        pkg = Package.query.filter_by(name=sub.package).first() if sub.package else None
+        if pkg:
+            base = sub.expires_at if sub.expires_at and sub.expires_at > datetime.utcnow() else datetime.utcnow()
+            sub.expires_at = calculate_expiry(pkg, base)
+        else:
+            base = sub.expires_at if sub.expires_at and sub.expires_at > datetime.utcnow() else datetime.utcnow()
+            sub.expires_at = base + timedelta(days=30)
+
         sub.status = 'active'
         db.session.commit()
 
-        flash(f'➕ تم تمديد "{sub.username}" 30 يومًا — ينتهي في {sub.expires_at.strftime("%Y-%m-%d")}', 'success')
+        flash(f'➕ تم تمديد "{sub.username}" — ينتهي في {sub.expires_at.strftime("%Y-%m-%d")}', 'success')
     except Exception as e:
         db.session.rollback()
         flash(f'❌ خطأ: {str(e)}', 'danger')
@@ -696,8 +732,8 @@ def update_subscriber(sub_id):
         if package_name and package_name != sub.package:
             sub.package = package_name
             pkg = Package.query.filter_by(name=package_name).first()
-            if pkg and pkg.duration:
-                sub.expires_at = datetime.utcnow() + timedelta(days=pkg.duration)
+            if pkg:
+                sub.expires_at = calculate_expiry(pkg)
 
         router_id = request.form.get('router_id', '').strip()
         sub.router_id = int(router_id) if router_id else None
@@ -740,7 +776,11 @@ def add_package():
     name = request.form.get('name', '').strip()
     speed = request.form.get('speed', '').strip()
     price = request.form.get('price', '0').strip()
-    duration = request.form.get('duration', '30').strip()
+    duration = request.form.get('duration', '1').strip()
+    duration_unit = request.form.get('duration_unit', 'days').strip()
+
+    if duration_unit not in ('days', 'months'):
+        duration_unit = 'days'
 
     if not name:
         flash('❌ اسم الباقة مطلوب', 'danger')
@@ -755,11 +795,13 @@ def add_package():
             name=name,
             speed=speed,
             price=float(price or 0),
-            duration=int(duration or 30),
+            duration=int(duration or 1),
+            duration_unit=duration_unit,
         )
         db.session.add(pkg)
         db.session.commit()
-        flash(f'✅ تم إضافة باقة "{name}"', 'success')
+        unit = 'شهر' if duration_unit == 'months' else 'يوم'
+        flash(f'✅ تم إضافة باقة "{name}" — {duration} {unit}', 'success')
     except Exception as e:
         db.session.rollback()
         flash(f'❌ خطأ: {str(e)}', 'danger')
@@ -775,7 +817,11 @@ def update_package(pkg_id):
         name = request.form.get('name', '').strip()
         speed = request.form.get('speed', '').strip()
         price = request.form.get('price', '0').strip()
-        duration = request.form.get('duration', '30').strip()
+        duration = request.form.get('duration', '1').strip()
+        duration_unit = request.form.get('duration_unit', 'days').strip()
+
+        if duration_unit not in ('days', 'months'):
+            duration_unit = 'days'
 
         if not name:
             flash('❌ اسم الباقة مطلوب', 'danger')
@@ -792,7 +838,8 @@ def update_package(pkg_id):
         pkg.name = name
         pkg.speed = speed
         pkg.price = float(price or 0)
-        pkg.duration = int(duration or 30)
+        pkg.duration = int(duration or 1)
+        pkg.duration_unit = duration_unit
 
         db.session.commit()
         flash(f'✅ تم تحديث باقة "{name}"', 'success')
