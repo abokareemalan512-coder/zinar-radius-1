@@ -1,0 +1,84 @@
+{% extends "base.html" %}
+{% block title %}استيراد من Mikrotik{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h2>📥 استيراد مستخدمين من Mikrotik</h2>
+    <a href="{{ url_for('routers') }}" class="btn btn-secondary">
+        <i class="bi bi-arrow-right"></i> رجوع
+    </a>
+</div>
+
+<div class="row g-4">
+    <div class="col-lg-8">
+        <div class="card p-4">
+            <h5 class="text-accent mb-3">
+                <i class="bi bi-router"></i> الراوتر: {{ router.name }}
+            </h5>
+
+            <form method="POST" enctype="multipart/form-data">
+
+                <div class="mb-3">
+                    <label class="form-label">
+                        <i class="bi bi-file-earmark-code text-accent"></i>
+                        ملف Mikrotik (.rsc) *
+                    </label>
+                    <input type="file" name="rsc_file" class="form-control"
+                           accept=".rsc,.txt" required>
+                    <small class="text-muted">
+                        ارفع ملف backup من Mikrotik (يحتوي على /ppp secret أو /ip hotspot user)
+                    </small>
+                </div>
+
+                <div class="form-check mb-4">
+                    <input type="checkbox" name="push_to_router"
+                           class="form-check-input" id="push_r">
+                    <label class="form-check-label fw-bold" for="push_r">
+                        <i class="bi bi-cloud-upload"></i>
+                        أيضًا ارفع المستخدمين إلى الراوتر
+                    </label>
+                    <br>
+                    <small class="text-muted">
+                        ⚠️ لا تحددها إذا كانت المستخدمين موجودين أصلًا على الراوتر
+                    </small>
+                </div>
+
+                <button type="submit" class="btn btn-primary w-100 py-2 fw-bold"
+                        onclick="return confirm('بدء الاستيراد؟')">
+                    <i class="bi bi-upload"></i> استيراد الآن
+                </button>
+            </form>
+        </div>
+
+        <div class="card mt-4 p-4">
+            <h6 class="text-accent mb-3">📖 كيف أحصل على ملف .rsc؟</h6>
+            <ol style="line-height: 2;">
+                <li>افتح <strong>WinBox</strong> واتصل بالراوتر</li>
+                <li>اذهب إلى <code>Files</code></li>
+                <li>اضغط <strong>Backup</strong> → احفظ الملف</li>
+                <li>أو من <code>New Terminal</code> نفّذ:
+                    <br>
+                    <code class="d-block mt-2" style="background: var(--bg-hover); padding: 8px;">
+                        /ppp secret export file=users
+                    </code>
+                </li>
+                <li>سيُنشأ ملف <code>users.rsc</code> في Files</li>
+                <li>حمّله إلى جهازك وارفعه هنا</li>
+            </ol>
+        </div>
+    </div>
+
+    <div class="col-lg-4">
+        <div class="card p-4">
+            <h5 class="text-accent mb-3">✨ المميزات</h5>
+            <ul class="list-unstyled mb-0" style="line-height: 2;">
+                <li>✅ اكتشاف تلقائي (PPPoE + Hotspot)</li>
+                <li>✅ قراءة الاسم/كلمة المرور/الباقة</li>
+                <li>✅ تجاهل المكرر</li>
+                <li>✅ خيار رفع للراوتر</li>
+                <li>✅ حد أقصى: 5 MB</li>
+            </ul>
+        </div>
+    </div>
+</div>
+{% endblock %}
