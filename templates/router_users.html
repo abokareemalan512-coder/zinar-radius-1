@@ -2,13 +2,16 @@
 {% block title %}مستخدمو الراوتر{% endblock %}
 
 {% block content %}
-<div class="d-flex justify-content-between align-items-center mb-4">
-    <h2>👥 مستخدمو الراوتر: <span class="text-accent">{{ router.name }}</span></h2>
+<div class="d-flex justify-content-between align-items-center mb-4 flex-wrap gap-2">
+    <h2>👥 مستخدمو: <span class="text-accent">{{ router.name }}</span></h2>
     <div class="d-flex gap-2">
-        <a href="{{ url_for('sync_router', router_id=router.id) }}"
+        <a href="{{ url_for('sync_router', router_id=router.id, type=user_type) }}"
            class="btn btn-warning"
-           onclick="return confirm('مزامنة المشتركين من الموقع إلى الراوتر؟')">
+           onclick="return confirm('مزامنة المشتركين إلى الراوتر؟')">
             <i class="bi bi-arrow-repeat"></i> مزامنة
+        </a>
+        <a href="{{ url_for('import_rsc', router_id=router.id) }}" class="btn btn-info">
+            <i class="bi bi-upload"></i> استيراد .rsc
         </a>
         <a href="{{ url_for('routers') }}" class="btn btn-secondary">
             <i class="bi bi-arrow-right"></i> رجوع
@@ -16,24 +19,27 @@
     </div>
 </div>
 
+<!-- اختيار النوع -->
+<div class="card mb-4 p-3">
+    <div class="btn-group w-100" role="group">
+        <a href="{{ url_for('router_users', router_id=router.id, type='pppoe') }}"
+           class="btn {% if user_type == 'pppoe' %}btn-primary{% else %}btn-secondary{% endif %}">
+            🌐 برودباند (PPPoE)
+        </a>
+        <a href="{{ url_for('router_users', router_id=router.id, type='hotspot') }}"
+           class="btn {% if user_type == 'hotspot' %}btn-primary{% else %}btn-secondary{% endif %}">
+            📶 هوت سبوت (Hotspot)
+        </a>
+    </div>
+</div>
+
 {% if error %}
 <div class="alert alert-danger">
-    ❌ <strong>فشل الاتصال بالراوتر:</strong>
+    ❌ <strong>فشل الاتصال:</strong>
     <code class="d-block mt-2">{{ error }}</code>
-    <hr>
-    <small>
-        💡 <strong>تحقق من:</strong>
-        <ul class="mb-0 mt-1">
-            <li>الراوتر مفتوح على الإنترنت (IP عام)</li>
-            <li>المنفذ <strong>22</strong> مفتوح في جدار الحماية</li>
-            <li>اسم المستخدم وكلمة المرور صحيحة</li>
-            <li>خدمة SSH مفعّلة على الراوتر</li>
-        </ul>
-    </small>
 </div>
 {% else %}
 
-<!-- الإحصائيات -->
 <div class="row g-3 mb-4">
     <div class="col-md-3">
         <div class="card p-3 text-center">
@@ -46,30 +52,29 @@
         <div class="card p-3 text-center">
             <div class="fs-2 text-accent">🟢</div>
             <h4 class="mb-0">{{ actives|length }}</h4>
-            <small class="text-muted">اتصالات نشطة</small>
+            <small class="text-muted">نشطون</small>
         </div>
     </div>
     <div class="col-md-3">
         <div class="card p-3 text-center">
             <div class="fs-2 text-accent">📦</div>
             <h4 class="mb-0">{{ profiles|length }}</h4>
-            <small class="text-muted">الباقات (Profiles)</small>
+            <small class="text-muted">الباقات</small>
         </div>
     </div>
     <div class="col-md-3">
         <div class="card p-3 text-center">
             <div class="fs-2 text-accent">🌐</div>
-            <h4 class="mb-0" style="font-size: 16px;">{{ router.ip_address }}</h4>
-            <small class="text-muted">عنوان الراوتر</small>
+            <h4 class="mb-0" style="font-size: 14px;">{{ router.ip_address }}</h4>
+            <small class="text-muted">IP</small>
         </div>
     </div>
 </div>
 
-<!-- الاتصالات النشطة -->
 {% if actives %}
 <div class="card mb-4">
     <div class="card-header">
-        <h5 class="mb-0 text-accent">🟢 الاتصالات النشطة ({{ actives|length }})</h5>
+        <h5 class="mb-0 text-accent">🟢 الاتصالات النشطة</h5>
     </div>
     <div class="table-responsive">
         <table class="table table-hover mb-0">
@@ -86,11 +91,9 @@
                 {% for a in actives %}
                 <tr>
                     <td>{{ loop.index }}</td>
-                    <td class="text-accent fw-bold">{{ a.name or '-' }}</td>
+                    <td class="text-accent">{{ a.name or a.user or '-' }}</td>
                     <td>{{ a.address or '-' }}</td>
-                    <td>
-                        <span class="badge bg-info">{{ a.service or '-' }}</span>
-                    </td>
+                    <td>{{ a.service or '-' }}</td>
                     <td>{{ a.uptime or '-' }}</td>
                 </tr>
                 {% endfor %}
@@ -100,7 +103,6 @@
 </div>
 {% endif %}
 
-<!-- كل المستخدمين -->
 <div class="card">
     <div class="card-header">
         <h5 class="mb-0 text-accent">👥 كل المستخدمين ({{ users|length }})</h5>
@@ -121,9 +123,7 @@
                 <tr>
                     <td>{{ loop.index }}</td>
                     <td class="text-accent fw-bold">{{ u.name or '-' }}</td>
-                    <td>
-                        <span class="badge bg-primary">{{ u.profile or '-' }}</span>
-                    </td>
+                    <td><span class="badge bg-primary">{{ u.profile or '-' }}</span></td>
                     <td>{{ u.service or '-' }}</td>
                     <td>
                         {% if u.disabled == 'true' %}
@@ -136,7 +136,7 @@
                 {% else %}
                 <tr>
                     <td colspan="5" class="text-center py-5 text-muted">
-                        📭 لا يوجد مستخدمون على الراوتر
+                        📭 لا يوجد مستخدمون
                     </td>
                 </tr>
                 {% endfor %}
@@ -145,21 +145,17 @@
     </div>
 </div>
 
-<!-- الباقات (Profiles) -->
 {% if profiles %}
 <div class="card mt-4">
     <div class="card-header">
-        <h5 class="mb-0 text-accent">📦 الباقات المتاحة ({{ profiles|length }})</h5>
+        <h5 class="mb-0 text-accent">📦 الباقات المتاحة</h5>
     </div>
     <div class="card-body">
         {% for p in profiles %}
-        <span class="badge bg-primary me-2 mb-2" style="font-size: 14px; padding: 8px 14px;">
+        <span class="badge bg-primary me-2 mb-2" style="padding: 8px 14px;">
             {{ p }}
         </span>
         {% endfor %}
-    </div>
-    <div class="card-footer small text-muted">
-        💡 <strong>مهم:</strong> اسم الباقة في الموقع يجب أن يطابق اسم Profile في الراوتر (مع استبدال المسافات بـ _)
     </div>
 </div>
 {% endif %}
