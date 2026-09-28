@@ -1,153 +1,229 @@
-@app.route('/subscribers/bulk-add', methods=['GET', 'POST'])
-def bulk_add():
-    if request.method == 'POST':
-        router_id = request.form.get('router_id', '').strip()
-        package_name = request.form.get('package', '').strip()
-        user_type = request.form.get('user_type', 'pppoe').strip()
-        prefix = request.form.get('prefix', '').strip()
-        char_mode = request.form.get('char_mode', 'numbers').strip()
-        count = request.form.get('count', '1').strip()
-        password_mode = request.form.get('password_mode', 'random')
-        fixed_password = request.form.get('fixed_password', '').strip()
-        password_length = request.form.get('password_length', '6').strip()
-        push_to_router = request.form.get('push_to_router') == 'on'
+{% extends "base.html" %}
+{% block title %}إضافة جماعية{% endblock %}
 
-        if user_type not in ('pppoe', 'hotspot'):
-            user_type = 'pppoe'
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h2>👥 إضافة جماعية للمستخدمين</h2>
+    <a href="{{ url_for('add_subscriber') }}" class="btn btn-secondary">
+        <i class="bi bi-arrow-right"></i> رجوع
+    </a>
+</div>
 
-        if char_mode not in ('numbers', 'letters', 'mixed'):
-            char_mode = 'numbers'
+<div class="row g-4">
+    <div class="col-lg-8">
+        <div class="card p-4">
+            <form method="POST" id="bulkForm">
 
-        if password_mode not in ('random', 'same_as_username', 'fixed'):
-            password_mode = 'random'
+                <div class="mb-3">
+                    <label class="form-label">نوع المستخدم *</label>
+                    <div class="d-flex gap-3">
+                        <div class="form-check">
+                            <input class="form-check-input" type="radio"
+                                   name="user_type" value="pppoe" checked id="bt_pppoe">
+                            <label class="form-check-label fw-bold" for="bt_pppoe">
+                                🌐 برودباند (PPPoE)
+                            </label>
+                        </div>
+                        <div class="form-check">
+                            <input class="form-check-input" type="radio"
+                                   name="user_type" value="hotspot" id="bt_hotspot">
+                            <label class="form-check-label fw-bold" for="bt_hotspot">
+                                📶 هوت سبوت
+                            </label>
+                        </div>
+                    </div>
+                </div>
 
-        # طول كلمة المرور العشوائية
-        try:
-            password_length = int(password_length)
-            if password_length < 4 or password_length > 20:
-                password_length = 6
-        except ValueError:
-            password_length = 6
+                <div class="mb-3">
+                    <label class="form-label">
+                        <i class="bi bi-shuffle text-accent"></i> نوع الأسماء *
+                    </label>
+                    <div class="d-flex gap-4 flex-wrap">
+                        <div class="form-check">
+                            <input class="form-check-input" type="radio"
+                                   name="char_mode" value="numbers" checked id="cm_numbers">
+                            <label class="form-check-label fw-bold" for="cm_numbers">
+                                🔢 أرقام
+                            </label>
+                        </div>
+                        <div class="form-check">
+                            <input class="form-check-input" type="radio"
+                                   name="char_mode" value="mixed" id="cm_mixed">
+                            <label class="form-check-label fw-bold" for="cm_mixed">
+                                🔤 أحرف وأرقام
+                            </label>
+                        </div>
+                        <div class="form-check">
+                            <input class="form-check-input" type="radio"
+                                   name="char_mode" value="letters" id="cm_letters">
+                            <label class="form-check-label fw-bold" for="cm_letters">
+                                🔡 أحرف
+                            </label>
+                        </div>
+                    </div>
+                </div>
 
-        # ✅ طول الاسم العشوائي
-        try:
-            random_length = int(request.form.get('random_length', '6'))
-            if random_length < 4 or random_length > 20:
-                random_length = 6
-        except ValueError:
-            random_length = 6
+                <div class="mb-3">
+                    <label class="form-label">بادئة الأسماء (Prefix) — اختياري</label>
+                    <input type="text" name="prefix" class="form-control"
+                           placeholder="مثال: user_ أو P">
+                </div>
 
-        try:
-            count = int(count)
-        except ValueError:
-            flash('❌ العدد غير صحيح', 'danger')
-            return redirect(url_for('bulk_add'))
+                <div class="row">
+                    <div class="col-md-6 mb-3">
+                        <label class="form-label">طول الاسم *</label>
+                        <input type="number" name="random_length" id="random_length"
+                               class="form-control" value="6" min="4" max="20">
+                        <small class="text-muted">مثال: 6 → <code>a3b7k9</code></small>
+                    </div>
+                    <div class="col-md-6 mb-3">
+                        <label class="form-label">العدد الكلي *</label>
+                        <input type="number" name="count" class="form-control"
+                               value="10" min="1" max="500">
+                    </div>
+                </div>
 
-        if count < 1 or count > 500:
-            flash('❌ العدد يجب أن يكون بين 1 و 500', 'danger')
-            return redirect(url_for('bulk_add'))
+                <div class="alert alert-info small">
+                    <strong>📋 معاينة (3 عينات):</strong>
+                    <div id="previewText" class="mt-2" style="font-family: monospace; font-size: 14px; font-weight: 600;"></div>
+                </div>
 
-        if not router_id:
-            flash('❌ اختر راوتر', 'danger')
-            return redirect(url_for('bulk_add'))
+                <div class="mb-3">
+                    <label class="form-label">طريقة كلمة المرور *</label>
+                    <div class="d-flex gap-3 flex-wrap">
+                        <div class="form-check">
+                            <input class="form-check-input" type="radio"
+                                   name="password_mode" value="random"
+                                   id="pm_random" checked>
+                            <label class="form-check-label fw-bold" for="pm_random">
+                                🎲 كلمة مرور عشوائية
+                            </label>
+                        </div>
+                        <div class="form-check">
+                            <input class="form-check-input" type="radio"
+                                   name="password_mode" value="same_as_username"
+                                   id="pm_same">
+                            <label class="form-check-label" for="pm_same">
+                                نفس اسم المستخدم
+                            </label>
+                        </div>
+                        <div class="form-check">
+                            <input class="form-check-input" type="radio"
+                                   name="password_mode" value="fixed" id="pm_fixed">
+                            <label class="form-check-label" for="pm_fixed">
+                                ثابتة للجميع
+                            </label>
+                        </div>
+                    </div>
+                </div>
 
-        router = Router.query.get(int(router_id))
-        if not router:
-            flash('❌ الراوتر غير موجود', 'danger')
-            return redirect(url_for('bulk_add'))
+                <div class="mb-3" id="random_pass_div">
+                    <label class="form-label">طول كلمة المرور</label>
+                    <input type="number" name="password_length" id="password_length"
+                           class="form-control" value="6" min="4" max="20">
+                </div>
 
-        pkg = Package.query.filter_by(name=package_name).first() if package_name else None
-        expires_at = calculate_expiry(pkg) if pkg else None
+                <div class="mb-3" id="fixed_password_div" style="display: none;">
+                    <label class="form-label">كلمة المرور الثابتة</label>
+                    <input type="text" name="fixed_password" class="form-control">
+                </div>
 
-        api = None
-        if push_to_router:
-            try:
-                api = get_router_api(router)
-            except Exception as e:
-                flash(f'⚠️ فشل الاتصال بالراوتر: {e}', 'warning')
+                <div class="mb-3">
+                    <label class="form-label">الباقة *</label>
+                    <select name="package" class="form-select" required>
+                        <option value="">— اختر باقة —</option>
+                        {% for pkg in packages %}
+                        <option value="{{ pkg.name }}">
+                            {{ pkg.name }} — {{ pkg.duration }}
+                            {% if pkg.duration_unit == 'months' %}شهر{% else %}يوم{% endif %}
+                            — {{ pkg.price }} ل.س
+                        </option>
+                        {% endfor %}
+                    </select>
+                </div>
 
-        # مجموعات أحرف (بدون ملبسات)
-        LETTERS = 'abcdefghijkmnpqrstuvwxyz'
-        NUMS = '23456789'
-        MIXED = LETTERS + NUMS
+                <div class="mb-3">
+                    <label class="form-label">الراوتر *</label>
+                    <select name="router_id" class="form-select" required>
+                        <option value="">— اختر راوتر —</option>
+                        {% for r in routers %}
+                        <option value="{{ r.id }}">{{ r.name }} — {{ r.ip_address }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
 
-        # ✅ توليد الأسماء العشوائية
-        usernames = []
-        if char_mode == 'numbers':
-            for _ in range(count):
-                rand = ''.join(random.choices(NUMS, k=random_length))
-                usernames.append(f"{prefix}{rand}")
-        elif char_mode == 'letters':
-            for _ in range(count):
-                rand = ''.join(random.choices(LETTERS, k=random_length))
-                usernames.append(f"{prefix}{rand}")
-        else:
-            for _ in range(count):
-                rand = ''.join(random.choices(MIXED, k=random_length))
-                usernames.append(f"{prefix}{rand}")
+                <div class="form-check mb-4">
+                    <input type="checkbox" name="push_to_router"
+                           class="form-check-input" id="push_r" checked>
+                    <label class="form-check-label fw-bold" for="push_r">
+                        <i class="bi bi-cloud-upload"></i> رفع تلقائي إلى الراوتر
+                    </label>
+                </div>
 
-        created = failed = push_ok = push_fail = 0
-        errors = []
+                <button type="submit" class="btn btn-primary w-100 py-2 fw-bold"
+                        onclick="return confirm('إنشاء المستخدمين؟')">
+                    <i class="bi bi-magic"></i> إنشاء المستخدمين
+                </button>
+            </form>
+        </div>
+    </div>
 
-        for username in usernames:
-            if password_mode == 'same_as_username':
-                password = username
-            elif password_mode == 'fixed':
-                password = fixed_password
-            elif password_mode == 'random':
-                password = ''.join(random.choices(MIXED, k=password_length))
-            else:
-                password = username
+    <div class="col-lg-4">
+        <div class="card p-4">
+            <h5 class="text-accent mb-3">📊 الإحصائيات</h5>
+            <ul class="list-unstyled mb-0" style="line-height: 2;">
+                <li>🔢 <strong>الحد الأقصى:</strong> 500 مستخدم</li>
+                <li>⚡ <strong>السرعة:</strong> ~1 مستخدم/ثانية</li>
+                <li>💾 <strong>الحفظ:</strong> تلقائي</li>
+                <li>📡 <strong>الراوتر:</strong> إنشاء تلقائي</li>
+            </ul>
+        </div>
+    </div>
+</div>
 
-            if Subscriber.query.filter_by(username=username).first():
-                errors.append(f"{username}: مكرر")
-                failed += 1
-                continue
+<script>
+function randomString(len, mode) {
+    const letters = 'abcdefghijkmnpqrstuvwxyz';
+    const numbers = '23456789';
+    let chars = '';
+    if (mode === 'letters') chars = letters;
+    else if (mode === 'mixed') chars = letters + numbers;
+    else if (mode === 'numbers') chars = numbers;
+    let out = '';
+    for (let i = 0; i < len; i++) {
+        out += chars.charAt(Math.floor(Math.random() * chars.length));
+    }
+    return out;
+}
 
-            try:
-                if api and pkg:
-                    try:
-                        api.user_create(
-                            username, password, user_type,
-                            profile=package_to_profile(pkg.name)
-                        )
-                        push_ok += 1
-                    except MikrotikError as e:
-                        push_fail += 1
-                        errors.append(f"{username}: {str(e)[:30]}")
+function updatePreview() {
+    const mode = document.querySelector('input[name="char_mode"]:checked').value;
+    const prefix = document.querySelector('input[name="prefix"]').value || '';
+    const len = parseInt(document.getElementById('random_length').value) || 6;
+    const samples = [];
+    for (let i = 0; i < 3; i++) {
+        samples.push(prefix + randomString(len, mode));
+    }
+    document.getElementById('previewText').textContent = samples.join('  |  ');
+}
 
-                sub = Subscriber(
-                    name=username, username=username, password=password,
-                    package=package_name, user_type=user_type,
-                    router_id=router.id,
-                    expires_at=expires_at, status='active'
-                )
-                db.session.add(sub)
-                created += 1
-            except Exception as e:
-                failed += 1
-                errors.append(f"{username}: {str(e)[:30]}")
+document.querySelectorAll('input[name="char_mode"]').forEach(el => {
+    el.addEventListener('change', updatePreview);
+});
+document.querySelectorAll('input[name="prefix"], input[name="random_length"]').forEach(el => {
+    el.addEventListener('input', updatePreview);
+});
 
-        db.session.commit()
+document.querySelectorAll('input[name="password_mode"]').forEach(el => {
+    el.addEventListener('change', () => {
+        const mode = document.querySelector('input[name="password_mode"]:checked').value;
+        document.getElementById('random_pass_div').style.display =
+            (mode === 'random') ? 'block' : 'none';
+        document.getElementById('fixed_password_div').style.display =
+            (mode === 'fixed') ? 'block' : 'none';
+    });
+});
 
-        msg = f'✅ تم إنشاء {created} مستخدم'
-        if failed:
-            msg += f' — فشل {failed}'
-        if push_to_router:
-            msg += f' — رُفع {push_ok} للراوتر'
-            if push_fail:
-                msg += f' — فشل رفع {push_fail}'
-
-        flash(msg, 'success' if failed == 0 else 'warning')
-        if errors:
-            for err in errors[:5]:
-                flash(f'⚠️ {err}', 'warning')
-
-        return redirect(url_for('subscribers'))
-
-    packages_list = Package.query.order_by(Package.name).all()
-    routers_list = Router.query.order_by(Router.name).all()
-    return render_template(
-        'bulk_add.html',
-        packages=packages_list, routers=routers_list
-    )
+updatePreview();
+</script>
+{% endblock %}
