@@ -2,21 +2,75 @@
 {% block title %}المشتركين{% endblock %}
 
 {% block content %}
-<div class="d-flex justify-content-between align-items-center mb-4">
+<div class="d-flex justify-content-between align-items-center mb-4 flex-wrap gap-2">
     <h2>👥 المشتركين</h2>
-    <a href="{{ url_for('add_subscriber') }}" class="btn btn-primary">
-        <i class="bi bi-person-plus"></i> إضافة مشترك
-    </a>
+    <div class="d-flex gap-2 flex-wrap">
+        <a href="{{ url_for('add_subscriber') }}" class="btn btn-primary">
+            <i class="bi bi-person-plus"></i> إضافة فردية
+        </a>
+        <a href="{{ url_for('bulk_add') }}" class="btn btn-warning">
+            <i class="bi bi-people-fill"></i> إضافة جماعية
+        </a>
+    </div>
 </div>
 
+<!-- شريط البحث والفلاتر -->
 <div class="card mb-3 p-3">
-    <form method="GET" class="d-flex gap-2">
-        <input type="text" name="q" class="form-control"
-               placeholder="بحث بالاسم أو اسم المستخدم..." value="{{ search }}">
-        <button class="btn btn-primary" type="submit">
-            <i class="bi bi-search"></i> بحث
-        </button>
-    </form>
+    <div class="row g-2 align-items-center">
+        <div class="col-md-5">
+            <form method="GET" class="d-flex gap-2">
+                <input type="text" name="q" class="form-control"
+                       placeholder="بحث..." value="{{ search }}">
+                {% if filter_type %}
+                    <input type="hidden" name="type" value="{{ filter_type }}">
+                {% endif %}
+                <button class="btn btn-primary" type="submit">
+                    <i class="bi bi-search"></i>
+                </button>
+            </form>
+        </div>
+        <div class="col-md-4">
+            <div class="btn-group w-100" role="group">
+                <a href="{{ url_for('subscribers') }}"
+                   class="btn {% if not filter_type %}btn-primary{% else %}btn-secondary{% endif %}">
+                    الكل
+                </a>
+                <a href="{{ url_for('subscribers', type='pppoe') }}"
+                   class="btn {% if filter_type == 'pppoe' %}btn-primary{% else %}btn-secondary{% endif %}">
+                    🌐 برودباند
+                </a>
+                <a href="{{ url_for('subscribers', type='hotspot') }}"
+                   class="btn {% if filter_type == 'hotspot' %}btn-primary{% else %}btn-secondary{% endif %}">
+                    📶 هوت سبوت
+                </a>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="dropdown w-100">
+                <button class="btn btn-info w-100 dropdown-toggle" data-bs-toggle="dropdown">
+                    <i class="bi bi-download"></i> تصدير
+                </button>
+                <ul class="dropdown-menu">
+                    <li>
+                        <a class="dropdown-item" href="{{ url_for('export_subscribers', format='csv', type=filter_type) }}">
+                            📊 CSV (Excel)
+                        </a>
+                    </li>
+                    <li>
+                        <a class="dropdown-item" href="{{ url_for('export_subscribers', format='txt', type=filter_type) }}">
+                            📄 ملف نصي (TXT)
+                        </a>
+                    </li>
+                    <li>
+                        <a class="dropdown-item" href="{{ url_for('export_subscribers', format='print', type=filter_type) }}"
+                           target="_blank">
+                            🖨️ طباعة
+                        </a>
+                    </li>
+                </ul>
+            </div>
+        </div>
+    </div>
 </div>
 
 <div class="card">
@@ -26,12 +80,13 @@
                 <tr>
                     <th>#</th>
                     <th>اسم المشترك</th>
-                    <th>اسم المستخدم</th>
+                    <th>المستخدم</th>
                     <th>كلمة المرور</th>
+                    <th>النوع</th>
                     <th>الباقة</th>
                     <th>IP الراوتر</th>
                     <th>الحالة</th>
-                    <th>ينتهي في</th>
+                    <th>ينتهي</th>
                     <th>المتبقي</th>
                     <th>إجراءات</th>
                 </tr>
@@ -46,10 +101,17 @@
                     <td>
                         <span class="password-field" data-id="{{ sub.id }}">••••••</span>
                         <button class="btn btn-sm btn-outline-light py-0 px-1"
-                                onclick="togglePassword({{ sub.id }}, '{{ sub.password|e }}')"
-                                title="إظهار/إخفاء">
+                                onclick="togglePassword({{ sub.id }}, '{{ sub.password|e }}')">
                             <i class="bi bi-eye" id="eye-{{ sub.id }}"></i>
                         </button>
+                    </td>
+
+                    <td>
+                        {% if sub.user_type == 'hotspot' %}
+                            <span class="badge bg-warning">📶 هوت سبوت</span>
+                        {% else %}
+                            <span class="badge bg-info">🌐 برودباند</span>
+                        {% endif %}
                     </td>
 
                     <td>{{ sub.package or '-' }}</td>
@@ -57,7 +119,6 @@
                     <td>
                         {% if sub.router_id and sub.router_id in routers %}
                             <span class="text-accent">{{ routers[sub.router_id].ip_address }}</span>
-                            <br><small class="text-muted">{{ routers[sub.router_id].name }}</small>
                         {% else %}
                             <span class="text-muted">—</span>
                         {% endif %}
@@ -75,13 +136,7 @@
                         {% endif %}
                     </td>
 
-                    <td>
-                        {% if sub.expires_at %}
-                            {{ sub.expires_at.strftime('%Y-%m-%d') }}
-                        {% else %}
-                            <span class="text-muted">—</span>
-                        {% endif %}
-                    </td>
+                    <td>{{ sub.expires_at.strftime('%Y-%m-%d') if sub.expires_at else '—' }}</td>
 
                     <td>
                         {% if sub.expires_at %}
@@ -104,7 +159,7 @@
                         <div class="d-flex gap-1 flex-wrap">
                             <a href="{{ url_for('toggle_subscriber', sub_id=sub.id) }}"
                                class="btn btn-sm {% if sub.status == 'active' %}btn-warning{% else %}btn-success{% endif %}"
-                               title="{% if sub.status == 'active' %}إيقاف{% else %}تفعيل{% endif %}">
+                               title="تفعيل/إيقاف">
                                 {% if sub.status == 'active' %}
                                     <i class="bi bi-pause-fill"></i>
                                 {% else %}
@@ -114,15 +169,15 @@
 
                             <a href="{{ url_for('reset_subscriber', sub_id=sub.id) }}"
                                class="btn btn-sm btn-info"
-                               onclick="return confirm('تصفير باقة {{ sub.username }}؟ سيبدأ من جديد')"
-                               title="تصفير الباقة">
+                               onclick="return confirm('تصفير الباقة؟')"
+                               title="تصفير">
                                 <i class="bi bi-arrow-counterclockwise"></i>
                             </a>
 
                             <a href="{{ url_for('extend_subscriber', sub_id=sub.id) }}"
                                class="btn btn-sm btn-primary"
-                               onclick="return confirm('تمديد اشتراك {{ sub.username }} 30 يوم؟')"
-                               title="تمديد 30 يوم">
+                               onclick="return confirm('تمديد 30 يوم؟')"
+                               title="تمديد">
                                 <i class="bi bi-plus-circle"></i>
                             </a>
 
@@ -134,7 +189,7 @@
 
                             <a href="{{ url_for('delete_subscriber', sub_id=sub.id) }}"
                                class="btn btn-sm btn-danger"
-                               onclick="return confirm('تأكيد حذف {{ sub.username }}؟')"
+                               onclick="return confirm('تأكيد الحذف؟')"
                                title="حذف">
                                 <i class="bi bi-trash"></i>
                             </a>
@@ -143,8 +198,8 @@
                 </tr>
                 {% else %}
                 <tr>
-                    <td colspan="10" class="text-center py-5 text-muted">
-                        📭 لا يوجد مشتركون بعد
+                    <td colspan="11" class="text-center py-5 text-muted">
+                        📭 لا يوجد مشتركون
                     </td>
                 </tr>
                 {% endfor %}
@@ -153,7 +208,7 @@
     </div>
 </div>
 
-<!-- Modal تعديل المشترك -->
+<!-- Modal تعديل -->
 <div class="modal fade" id="editSubModal" tabindex="-1">
     <div class="modal-dialog modal-dialog-centered">
         <div class="modal-content">
@@ -206,7 +261,7 @@
                 <div class="modal-footer border-secondary">
                     <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">إلغاء</button>
                     <button type="submit" class="btn btn-primary">
-                        <i class="bi bi-save"></i> حفظ التعديلات
+                        <i class="bi bi-save"></i> حفظ
                     </button>
                 </div>
             </form>
@@ -234,9 +289,7 @@ function openEditSub(id, name, username, pkg, routerId) {
     document.getElementById('sub_password').value = '';
     document.getElementById('sub_package').value = pkg || '';
     document.getElementById('sub_router').value = routerId || '';
-
-    const modal = new bootstrap.Modal(document.getElementById('editSubModal'));
-    modal.show();
+    new bootstrap.Modal(document.getElementById('editSubModal')).show();
 }
 </script>
 {% endblock %}
