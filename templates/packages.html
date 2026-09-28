@@ -7,6 +7,7 @@
 </div>
 
 <div class="row g-4">
+    <!-- نموذج إضافة باقة -->
     <div class="col-lg-4">
         <div class="card p-4">
             <h5 class="text-accent mb-3">
@@ -16,7 +17,7 @@
                 <div class="mb-3">
                     <label class="form-label">اسم الباقة</label>
                     <input type="text" name="name" class="form-control"
-                           placeholder="مثال: باقة شهرية 5M" required>
+                           placeholder="مثال: باقة 5M" required>
                 </div>
                 <div class="mb-3">
                     <label class="form-label">السرعة</label>
@@ -28,12 +29,36 @@
                     <input type="number" name="price" class="form-control"
                            placeholder="0" step="0.01" required>
                 </div>
+
+                <!-- ✅ اختيار وحدة المدة -->
                 <div class="mb-3">
-                    <label class="form-label">المدة (بالأيام)</label>
-                    <input type="number" name="duration" class="form-control"
-                           placeholder="30" value="30" required>
-                    <small class="text-muted">30 = شهر، 90 = 3 أشهر</small>
+                    <label class="form-label">وحدة المدة</label>
+                    <div class="d-flex gap-3">
+                        <div class="form-check">
+                            <input class="form-check-input" type="radio"
+                                   name="duration_unit" value="days"
+                                   id="unit_days_add" checked>
+                            <label class="form-check-label" for="unit_days_add">📅 أيام</label>
+                        </div>
+                        <div class="form-check">
+                            <input class="form-check-input" type="radio"
+                                   name="duration_unit" value="months"
+                                   id="unit_months_add">
+                            <label class="form-check-label" for="unit_months_add">🗓️ أشهر</label>
+                        </div>
+                    </div>
                 </div>
+
+                <div class="mb-3">
+                    <label class="form-label">المدة</label>
+                    <input type="number" name="duration" class="form-control"
+                           placeholder="1" value="1" min="1" required>
+                    <small class="text-muted">
+                        💡 <strong>أيام:</strong> 30 = شهر بـ 30 يوم |
+                        <strong>أشهر:</strong> 1 = شهر ميلادي (28-31 يوم حسب الشهر)
+                    </small>
+                </div>
+
                 <button type="submit" class="btn btn-primary w-100">
                     <i class="bi bi-save"></i> حفظ الباقة
                 </button>
@@ -41,6 +66,7 @@
         </div>
     </div>
 
+    <!-- جدول الباقات -->
     <div class="col-lg-8">
         <div class="card">
             <div class="card-header">
@@ -67,11 +93,24 @@
                             <td class="text-accent fw-bold">{{ pkg.name }}</td>
                             <td>{{ pkg.speed or '-' }}</td>
                             <td>{{ pkg.price }} ل.س</td>
-                            <td>{{ pkg.duration }} يوم</td>
+                            <td>
+                                {% if pkg.duration_unit == 'months' %}
+                                    🗓️ {{ pkg.duration }} شهر
+                                {% else %}
+                                    📅 {{ pkg.duration }} يوم
+                                {% endif %}
+                            </td>
                             <td>
                                 <div class="d-flex gap-1">
                                     <button class="btn btn-sm btn-primary"
-                                            onclick='openPackageModal({{ pkg.id }}, "{{ pkg.name|e }}", "{{ pkg.speed|e }}", {{ pkg.price }}, {{ pkg.duration }})'
+                                            onclick='openPackageModal(
+                                                {{ pkg.id }},
+                                                "{{ pkg.name|e }}",
+                                                "{{ pkg.speed|e }}",
+                                                {{ pkg.price }},
+                                                {{ pkg.duration }},
+                                                "{{ pkg.duration_unit or "days" }}"
+                                            )'
                                             title="تعديل">
                                         <i class="bi bi-pencil"></i>
                                     </button>
@@ -99,6 +138,7 @@
     </div>
 </div>
 
+<!-- Modal تعديل الباقة -->
 <div class="modal fade" id="editPackageModal" tabindex="-1">
     <div class="modal-dialog modal-dialog-centered">
         <div class="modal-content">
@@ -124,10 +164,30 @@
                         <input type="number" name="price" id="pkg_price"
                                class="form-control" step="0.01" required>
                     </div>
+
+                    <!-- ✅ اختيار وحدة المدة في التعديل -->
                     <div class="mb-3">
-                        <label class="form-label">المدة (بالأيام)</label>
+                        <label class="form-label">وحدة المدة</label>
+                        <div class="d-flex gap-3">
+                            <div class="form-check">
+                                <input class="form-check-input" type="radio"
+                                       name="duration_unit" value="days"
+                                       id="unit_days_edit">
+                                <label class="form-check-label" for="unit_days_edit">📅 أيام</label>
+                            </div>
+                            <div class="form-check">
+                                <input class="form-check-input" type="radio"
+                                       name="duration_unit" value="months"
+                                       id="unit_months_edit">
+                                <label class="form-check-label" for="unit_months_edit">🗓️ أشهر</label>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label">المدة</label>
                         <input type="number" name="duration" id="pkg_duration"
-                               class="form-control" required>
+                               class="form-control" min="1" required>
                     </div>
                 </div>
 
@@ -143,12 +203,19 @@
 </div>
 
 <script>
-function openPackageModal(id, name, speed, price, duration) {
+function openPackageModal(id, name, speed, price, duration, unit) {
     document.getElementById('editPackageForm').action = '/packages/update/' + id;
     document.getElementById('pkg_name').value = name;
     document.getElementById('pkg_speed').value = speed;
     document.getElementById('pkg_price').value = price;
     document.getElementById('pkg_duration').value = duration;
+
+    // اختيار الوحدة المناسبة
+    if (unit === 'months') {
+        document.getElementById('unit_months_edit').checked = true;
+    } else {
+        document.getElementById('unit_days_edit').checked = true;
+    }
 
     const modal = new bootstrap.Modal(document.getElementById('editPackageModal'));
     modal.show();
