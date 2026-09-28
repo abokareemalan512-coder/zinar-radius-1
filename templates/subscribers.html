@@ -17,7 +17,7 @@
 <!-- شريط البحث والفلاتر -->
 <div class="card mb-3 p-3">
     <div class="row g-2 align-items-center">
-        <div class="col-md-5">
+        <div class="col-md-4">
             <form method="GET" class="d-flex gap-2">
                 <input type="text" name="q" class="form-control"
                        placeholder="بحث..." value="{{ search }}">
@@ -45,10 +45,10 @@
                 </a>
             </div>
         </div>
-        <div class="col-md-3">
+        <div class="col-md-4">
             <div class="dropdown w-100">
                 <button class="btn btn-info w-100 dropdown-toggle" data-bs-toggle="dropdown">
-                    <i class="bi bi-download"></i> تصدير
+                    <i class="bi bi-download"></i> تصدير الكل
                 </button>
                 <ul class="dropdown-menu">
                     <li>
@@ -64,11 +64,35 @@
                     <li>
                         <a class="dropdown-item" href="{{ url_for('export_subscribers', format='print', type=filter_type) }}"
                            target="_blank">
-                            🖨️ طباعة
+                            🖨️ طباعة الكل
                         </a>
                     </li>
                 </ul>
             </div>
+        </div>
+    </div>
+</div>
+
+<!-- شريط الإجراءات الجماعية (يظهر عند التحديد) -->
+<div class="card mb-3 p-3" id="bulkBar" style="display: none; background: linear-gradient(135deg, #0ea5e9, #0284c7);">
+    <div class="d-flex justify-content-between align-items-center flex-wrap gap-2">
+        <div class="text-white fw-bold">
+            <i class="bi bi-check2-square"></i>
+            تم تحديد <span id="selectedCount">0</span> مشترك
+        </div>
+        <div class="d-flex gap-2 flex-wrap">
+            <button class="btn btn-light btn-sm" onclick="printSelected()">
+                🖨️ طباعة المحدد
+            </button>
+            <button class="btn btn-light btn-sm" onclick="exportSelected('csv')">
+                📊 CSV
+            </button>
+            <button class="btn btn-light btn-sm" onclick="exportSelected('txt')">
+                📄 TXT
+            </button>
+            <button class="btn btn-light btn-sm" onclick="clearSelection()">
+                ✖ إلغاء التحديد
+            </button>
         </div>
     </div>
 </div>
@@ -78,6 +102,11 @@
         <table class="table table-hover mb-0">
             <thead>
                 <tr>
+                    <th style="width: 40px;">
+                        <input type="checkbox" id="selectAll"
+                               class="form-check-input"
+                               onchange="toggleAll(this)">
+                    </th>
                     <th>#</th>
                     <th>اسم المشترك</th>
                     <th>المستخدم</th>
@@ -94,6 +123,10 @@
             <tbody>
                 {% for sub in subscribers %}
                 <tr>
+                    <td>
+                        <input type="checkbox" class="form-check-input sub-checkbox"
+                               value="{{ sub.id }}" onchange="updateBulkBar()">
+                    </td>
                     <td>{{ sub.id }}</td>
                     <td class="text-accent fw-bold">{{ sub.name or sub.username }}</td>
                     <td>{{ sub.username }}</td>
@@ -169,15 +202,13 @@
 
                             <a href="{{ url_for('reset_subscriber', sub_id=sub.id) }}"
                                class="btn btn-sm btn-info"
-                               onclick="return confirm('تصفير الباقة؟')"
-                               title="تصفير">
+                               onclick="return confirm('تصفير الباقة؟')" title="تصفير">
                                 <i class="bi bi-arrow-counterclockwise"></i>
                             </a>
 
                             <a href="{{ url_for('extend_subscriber', sub_id=sub.id) }}"
                                class="btn btn-sm btn-primary"
-                               onclick="return confirm('تمديد 30 يوم؟')"
-                               title="تمديد">
+                               onclick="return confirm('تمديد 30 يوم؟')" title="تمديد">
                                 <i class="bi bi-plus-circle"></i>
                             </a>
 
@@ -189,8 +220,7 @@
 
                             <a href="{{ url_for('delete_subscriber', sub_id=sub.id) }}"
                                class="btn btn-sm btn-danger"
-                               onclick="return confirm('تأكيد الحذف؟')"
-                               title="حذف">
+                               onclick="return confirm('تأكيد الحذف؟')" title="حذف">
                                 <i class="bi bi-trash"></i>
                             </a>
                         </div>
@@ -198,7 +228,7 @@
                 </tr>
                 {% else %}
                 <tr>
-                    <td colspan="11" class="text-center py-5 text-muted">
+                    <td colspan="12" class="text-center py-5 text-muted">
                         📭 لا يوجد مشتركون
                     </td>
                 </tr>
@@ -219,24 +249,20 @@
                     </h5>
                     <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
                 </div>
-
                 <div class="modal-body">
                     <div class="mb-3">
                         <label class="form-label">اسم المشترك</label>
                         <input type="text" name="name" id="sub_name" class="form-control">
                     </div>
-
                     <div class="mb-3">
                         <label class="form-label">اسم المستخدم</label>
                         <input type="text" name="username" id="sub_username" class="form-control" required>
                     </div>
-
                     <div class="mb-3">
                         <label class="form-label">كلمة المرور</label>
                         <input type="text" name="password" id="sub_password"
                                class="form-control" placeholder="اتركها فارغة للإبقاء">
                     </div>
-
                     <div class="mb-3">
                         <label class="form-label">الباقة</label>
                         <select name="package" id="sub_package" class="form-select">
@@ -246,7 +272,6 @@
                             {% endfor %}
                         </select>
                     </div>
-
                     <div class="mb-3">
                         <label class="form-label">الراوتر</label>
                         <select name="router_id" id="sub_router" class="form-select">
@@ -257,7 +282,6 @@
                         </select>
                     </div>
                 </div>
-
                 <div class="modal-footer border-secondary">
                     <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">إلغاء</button>
                     <button type="submit" class="btn btn-primary">
@@ -270,6 +294,7 @@
 </div>
 
 <script>
+// ============ كلمة المرور ============
 function togglePassword(id, password) {
     const span = document.querySelector(`.password-field[data-id="${id}"]`);
     const eye = document.getElementById(`eye-${id}`);
@@ -282,6 +307,7 @@ function togglePassword(id, password) {
     }
 }
 
+// ============ تعديل ============
 function openEditSub(id, name, username, pkg, routerId) {
     document.getElementById('editSubForm').action = '/subscribers/update/' + id;
     document.getElementById('sub_name').value = name;
@@ -290,6 +316,54 @@ function openEditSub(id, name, username, pkg, routerId) {
     document.getElementById('sub_package').value = pkg || '';
     document.getElementById('sub_router').value = routerId || '';
     new bootstrap.Modal(document.getElementById('editSubModal')).show();
+}
+
+// ============ التحديد الجماعي ============
+function toggleAll(source) {
+    document.querySelectorAll('.sub-checkbox').forEach(cb => {
+        cb.checked = source.checked;
+    });
+    updateBulkBar();
+}
+
+function updateBulkBar() {
+    const checked = document.querySelectorAll('.sub-checkbox:checked');
+    const bar = document.getElementById('bulkBar');
+    const cnt = document.getElementById('selectedCount');
+    if (checked.length > 0) {
+        bar.style.display = 'block';
+        cnt.textContent = checked.length;
+    } else {
+        bar.style.display = 'none';
+    }
+}
+
+function clearSelection() {
+    document.querySelectorAll('.sub-checkbox').forEach(cb => cb.checked = false);
+    document.getElementById('selectAll').checked = false;
+    updateBulkBar();
+}
+
+function getSelectedIds() {
+    const ids = [];
+    document.querySelectorAll('.sub-checkbox:checked').forEach(cb => {
+        ids.push(cb.value);
+    });
+    return ids;
+}
+
+function printSelected() {
+    const ids = getSelectedIds();
+    if (ids.length === 0) return;
+    const url = '/subscribers/export/print?ids=' + ids.join(',');
+    window.open(url, '_blank');
+}
+
+function exportSelected(format) {
+    const ids = getSelectedIds();
+    if (ids.length === 0) return;
+    const url = `/subscribers/export/${format}?ids=` + ids.join(',');
+    window.location.href = url;
 }
 </script>
 {% endblock %}
