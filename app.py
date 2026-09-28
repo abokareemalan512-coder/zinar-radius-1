@@ -2,6 +2,8 @@
 import os
 import io
 import csv
+import random
+import string
 import logging
 import traceback
 import calendar
@@ -76,7 +78,7 @@ class Subscriber(db.Model):
     username = db.Column(db.String(100), nullable=False)
     password = db.Column(db.String(150), nullable=False)
     package = db.Column(db.String(100))
-    user_type = db.Column(db.String(20), default='pppoe')  # pppoe / hotspot
+    user_type = db.Column(db.String(20), default='pppoe')
     router_id = db.Column(db.Integer, db.ForeignKey('routers.id'))
     status = db.Column(db.String(20), default='active')
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
@@ -100,7 +102,7 @@ class Package(db.Model):
     price = db.Column(db.Float, default=0)
     duration = db.Column(db.Integer, default=30)
     duration_unit = db.Column(db.String(10), default='days')
-    user_type = db.Column(db.String(20), default='pppoe')  # pppoe / hotspot
+    user_type = db.Column(db.String(20), default='pppoe')
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
 
 
@@ -501,7 +503,6 @@ def delete_router(router_id):
 
 @app.route('/routers/<int:router_id>/users')
 def router_users(router_id):
-    """عرض مستخدمي الراوتر (Hotspot + PPPoE)"""
     router = Router.query.get_or_404(router_id)
     user_type = request.args.get('type', 'pppoe')
 
@@ -577,7 +578,6 @@ def sync_router(router_id):
 
 @app.route('/routers/<int:router_id>/import', methods=['GET', 'POST'])
 def import_rsc(router_id):
-    """رفع ملف .rsc من Mikrotik وإضافة كل المستخدمين"""
     router = Router.query.get_or_404(router_id)
 
     if request.method == 'POST':
@@ -598,7 +598,6 @@ def import_rsc(router_id):
             flash(f'❌ فشل قراءة الملف: {e}', 'danger')
             return redirect(url_for('import_rsc', router_id=router_id))
 
-        # تحليل الملف
         try:
             api = get_router_api(router)
             parsed = api.import_rsc_content(content)
@@ -615,29 +614,23 @@ def import_rsc(router_id):
             all_users.append(u)
 
         if not all_users:
-            flash('⚠️ لم يتم العثور على أي مستخدمين في الملف', 'warning')
+            flash('⚠️ لم يتم العثور على أي مستخدمين', 'warning')
             return redirect(url_for('import_rsc', router_id=router_id))
 
-        # حفظ في قاعدة البيانات
-        added = 0
-        skipped = 0
-        push_ok = 0
-        push_fail = 0
+        added = skipped = push_ok = push_fail = 0
 
         for u in all_users:
             username = u.get('name')
             if not username:
                 continue
 
-            # هل موجود؟
             if Subscriber.query.filter_by(username=username, router_id=router_id).first():
                 skipped += 1
                 continue
 
             try:
                 sub = Subscriber(
-                    name=username,
-                    username=username,
+                    name=username, username=username,
                     password=u.get('password', ''),
                     package=u.get('profile', ''),
                     user_type=u.get('user_type', 'pppoe'),
@@ -648,12 +641,10 @@ def import_rsc(router_id):
                 db.session.add(sub)
                 added += 1
 
-                # Push للراوتر إن طُلب
                 if push_to_router:
                     try:
                         api.user_create(
-                            username,
-                            u.get('password', ''),
+                            username, u.get('password', ''),
                             u.get('user_type', 'pppoe'),
                             profile=u.get('profile', 'default')
                         )
@@ -799,13 +790,12 @@ def add_subscriber():
 
 @app.route('/subscribers/bulk-add', methods=['GET', 'POST'])
 def bulk_add():
-    """إضافة مجموعة مستخدمين بضغطة واحدة"""
     if request.method == 'POST':
         router_id = request.form.get('router_id', '').strip()
         package_name = request.form.get('package', '').strip()
         user_type = request.form.get('user_type', 'pppoe').strip()
         prefix = request.form.get('prefix', '').strip()
-        start_num = request.form.get('start_num', '1').strip()
+        char_mode = request.form.get('char_mode', 'numbers').strip()
         count = request.form.get('count', '1').strip()
         password_mode = request.form.get('password_mode', 'same_as_username')
         fixed_password = request.form.get('fixed_password', '').strip()
@@ -814,11 +804,35 @@ def bulk_add():
         if user_type not in ('pppoe', 'hotspot'):
             user_type = 'pppoe'
 
+        if char_mode not in ('numbers', 'letters', 'mixed'):
+            char_mode = 'numbers'
+
+        # ✅ متغيرات حسب النوع
+        start_num = 1
+        number_length = 4
+        random_length = 6
+
+        if char_mode == 'numbers':
+            try:
+                start_num = int(request.form.get('start_num', '1'))
+                number_length = int(request.form.get('number_length', '4'))
+                if number_length < 1 or number_length > 10:
+                    number_length = 4
+            except ValueError:
+                flash('❌ أرقام غير صحيحة', 'danger')
+                return redirect(url_for('bulk_add'))
+        else:
+            try:
+                random_length = int(request.form.get('random_length', '6'))
+                if random_length < 3 or random_length > 20:
+                    random_length = 6
+            except ValueError:
+                random_length = 6
+
         try:
-            start_num = int(start_num)
             count = int(count)
         except ValueError:
-            flash('❌ أرقام غير صحيحة', 'danger')
+            flash('❌ العدد غير صحيح', 'danger')
             return redirect(url_for('bulk_add'))
 
         if count < 1 or count > 500:
@@ -837,7 +851,6 @@ def bulk_add():
         pkg = Package.query.filter_by(name=package_name).first() if package_name else None
         expires_at = calculate_expiry(pkg) if pkg else None
 
-        # الاتصال بالراوتر (إذا push)
         api = None
         if push_to_router:
             try:
@@ -845,15 +858,25 @@ def bulk_add():
             except Exception as e:
                 flash(f'⚠️ فشل الاتصال بالراوتر: {e}', 'warning')
 
-        created = 0
-        failed = 0
-        push_ok = 0
-        push_fail = 0
+        # ✅ توليد الأسماء
+        usernames = []
+        if char_mode == 'numbers':
+            for i in range(start_num, start_num + count):
+                num_str = str(i).zfill(number_length)
+                usernames.append(f"{prefix}{num_str}")
+        elif char_mode == 'letters':
+            for _ in range(count):
+                rand = ''.join(random.choices(string.ascii_lowercase, k=random_length))
+                usernames.append(f"{prefix}{rand}")
+        else:  # mixed
+            for _ in range(count):
+                rand = ''.join(random.choices(string.ascii_lowercase + string.digits, k=random_length))
+                usernames.append(f"{prefix}{rand}")
+
+        created = failed = push_ok = push_fail = 0
         errors = []
 
-        for i in range(start_num, start_num + count):
-            username = f"{prefix}{i}" if prefix else str(i)
-
+        for username in usernames:
             # كلمة المرور
             if password_mode == 'same_as_username':
                 password = username
@@ -862,14 +885,12 @@ def bulk_add():
             else:
                 password = username
 
-            # هل موجود؟
             if Subscriber.query.filter_by(username=username).first():
                 errors.append(f"{username}: مكرر")
                 failed += 1
                 continue
 
             try:
-                # Push للراوتر
                 if api and pkg:
                     try:
                         api.user_create(
@@ -1108,25 +1129,44 @@ def delete_subscriber(sub_id):
 
 @app.route('/subscribers/export/<format>')
 def export_subscribers(format):
-    """تصدير المشتركين (csv / txt / print)"""
+    """تصدير المشتركين (csv / txt / print) — يدعم تحديد IDs"""
     filter_type = request.args.get('type', '').strip()
-    query = Subscriber.query
+    ids_param = request.args.get('ids', '').strip()
 
-    if filter_type in ('pppoe', 'hotspot'):
-        query = query.filter_by(user_type=filter_type)
+    # ✅ إذا حُدد مستخدمون — استخدمهم
+    if ids_param:
+        try:
+            ids_list = [int(x) for x in ids_param.split(',') if x.strip().isdigit()]
+            subs = Subscriber.query.filter(Subscriber.id.in_(ids_list))\
+                                   .order_by(Subscriber.created_at.desc()).all()
+        except Exception as e:
+            logger.error(f"❌ ids parsing: {e}")
+            subs = []
+    else:
+        # وإلا — كل المشتركين حسب الفلتر
+        query = Subscriber.query
+        if filter_type in ('pppoe', 'hotspot'):
+            query = query.filter_by(user_type=filter_type)
+        subs = query.order_by(Subscriber.created_at.desc()).all()
 
-    subs = query.order_by(Subscriber.created_at.desc()).all()
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
 
+    # ============ CSV ============
     if format == 'csv':
         output = io.StringIO()
-        # BOM للعربية في Excel
-        output.write('\ufeff')
+        output.write('\ufeff')  # BOM
         writer = csv.writer(output)
-        writer.writerow(['#', 'الاسم', 'اسم المستخدم', 'كلمة المرور', 'الباقة', 'النوع', 'الحالة', 'الانتهاء'])
+        writer.writerow(['#', 'الاسم', 'اسم المستخدم', 'كلمة المرور',
+                         'الباقة', 'النوع', 'الحالة', 'الانتهاء'])
         for i, s in enumerate(subs, 1):
             writer.writerow([
-                i, s.name or '', s.username, s.password,
-                s.package or '', s.user_type or 'pppoe', s.status,
+                i,
+                s.name or '',
+                s.username,
+                s.password,
+                s.package or '',
+                s.user_type or 'pppoe',
+                s.status,
                 s.expires_at.strftime('%Y-%m-%d') if s.expires_at else ''
             ])
         output.seek(0)
@@ -1134,13 +1174,16 @@ def export_subscribers(format):
             io.BytesIO(output.getvalue().encode('utf-8')),
             mimetype='text/csv',
             as_attachment=True,
-            download_name=f'subscribers_{datetime.now().strftime("%Y%m%d_%H%M%S")}.csv'
+            download_name=f'subscribers_{timestamp}.csv'
         )
 
+    # ============ TXT ============
     elif format == 'txt':
         lines = []
         lines.append('=' * 60)
-        lines.append(f'  تقرير المشتركين — {datetime.now().strftime("%Y-%m-%d %H:%M")}')
+        lines.append(f'  ZINAR — قائمة المشتركين')
+        lines.append(f'  {datetime.now().strftime("%Y-%m-%d %H:%M")}')
+        lines.append(f'  العدد: {len(subs)}')
         lines.append('=' * 60)
         lines.append('')
         for i, s in enumerate(subs, 1):
@@ -1159,11 +1202,11 @@ def export_subscribers(format):
             io.BytesIO(content.encode('utf-8')),
             mimetype='text/plain',
             as_attachment=True,
-            download_name=f'subscribers_{datetime.now().strftime("%Y%m%d_%H%M%S")}.txt'
+            download_name=f'subscribers_{timestamp}.txt'
         )
 
+    # ============ PRINT ============
     elif format == 'print':
-        # صفحة HTML للطباعة
         return render_template('print_subscribers.html',
                                subscribers=subs,
                                now=datetime.utcnow(),
