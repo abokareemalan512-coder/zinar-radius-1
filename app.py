@@ -221,7 +221,6 @@ def get_master_router():
 
 
 def check_first_connections():
-    """فحص الاتصالات وتفعيل التواريخ لأول اتصال"""
     try:
         pending = Subscriber.query.filter(
             Subscriber.expires_at.is_(None),
@@ -442,9 +441,9 @@ def routers():
                        port=port, is_master=is_master, is_active=True)
             db.session.add(r)
             db.session.commit()
-            flash(f'✅ الراوتر "{name}" أُضيف' if test_mikrotik_connection(r)
-                  else '⚠️ أُضيف لكن الاتصال فشل',
-                  'success' if test_mikrotik_connection(r) else 'warning')
+            ok = test_mikrotik_connection(r)
+            flash(f'✅ الراوتر "{name}" أُضيف' if ok else '⚠️ أُضيف لكن الاتصال فشل',
+                  'success' if ok else 'warning')
         except Exception as e:
             db.session.rollback()
             flash(f'❌ {str(e)}', 'danger')
@@ -469,15 +468,14 @@ def set_master_router(router_id):
 
 @app.route('/routers/toggle/<int:router_id>')
 def toggle_router(router_id):
-    """تشغيل/إيقاف راوتر — يؤثر على كل مشتركيه"""
     try:
         router = Router.query.get_or_404(router_id)
         router.is_active = not router.is_active
         db.session.commit()
 
         pushed_subs = Subscriber.query.filter_by(pushed_router_id=router.id).all()
-
         success = fail = 0
+
         try:
             api = get_router_api(router)
             for sub in pushed_subs:
@@ -593,8 +591,6 @@ def router_users(router_id):
                            actives=actives, profiles=profiles, error=error,
                            user_type=ut)
 
-
-# ============ Sync (رفع كل مشتركي راوتر) ============
 
 @app.route('/routers/<int:router_id>/sync')
 def sync_router(router_id):
@@ -755,7 +751,7 @@ def subscribers():
         search=search, now=now, filter_type=ft, filter_push=fp)
 
 
-# ============ Add Subscriber (DB فقط) ============
+# ============ Add Subscriber ============
 
 @app.route('/add-subscriber', methods=['GET', 'POST'])
 @app.route('/subscribers/add', methods=['GET', 'POST'])
@@ -796,7 +792,7 @@ def add_subscriber():
         routers=Router.query.order_by(Router.name).all())
 
 
-# ============ Bulk Add (DB فقط) ============
+# ============ Bulk Add ============
 
 @app.route('/subscribers/bulk-add', methods=['GET', 'POST'])
 def bulk_add():
@@ -893,7 +889,6 @@ def bulk_add():
 
 @app.route('/subscribers/push/<int:sub_id>')
 def push_subscriber(sub_id):
-    """رفع مشترك واحد للراوتر"""
     try:
         sub = Subscriber.query.get_or_404(sub_id)
         ut = sub.user_type or 'pppoe'
@@ -939,7 +934,6 @@ def push_subscriber(sub_id):
 
 @app.route('/subscribers/move/<int:sub_id>', methods=['POST'])
 def move_subscriber(sub_id):
-    """نقل مشترك بين السيرفرات"""
     try:
         sub = Subscriber.query.get_or_404(sub_id)
         new_rid = request.form.get('new_router_id', '').strip()
@@ -956,7 +950,6 @@ def move_subscriber(sub_id):
         old_rid = sub.router_id
         ut = sub.user_type or 'pppoe'
 
-        # حذف من القديم
         if old_rid and old_rid != new_rid:
             old = Router.query.get(old_rid)
             if old:
@@ -967,7 +960,6 @@ def move_subscriber(sub_id):
                 except MikrotikError:
                     pass
 
-        # إضافة للجديد
         msg = ''
         try:
             api_new = get_router_api(new_router)
@@ -1139,7 +1131,6 @@ def update_subscriber(sub_id):
         rid = request.form.get('router_id', '').strip()
         sub.router_id = int(rid) if rid else None
 
-        # تحديث على السيرفر لو مرفوع
         if sub.pushed_router_id:
             r = Router.query.get(sub.pushed_router_id)
             if r:
@@ -1165,6 +1156,8 @@ def update_subscriber(sub_id):
     return redirect(url_for('subscribers'))
 
 
+# ============ Delete Single ============
+
 @app.route('/subscribers/delete/<int:sub_id>')
 def delete_subscriber(sub_id):
     try:
@@ -1184,6 +1177,123 @@ def delete_subscriber(sub_id):
     except Exception as e:
         db.session.rollback()
         flash(f'❌ {str(e)}', 'danger')
+    return redirect(url_for('subscribers'))
+
+
+# ============ Delete Bulk ============
+
+@app.route('/subscribers/bulk-delete', methods=['POST'])
+def bulk_delete_subscribers():
+    """حذف مجموعة مختارة من المشتركين"""
+    try:
+        ids = request.form.get('ids', '').strip()
+        if not ids:
+            flash('❌ لم تحدد أي مشترك', 'warning')
+            return redirect(url_for('subscribers'))
+
+        ids_list = [int(x) for x in ids.split(',') if x.strip().isdigit()]
+        if not ids_list:
+            flash('❌ معرّفات غير صالحة', 'danger')
+            return redirect(url_for('subscribers'))
+
+        subs = Subscriber.query.filter(Subscriber.id.in_(ids_list)).all()
+        deleted = 0
+        router_fail = 0
+        errors = []
+
+        for sub in subs:
+            if sub.pushed_router_id:
+                r = Router.query.get(sub.pushed_router_id)
+                if r:
+                    ut = sub.user_type or 'pppoe'
+                    try:
+                        api = get_router_api(r)
+                        api.user_kick(sub.username, ut)
+                        api.user_delete(sub.username, ut)
+                    except Exception as e:
+                        router_fail += 1
+                        errors.append(f"{sub.username}: {str(e)[:30]}")
+
+            db.session.delete(sub)
+            deleted += 1
+
+        db.session.commit()
+
+        msg = f'🗑 تم حذف {deleted} مشترك'
+        if router_fail:
+            msg += f' — فشل إزالة {router_fail} من السيرفر'
+        flash(msg, 'success' if not router_fail else 'warning')
+        for e in errors[:5]:
+            flash(f'⚠️ {e}', 'warning')
+
+    except Exception as e:
+        db.session.rollback()
+        logger.error(f"❌ bulk_delete: {e}")
+        flash(f'❌ {str(e)}', 'danger')
+
+    return redirect(url_for('subscribers'))
+
+
+# ============ Delete Expired ============
+
+@app.route('/subscribers/delete-expired', methods=['POST'])
+def delete_expired_subscribers():
+    """حذف كل المشتركين المنتهية صلاحيتهم"""
+    try:
+        now = datetime.utcnow()
+
+        expired_subs = Subscriber.query.filter(
+            Subscriber.expires_at.isnot(None),
+            Subscriber.expires_at < now
+        ).all()
+
+        extra = Subscriber.query.filter(
+            Subscriber.status == 'expired',
+            Subscriber.expires_at.is_(None)
+        ).all()
+
+        all_expired = list(expired_subs) + list(extra)
+        seen = set()
+        unique_expired = []
+        for s in all_expired:
+            if s.id not in seen:
+                seen.add(s.id)
+                unique_expired.append(s)
+
+        if not unique_expired:
+            flash('ℹ️ لا يوجد مشتركون منتهون', 'info')
+            return redirect(url_for('subscribers'))
+
+        deleted = 0
+        router_fail = 0
+
+        for sub in unique_expired:
+            if sub.pushed_router_id:
+                r = Router.query.get(sub.pushed_router_id)
+                if r:
+                    ut = sub.user_type or 'pppoe'
+                    try:
+                        api = get_router_api(r)
+                        api.user_kick(sub.username, ut)
+                        api.user_delete(sub.username, ut)
+                    except Exception:
+                        router_fail += 1
+
+            db.session.delete(sub)
+            deleted += 1
+
+        db.session.commit()
+
+        msg = f'🗑 تم حذف {deleted} مشترك منتهي'
+        if router_fail:
+            msg += f' — فشل إزالة {router_fail} من السيرفر'
+        flash(msg, 'success' if not router_fail else 'warning')
+
+    except Exception as e:
+        db.session.rollback()
+        logger.error(f"❌ delete_expired: {e}")
+        flash(f'❌ {str(e)}', 'danger')
+
     return redirect(url_for('subscribers'))
 
 
