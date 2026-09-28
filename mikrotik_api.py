@@ -1,332 +1,264 @@
+# mikrotik_api.py
 """
-mikrotik_api.py
-وحدة مسؤولة عن الاتصال بأجهزة MikroTik (RouterOS API) والتعامل معها.
-مصممة للعمل مع عدة راوترات في نفس الوقت - كل استدعاء بياخد كائن Router
-(فيه ip_address, username, password) ويتصل فيه بشكل مستقل.
+خدمة الاتصال بـ Mikrotik RouterOS عبر SSH (Paramiko)
+تسمح بإنشاء/حذف/تفعيل/إيقاف مستخدمي PPPoE تلقائيًا
 """
+import logging
+import paramiko
 
-import socket
-import routeros_api
-
-# مهلة الاتصال بالثواني - إذا الراوتر مش قادر يوصل، ما منستنى أكتر من هيك
-CONNECTION_TIMEOUT = 5
+logger = logging.getLogger(__name__)
 
 
-def _connect(router, port=None, use_ssl=False):
-    """
-    يفتح اتصال جديد براوتر واحد ويرجع كائن API جاهز للاستخدام.
-    لازم تستدعي .disconnect() على الـ connection بعد ما تخلص (أو استخدم try/finally).
-    """
-    if port is None:
-        port = getattr(router, 'port', None) or 8728
-
-    old_timeout = socket.getdefaulttimeout()
-    socket.setdefaulttimeout(CONNECTION_TIMEOUT)
-    try:
-        connection = routeros_api.RouterOsApiPool(
-            host=router.ip_address,
-            username=router.username,
-            password=router.password,
-            port=port,
-            use_ssl=use_ssl,
-            ssl_verify=False,
-            plaintext_login=True,
-        )
-        api = connection.get_api()
-        return connection, api
-    finally:
-        socket.setdefaulttimeout(old_timeout)
+class MikrotikError(Exception):
+    """خطأ في Mikrotik"""
+    pass
 
 
-def test_connection(router):
-    """
-    يتأكد فقط إنه الراوتر قابل للوصول والبيانات صحيحة.
-    يرجع dict فيه success (True/False) ورسالة، وما بيرمي استثناء أبداً
-    (مهم عشان صفحة الراوترات ما تطيح لو راوتر واحد وقع).
-    """
-    connection = None
-    try:
-        connection, api = _connect(router)
-        identity = api.get_resource('/system/identity').get()
-        name = identity[0].get('name', 'MikroTik') if identity else 'MikroTik'
-        return {'success': True, 'message': f'متصل - {name}'}
-    except Exception as e:
-        return {'success': False, 'message': str(e)}
-    finally:
-        if connection:
-            try:
-                connection.disconnect()
-            except Exception:
-                pass
+class MikrotikAPI:
+    """عميل SSH للتحكم في Mikrotik"""
 
+    def __init__(self, host, username, password, port=22, timeout=10):
+        self.host = host
+        self.username = username
+        self.password = password
+        self.port = port or 22
+        self.timeout = timeout
+        self.client = None
 
-def get_router_stats(router):
-    """
-    يرجع إحصائيات حية من راوتر واحد: عدد جلسات PPPoE النشطة،
-    عدد جلسات Hotspot النشطة، ونسبة استخدام المعالج.
-    عند أي خطأ (راوتر مقطوع، بيانات غلط...) بيرجع أصفار بدل ما يوقّع الموقع.
-    """
-    result = {
-        'online': False,
-        'ppp_active': 0,
-        'hotspot_active': 0,
-        'cpu_load': 0,
-        'uptime': '-',
-        'error': None,
-    }
-    connection = None
-    try:
-        connection, api = _connect(router)
+    # ============ الاتصال ============
 
-        # جلسات PPPoE النشطة
+    def connect(self):
+        """فتح اتصال SSH"""
         try:
-            ppp_active = api.get_resource('/ppp/active').get()
-            result['ppp_active'] = len(ppp_active)
-        except Exception:
-            pass
+            self.client = paramiko.SSHClient()
+            self.client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
+            self.client.connect(
+                hostname=self.host,
+                port=self.port,
+                username=self.username,
+                password=self.password,
+                timeout=self.timeout,
+                allow_agent=False,
+                look_for_keys=False,
+            )
+            return True
+        except Exception as e:
+            logger.error(f"❌ فشل الاتصال بـ {self.host}: {e}")
+            raise MikrotikError(f"فشل الاتصال: {str(e)}")
 
-        # جلسات Hotspot النشطة
+    def disconnect(self):
+        """إغلاق الاتصال"""
+        if self.client:
+            try:
+                self.client.close()
+            except Exception:
+                pass
+            self.client = None
+
+    def __enter__(self):
+        self.connect()
+        return self
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        self.disconnect()
+
+    # ============ تنفيذ الأوامر ============
+
+    def execute(self, command):
+        """تنفيذ أمر RouterOS وإرجاع النتيجة"""
+        if not self.client:
+            raise MikrotikError("لا يوجد اتصال نشط")
         try:
-            hotspot_active = api.get_resource('/ip/hotspot/active').get()
-            result['hotspot_active'] = len(hotspot_active)
-        except Exception:
-            pass
+            stdin, stdout, stderr = self.client.exec_command(command)
+            output = stdout.read().decode('utf-8', errors='ignore')
+            error = stderr.read().decode('utf-8', errors='ignore')
+            if error and 'failure' in error.lower():
+                raise MikrotikError(error.strip())
+            return output.strip()
+        except MikrotikError:
+            raise
+        except Exception as e:
+            raise MikrotikError(f"خطأ في التنفيذ: {str(e)}")
 
-        # حمل المعالج والوقت التشغيلي
+    # ============ اختبار الاتصال ============
+
+    def test_connection(self):
+        """اختبار سريع للاتصال"""
         try:
-            resource = api.get_resource('/system/resource').get()
-            if resource:
-                result['cpu_load'] = resource[0].get('cpu-load', 0)
-                result['uptime'] = resource[0].get('uptime', '-')
-        except Exception:
-            pass
+            with self:
+                result = self.execute('/system identity print')
+                return True, result
+        except MikrotikError as e:
+            return False, str(e)
 
-        result['online'] = True
-    except Exception as e:
-        result['error'] = str(e)
-    finally:
-        if connection:
+    # ============ معلومات النظام ============
+
+    def get_identity(self):
+        """اسم الراوتر"""
+        with self:
+            return self.execute('/system identity print')
+
+    def get_resource(self):
+        """موارد النظام (CPU, RAM, Uptime)"""
+        with self:
+            return self.execute('/system resource print')
+
+    # ============ إدارة المستخدمين (PPPoE Secrets) ============
+
+    def list_users(self):
+        """قائمة كل مستخدمي PPPoE"""
+        with self:
+            output = self.execute('/ppp secret print detail')
+            users = []
+            current = {}
+            for line in output.split('\n'):
+                line = line.strip()
+                # بداية مستخدم جديد
+                if line and (line[0].isdigit()) and 'name=' in line:
+                    if current:
+                        users.append(current)
+                    current = {}
+                for part in line.split():
+                    if part.startswith('name='):
+                        current['name'] = part.replace('name=', '').strip('"')
+                    elif part.startswith('service='):
+                        current['service'] = part.replace('service=', '').strip('"')
+                    elif part.startswith('profile='):
+                        current['profile'] = part.replace('profile=', '').strip('"')
+                    elif part.startswith('disabled='):
+                        current['disabled'] = part.replace('disabled=', '').strip('"')
+            if current:
+                users.append(current)
+            return users
+
+    def user_exists(self, username):
+        """هل المستخدم موجود؟"""
+        with self:
+            output = self.execute(f'/ppp secret print where name="{username}"')
+            return username in output
+
+    def create_user(self, username, password, profile='default', service='pppoe'):
+        """إنشاء مستخدم PPPoE جديد"""
+        with self:
+            if self.user_exists(username):
+                raise MikrotikError(f"المستخدم '{username}' موجود مسبقًا")
+
+            cmd = (
+                f'/ppp secret add '
+                f'name="{username}" '
+                f'password="{password}" '
+                f'service={service} '
+                f'profile="{profile}"'
+            )
+            return self.execute(cmd)
+
+    def delete_user(self, username):
+        """حذف مستخدم"""
+        with self:
+            cmd = f'/ppp secret remove [find name="{username}"]'
+            return self.execute(cmd)
+
+    def enable_user(self, username):
+        """تفعيل مستخدم"""
+        with self:
+            cmd = f'/ppp secret enable [find name="{username}"]'
+            return self.execute(cmd)
+
+    def disable_user(self, username):
+        """إيقاف مستخدم"""
+        with self:
+            cmd = f'/ppp secret disable [find name="{username}"]'
+            return self.execute(cmd)
+
+    def update_user_password(self, username, new_password):
+        """تغيير كلمة مرور مستخدم"""
+        with self:
+            cmd = f'/ppp secret set [find name="{username}"] password="{new_password}"'
+            return self.execute(cmd)
+
+    def update_user_profile(self, username, new_profile):
+        """تغيير باقة (profile) مستخدم"""
+        with self:
+            cmd = f'/ppp secret set [find name="{username}"] profile="{new_profile}"'
+            return self.execute(cmd)
+
+    def disconnect_active_user(self, username):
+        """قطع الاتصال النشط لمستخدم"""
+        with self:
+            cmd = f'/ppp active remove [find name="{username}"]'
+            return self.execute(cmd)
+
+    # ============ الباقات (Profiles) ============
+
+    def list_profiles(self):
+        """قائمة الباقات المتاحة"""
+        with self:
+            output = self.execute('/ppp profile print detail')
+            profiles = []
+            for line in output.split('\n'):
+                line = line.strip()
+                if 'name=' in line:
+                    for part in line.split():
+                        if part.startswith('name='):
+                            name = part.replace('name=', '').strip('"')
+                            if name and name not in profiles:
+                                profiles.append(name)
+            return profiles
+
+    # ============ الاتصالات النشطة ============
+
+    def list_active(self):
+        """قائمة الاتصالات النشطة"""
+        with self:
+            output = self.execute('/ppp active print detail')
+            actives = []
+            current = {}
+            for line in output.split('\n'):
+                line = line.strip()
+                if line and (line[0].isdigit()) and 'name=' in line:
+                    if current:
+                        actives.append(current)
+                    current = {}
+                for part in line.split():
+                    if part.startswith('name='):
+                        current['name'] = part.replace('name=', '').strip('"')
+                    elif part.startswith('address='):
+                        current['address'] = part.replace('address=', '').strip('"')
+                    elif part.startswith('uptime='):
+                        current['uptime'] = part.replace('uptime=', '').strip('"')
+                    elif part.startswith('service='):
+                        current['service'] = part.replace('service=', '').strip('"')
+            if current:
+                actives.append(current)
+            return actives
+
+    def count_active(self):
+        """عدد الاتصالات النشطة"""
+        with self:
+            output = self.execute('/ppp active print count-only')
             try:
-                connection.disconnect()
-            except Exception:
-                pass
-    return result
+                return int(output.strip())
+            except ValueError:
+                return 0
 
 
-def get_all_routers_stats(routers):
-    """
-    ياخد لستة من كائنات Router (من قاعدة البيانات) ويرجع إحصائيات
-    كل واحد فيهم + المجموع الكلي. هاي الدالة يلي منستخدمها بالداشبورد
-    لجمع بيانات كل الراوترات مع بعض.
-    """
-    per_router = []
-    totals = {'ppp_active': 0, 'hotspot_active': 0, 'online_count': 0}
+# ============ دوال مساعدة ============
 
-    for router in routers:
-        stats = get_router_stats(router)
-        stats['router_id'] = router.id
-        stats['router_name'] = router.name
-        per_router.append(stats)
-
-        if stats['online']:
-            totals['online_count'] += 1
-            totals['ppp_active'] += stats['ppp_active']
-            totals['hotspot_active'] += stats['hotspot_active']
-
-    return {'per_router': per_router, 'totals': totals}
+def get_router_api(router):
+    """إنشاء كائن API من نموذج Router"""
+    return MikrotikAPI(
+        host=router.ip_address,
+        username=router.username,
+        password=router.password,
+        port=router.port or 22,
+        timeout=10,
+    )
 
 
-def get_userman_users(router):
-    """
-    يجرب يقرأ مستخدمي User Manager عبر RouterOS API (مش عبر Terminal).
-    بيرجع dict فيه success/error والبيانات الخام، مفيدة للتشخيص ولإعادة الاستخدام لاحقاً.
-    """
-    connection = None
+def test_router_connection(router):
+    """اختبار الاتصال بالراوتر"""
     try:
-        connection, api = _connect(router)
-        users = api.get_resource('/tool/user-manager/user').get()
-        return {'success': True, 'count': len(users), 'raw': users}
+        api = get_router_api(router)
+        return api.test_connection()
     except Exception as e:
-        return {'success': False, 'error': str(e)}
-    finally:
-        if connection:
-            try:
-                connection.disconnect()
-            except Exception:
-                pass
-
-
-def get_userman_profiles(router):
-    """نفس الفكرة بس للبروفايلات (الباقات) المعرّفة بـ User Manager."""
-    connection = None
-    try:
-        connection, api = _connect(router)
-        profiles = api.get_resource('/tool/user-manager/profile').get()
-        return {'success': True, 'count': len(profiles), 'raw': profiles}
-    except Exception as e:
-        return {'success': False, 'error': str(e)}
-    finally:
-        if connection:
-            try:
-                connection.disconnect()
-            except Exception:
-                pass
-
-
-def add_userman_profile(router, name, price='0', validity='0'):
-    """يضيف باقة (بروفايل) جديدة بـ User Manager."""
-    connection = None
-    try:
-        connection, api = _connect(router)
-        api.get_resource('/tool/user-manager/profile').add(
-            name=name, price=str(price), validity=str(validity)
-        )
-        return {'success': True}
-    except Exception as e:
-        return {'success': False, 'error': str(e)}
-    finally:
-        if connection:
-            try:
-                connection.disconnect()
-            except Exception:
-                pass
-
-
-def edit_userman_profile(router, name, price=None, validity=None):
-    """يعدّل باقة موجودة (بالبحث عن اسمها أولاً لمعرفة الـ id)."""
-    connection = None
-    try:
-        connection, api = _connect(router)
-        resource = api.get_resource('/tool/user-manager/profile')
-        matches = resource.get(name=name)
-        if not matches:
-            return {'success': False, 'error': 'الباقة غير موجودة'}
-        params = {}
-        if price is not None:
-            params['price'] = str(price)
-        if validity is not None:
-            params['validity'] = str(validity)
-        resource.set(id=matches[0]['id'], **params)
-        return {'success': True}
-    except Exception as e:
-        return {'success': False, 'error': str(e)}
-    finally:
-        if connection:
-            try:
-                connection.disconnect()
-            except Exception:
-                pass
-
-
-def remove_userman_profile(router, name):
-    """يحذف باقة من User Manager بالاعتماد على اسمها."""
-    connection = None
-    try:
-        connection, api = _connect(router)
-        resource = api.get_resource('/tool/user-manager/profile')
-        matches = resource.get(name=name)
-        if not matches:
-            return {'success': False, 'error': 'الباقة غير موجودة'}
-        for m in matches:
-            resource.remove(id=m['id'])
-        return {'success': True}
-    except Exception as e:
-        return {'success': False, 'error': str(e)}
-    finally:
-        if connection:
-            try:
-                connection.disconnect()
-            except Exception:
-                pass
-
-
-def edit_userman_user(router, username, password=None, profile=None):
-    """يعدّل مستخدم موجود (كلمة السر و/أو الباقة) بالاعتماد على اسم المستخدم."""
-    connection = None
-    try:
-        connection, api = _connect(router)
-        resource = api.get_resource('/tool/user-manager/user')
-        matches = resource.get(username=username)
-        if not matches:
-            return {'success': False, 'error': 'المستخدم غير موجود'}
-        params = {}
-        if password:
-            params['password'] = password
-        if profile:
-            params['actual-profile'] = profile
-        if params:
-            resource.set(id=matches[0]['id'], **params)
-        return {'success': True}
-    except Exception as e:
-        return {'success': False, 'error': str(e)}
-    finally:
-        if connection:
-            try:
-                connection.disconnect()
-            except Exception:
-                pass
-
-
-def add_userman_user(router, username, password, profile=None):
-    """
-    يضيف مستخدم جديد لـ User Manager مباشرة عبر API.
-    profile اختياري - إذا انحط، بينربط المستخدم بباقة معينة مباشرة.
-    """
-    connection = None
-    try:
-        connection, api = _connect(router)
-        params = {'customer': 'admin', 'username': username, 'password': password}
-        if profile:
-            params['actual-profile'] = profile
-        api.get_resource('/tool/user-manager/user').add(**params)
-        return {'success': True}
-    except Exception as e:
-        return {'success': False, 'error': str(e)}
-    finally:
-        if connection:
-            try:
-                connection.disconnect()
-            except Exception:
-                pass
-def remove_userman_user(router, username):
-    """يحذف مستخدم من User Manager بالاعتماد على اسم المستخدم."""
-    connection = None
-    try:
-        connection, api = _connect(router)
-        resource = api.get_resource('/tool/user-manager/user')
-        matches = resource.get(username=username)
-        if not matches:
-            return {'success': False, 'error': 'المستخدم غير موجود'}
-        for m in matches:
-            resource.remove(id=m['id'])
-        return {'success': True}
-    except Exception as e:
-        return {'success': False, 'error': str(e)}
-    finally:
-        if connection:
-            try:
-                connection.disconnect()
-            except Exception:
-                pass
-
-
-def disconnect_ppp_user(router, username):
-    """
-    يفصل مستخدم PPPoE معيّن فوراً من راوتر محدد (متل زر "قطع الاتصال").
-    """
-    connection = None
-    try:
-        connection, api = _connect(router)
-        active = api.get_resource('/ppp/active')
-        sessions = active.get(name=username)
-        for session in sessions:
-            active.remove(id=session['id'])
-        return {'success': True}
-    except Exception as e:
-        return {'success': False, 'message': str(e)}
-    finally:
-        if connection:
-            try:
-                connection.disconnect()
-            except Exception:
-                pass
+        return False, str(e)
