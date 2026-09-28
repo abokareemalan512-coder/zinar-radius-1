@@ -1,0 +1,150 @@
+{% extends "base.html" %}
+{% block title %}إضافة جماعية{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h2>👥 إضافة جماعية للمستخدمين</h2>
+    <a href="{{ url_for('add_subscriber') }}" class="btn btn-secondary">
+        <i class="bi bi-arrow-right"></i> رجوع
+    </a>
+</div>
+
+<div class="row g-4">
+    <div class="col-lg-8">
+        <div class="card p-4">
+            <form method="POST">
+
+                <div class="mb-3">
+                    <label class="form-label">نوع المستخدم *</label>
+                    <div class="d-flex gap-3">
+                        <div class="form-check">
+                            <input class="form-check-input" type="radio"
+                                   name="user_type" value="pppoe" checked id="bt_pppoe">
+                            <label class="form-check-label fw-bold" for="bt_pppoe">
+                                🌐 برودباند (PPPoE)
+                            </label>
+                        </div>
+                        <div class="form-check">
+                            <input class="form-check-input" type="radio"
+                                   name="user_type" value="hotspot" id="bt_hotspot">
+                            <label class="form-check-label fw-bold" for="bt_hotspot">
+                                📶 هوت سبوت
+                            </label>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="row">
+                    <div class="col-md-6 mb-3">
+                        <label class="form-label">بادئة الأسماء (Prefix)</label>
+                        <input type="text" name="prefix" class="form-control"
+                               placeholder="مثال: user_ أو 0055">
+                        <small class="text-muted">اتركها فارغة إذا لا تريد بادئة</small>
+                    </div>
+                    <div class="col-md-3 mb-3">
+                        <label class="form-label">من رقم *</label>
+                        <input type="number" name="start_num" class="form-control"
+                               value="1" min="1" required>
+                    </div>
+                    <div class="col-md-3 mb-3">
+                        <label class="form-label">العدد *</label>
+                        <input type="number" name="count" class="form-control"
+                               value="10" min="1" max="500" required>
+                    </div>
+                </div>
+
+                <div class="alert alert-info small">
+                    <strong>مثال:</strong> إذا أدخلت بادئة <code>user_</code>،
+                    من <code>100</code>، عدد <code>5</code> → سيُنشأ:
+                    <code>user_100</code>, <code>user_101</code>, <code>user_102</code>, <code>user_103</code>, <code>user_104</code>
+                </div>
+
+                <div class="mb-3">
+                    <label class="form-label">الباقة *</label>
+                    <select name="package" class="form-select" required>
+                        <option value="">— اختر باقة —</option>
+                        {% for pkg in packages %}
+                        <option value="{{ pkg.name }}">
+                            {{ pkg.name }} — {{ pkg.duration }}
+                            {% if pkg.duration_unit == 'months' %}شهر{% else %}يوم{% endif %}
+                            — {{ pkg.price }} ل.س
+                        </option>
+                        {% endfor %}
+                    </select>
+                </div>
+
+                <div class="mb-3">
+                    <label class="form-label">الراوتر *</label>
+                    <select name="router_id" class="form-select" required>
+                        <option value="">— اختر راوتر —</option>
+                        {% for r in routers %}
+                        <option value="{{ r.id }}">{{ r.name }} — {{ r.ip_address }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+
+                <div class="mb-3">
+                    <label class="form-label">طريقة كلمة المرور</label>
+                    <div class="d-flex gap-3 flex-wrap">
+                        <div class="form-check">
+                            <input class="form-check-input" type="radio"
+                                   name="password_mode" value="same_as_username"
+                                   id="pm_same" checked>
+                            <label class="form-check-label" for="pm_same">
+                                نفس اسم المستخدم
+                            </label>
+                        </div>
+                        <div class="form-check">
+                            <input class="form-check-input" type="radio"
+                                   name="password_mode" value="fixed" id="pm_fixed">
+                            <label class="form-check-label" for="pm_fixed">
+                                كلمة مرور ثابتة
+                            </label>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="mb-3" id="fixed_password_div" style="display: none;">
+                    <label class="form-label">كلمة المرور الثابتة</label>
+                    <input type="text" name="fixed_password" class="form-control"
+                           placeholder="كلمة المرور لكل المستخدمين">
+                </div>
+
+                <div class="form-check mb-4">
+                    <input type="checkbox" name="push_to_router"
+                           class="form-check-input" id="push_r" checked>
+                    <label class="form-check-label fw-bold" for="push_r">
+                        <i class="bi bi-cloud-upload"></i> رفع تلقائي إلى الراوتر
+                    </label>
+                </div>
+
+                <button type="submit" class="btn btn-primary w-100 py-2 fw-bold"
+                        onclick="return confirm('إنشاء المستخدمين؟')">
+                    <i class="bi bi-magic"></i> إنشاء المستخدمين
+                </button>
+            </form>
+        </div>
+    </div>
+
+    <div class="col-lg-4">
+        <div class="card p-4">
+            <h5 class="text-accent mb-3">📊 الإحصائيات</h5>
+            <ul class="list-unstyled mb-0" style="line-height: 2;">
+                <li>🔢 <strong>الحد الأقصى:</strong> 500 مستخدم</li>
+                <li>⚡ <strong>السرعة:</strong> ~1 مستخدم/ثانية</li>
+                <li>💾 <strong>الحفظ:</strong> تلقائي في قاعدة البيانات</li>
+                <li>📡 <strong>الراوتر:</strong> إنشاء تلقائي</li>
+            </ul>
+        </div>
+    </div>
+</div>
+
+<script>
+document.querySelectorAll('input[name="password_mode"]').forEach(el => {
+    el.addEventListener('change', () => {
+        document.getElementById('fixed_password_div').style.display =
+            document.getElementById('pm_fixed').checked ? 'block' : 'none';
+    });
+});
+</script>
+{% endblock %}
