@@ -16,6 +16,7 @@ from flask import (
 from flask_sqlalchemy import SQLAlchemy
 from werkzeug.security import generate_password_hash, check_password_hash
 import paramiko
+import radius_sync
 
 # ============ الإعدادات ============
 app = Flask(__name__)
@@ -42,6 +43,9 @@ _masked = database_url.split('@')[-1] if '@' in database_url else database_url
 logger.info(f"📊 DB: ...@{_masked}")
 
 db = SQLAlchemy(app)
+
+from api_sync import sync_bp
+app.register_blueprint(sync_bp)
 
 # ============ Models ============
 
@@ -618,6 +622,7 @@ def add_subscriber():
                 expires_at=None, status='active'
             ))
             db.session.commit()
+            radius_sync.sync_user(un, pw)
             flash(f'✅ "{un}" أُضيف — 📌 في قاعدة البيانات فقط', 'success')
             return redirect(url_for('subscribers'))
         except Exception as e:
@@ -697,6 +702,10 @@ def bulk_add():
                 failed += 1
 
         db.session.commit()
+        for un in usernames:
+            sub = Subscriber.query.filter_by(username=un).first()
+            if sub:
+                radius_sync.sync_user(sub.username, sub.password)
         flash(f'✅ {created} مشترك' + (f' — فشل {failed}' if failed else ''),
               'success' if not failed else 'warning')
         return redirect(url_for('subscribers'))
@@ -713,6 +722,7 @@ def toggle_subscriber(sub_id):
         if sub.status == 'active':
             sub.status = 'paused'
             db.session.commit()
+            radius_sync.pause_user(sub.username)
             # 👢 kick فوري
             kick_subscriber(sub)
             flash(f'⏸ "{sub.username}" موقوف وتم قطعه', 'warning')
@@ -722,6 +732,7 @@ def toggle_subscriber(sub_id):
             else:
                 sub.status = 'active'
                 db.session.commit()
+                radius_sync.resume_user(sub.username, sub.password)
                 flash(f'▶ "{sub.username}" نشط', 'success')
     except Exception as e:
         db.session.rollback()
@@ -787,6 +798,7 @@ def delete_subscriber(sub_id):
         sub = Subscriber.query.get_or_404(sub_id)
         # 👢 kick قبل الحذف
         kick_subscriber(sub)
+        radius_sync.delete_user(sub.username)
         db.session.delete(sub)
         db.session.commit()
         flash('✅ تم الحذف وقطع الاتصال', 'success')
@@ -814,6 +826,7 @@ def bulk_delete_subscribers():
                     kicked += 1
             except Exception:
                 pass
+            radius_sync.delete_user(sub.username)
             db.session.delete(sub)
             deleted += 1
         db.session.commit()
@@ -853,6 +866,7 @@ def delete_expired_subscribers():
                 kick_subscriber(sub)
             except Exception:
                 pass
+            radius_sync.delete_user(sub.username)
             db.session.delete(sub); deleted += 1
         db.session.commit()
         flash(f'🗑 تم حذف {deleted} منتهي', 'success')
@@ -1035,4 +1049,4 @@ def server_error(e):
 
 
 if __name__ == '__main__':
-    app.run(host='0.0.0.0', port=int(os.environ.get('PORT', 5000)), debug=True)
+    app.run(host='0.0.0.0', port=int(os.environ.get('PORT', 5000)), debug=False)
