@@ -379,12 +379,24 @@ def logout():
 
 # ============ Dashboard ============
 
-# ============ Traffic Cache ============
-_traffic_cache = {'up': 0.0, 'down': 0.0, 'ts': 0, 'iface': 'ether1'}
+# ============ Traffic Cache (DB-based) ============
+def _ensure_traffic_table():
+    from sqlalchemy import text
+    with db.engine.begin() as conn:
+        conn.execute(text("CREATE TABLE IF NOT EXISTS traffic_cache (id SERIAL PRIMARY KEY, iface VARCHAR(50), up FLOAT, down FLOAT, ts INTEGER)"))
 
 @app.route('/api/traffic')
 def api_traffic():
-    return jsonify(_traffic_cache)
+    try:
+        from sqlalchemy import text
+        _ensure_traffic_table()
+        with db.engine.connect() as conn:
+            r = conn.execute(text("SELECT up, down, ts, iface FROM traffic_cache LIMIT 1")).fetchone()
+            if r:
+                return jsonify({'up': r[0], 'down': r[1], 'ts': r[2], 'iface': r[3]})
+    except Exception:
+        pass
+    return jsonify({'up': 0.0, 'down': 0.0, 'ts': 0, 'iface': 'ether1'})
 
 @app.route('/api/traffic/update', methods=['POST'])
 def api_traffic_update():
@@ -392,10 +404,19 @@ def api_traffic_update():
     if token != 'zinar-sync-token-2026':
         return jsonify({'error': 'unauthorized'}), 401
     data = request.get_json() or {}
-    _traffic_cache['up'] = data.get('up', 0)
-    _traffic_cache['down'] = data.get('down', 0)
-    _traffic_cache['ts'] = data.get('ts', 0)
-    _traffic_cache['iface'] = data.get('iface', 'ether1')
+    try:
+        from sqlalchemy import text
+        _ensure_traffic_table()
+        with db.engine.begin() as conn:
+            r = conn.execute(text("SELECT id FROM traffic_cache LIMIT 1")).fetchone()
+            if r:
+                conn.execute(text("UPDATE traffic_cache SET up=:u, down=:d, ts=:t, iface=:i WHERE id=:id"),
+                    {'u': data.get('up', 0), 'd': data.get('down', 0), 't': data.get('ts', 0), 'i': data.get('iface', 'ether1'), 'id': r[0]})
+            else:
+                conn.execute(text("INSERT INTO traffic_cache (up, down, ts, iface) VALUES (:u, :d, :t, :i)"),
+                    {'u': data.get('up', 0), 'd': data.get('down', 0), 't': data.get('ts', 0), 'i': data.get('iface', 'ether1')})
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
     return jsonify({'ok': True})
 
 @app.route('/dashboard')
