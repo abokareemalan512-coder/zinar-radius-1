@@ -391,6 +391,7 @@ def logout():
 # ============ Traffic Cache (ORM) ============
 @app.route('/api/traffic')
 def api_traffic():
+    db.session.remove()
     try:
         row = TrafficCache.query.first()
         if row:
@@ -401,6 +402,7 @@ def api_traffic():
 
 @app.route('/api/traffic/update', methods=['POST'])
 def api_traffic_update():
+    db.session.remove()
     token = request.headers.get('X-Sync-Token')
     if token != 'zinar-sync-token-2026':
         return jsonify({'error': 'unauthorized'}), 401
