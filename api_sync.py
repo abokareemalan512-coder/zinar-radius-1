@@ -5,6 +5,9 @@ import os
 sync_bp = Blueprint('sync', __name__)
 SYNC_TOKEN = os.environ.get('SYNC_TOKEN', 'zinar-sync-token-2026')
 
+# تخزين آخر سرعة بالذاكرة
+_traffic_data = {}
+
 @sync_bp.route('/api/sync/subscribers', methods=['GET'])
 def get_subscribers():
     token = request.headers.get('X-Sync-Token') or request.args.get('token')
@@ -48,3 +51,17 @@ def mark_first_use():
             count += 1
     db.session.commit()
     return jsonify({'ok': True, 'updated': count})
+
+@sync_bp.route('/api/traffic/update', methods=['POST'])
+def traffic_update():
+    token = request.headers.get('X-Sync-Token')
+    if token != SYNC_TOKEN:
+        return jsonify({'error': 'unauthorized'}), 401
+    data = request.get_json() or {}
+    global _traffic_data
+    _traffic_data = data
+    return jsonify({'ok': True})
+
+@sync_bp.route('/api/traffic/get', methods=['GET'])
+def traffic_get():
+    return jsonify(_traffic_data)
