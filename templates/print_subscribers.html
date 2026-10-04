@@ -1,3 +1,4 @@
+cat > ~/zinar-radius-1/templates/print_subscribers.html << 'HTMLEOF'
 <!DOCTYPE html>
 <html lang="ar" dir="rtl">
 <head>
@@ -14,7 +15,7 @@
             color: #1e293b;
         }
 
-        /* ============ شريط التحكم (لا يُطبع) ============ */
+        /* شريط التحكم (لا يُطبع) */
         .controls {
             max-width: 1200px;
             margin: 0 auto 20px;
@@ -28,27 +29,20 @@
             justify-content: space-between;
             flex-wrap: wrap;
         }
-        .controls .info {
-            color: #475569;
-            font-size: 14px;
-        }
+        .controls .info { color: #475569; font-size: 14px; }
         .controls .info strong { color: #0ea5e9; }
         .btn {
-            border: none;
-            padding: 10px 22px;
-            border-radius: 8px;
-            cursor: pointer;
-            font-size: 14px;
-            font-weight: 600;
-            font-family: inherit;
-            transition: all 0.2s;
+            border: none; padding: 10px 22px; border-radius: 8px;
+            cursor: pointer; font-size: 14px; font-weight: 600;
+            font-family: inherit; transition: all 0.2s;
         }
         .btn-print { background: #0ea5e9; color: #fff; }
-        .btn-print:hover { background: #0284c7; transform: translateY(-1px); }
+        .btn-print:hover { background: #0284c7; }
+        .btn-toggle { background: #f59e0b; color: #fff; }
+        .btn-toggle:hover { background: #d97706; }
         .btn-close { background: #e2e8f0; color: #475569; }
         .btn-close:hover { background: #cbd5e1; }
 
-        /* ============ الحاوية الرئيسية ============ */
         .page {
             max-width: 1200px;
             margin: 0 auto;
@@ -58,127 +52,78 @@
             box-shadow: 0 4px 20px rgba(0,0,0,0.08);
         }
 
-        /* ============ الترويسة ============ */
+        /* الترويسة */
         .header {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            padding-bottom: 20px;
-            border-bottom: 3px solid #0ea5e9;
+            display: flex; justify-content: space-between; align-items: center;
+            padding-bottom: 20px; border-bottom: 3px solid #0ea5e9;
             margin-bottom: 24px;
         }
-        .logo {
-            display: flex;
-            align-items: center;
-            gap: 12px;
-        }
+        .logo { display: flex; align-items: center; gap: 12px; }
         .logo-icon {
-            width: 55px;
-            height: 55px;
+            width: 55px; height: 55px;
             background: linear-gradient(135deg, #0ea5e9, #38bdf8);
             border-radius: 14px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
+            display: flex; align-items: center; justify-content: center;
             font-size: 28px;
             box-shadow: 0 4px 12px rgba(14, 165, 233, 0.3);
         }
         .logo-text h1 {
-            color: #0f172a;
-            font-size: 24px;
-            font-weight: 900;
-            margin-bottom: 2px;
+            color: #0f172a; font-size: 24px; font-weight: 900; margin-bottom: 2px;
         }
-        .logo-text p {
-            color: #64748b;
-            font-size: 12px;
-        }
+        .logo-text p { color: #64748b; font-size: 12px; }
         .header-info {
-            text-align: left;
-            color: #64748b;
-            font-size: 12px;
-            line-height: 1.8;
+            text-align: left; color: #64748b; font-size: 12px; line-height: 1.8;
         }
         .header-info strong { color: #0f172a; }
 
-        /* ============ الإحصائيات ============ */
+        /* الإحصائيات */
         .stats {
-            display: grid;
-            grid-template-columns: repeat(3, 1fr);
-            gap: 15px;
-            margin-bottom: 24px;
+            display: grid; grid-template-columns: repeat(3, 1fr);
+            gap: 15px; margin-bottom: 24px;
         }
         .stat-card {
             background: linear-gradient(135deg, #f0f9ff, #e0f2fe);
             border: 1px solid #bae6fd;
-            border-radius: 10px;
-            padding: 14px 18px;
-            text-align: center;
+            border-radius: 10px; padding: 14px 18px; text-align: center;
         }
         .stat-card .num {
-            font-size: 26px;
-            font-weight: 900;
-            color: #0284c7;
-            line-height: 1;
-            margin-bottom: 4px;
+            font-size: 26px; font-weight: 900; color: #0284c7;
+            line-height: 1; margin-bottom: 4px;
         }
-        .stat-card .lbl {
-            font-size: 11px;
-            color: #0369a1;
-            font-weight: 600;
-        }
+        .stat-card .lbl { font-size: 11px; color: #0369a1; font-weight: 600; }
 
-        /* ============ الجدول ============ */
+        /* الجدول */
         table {
-            width: 100%;
-            border-collapse: collapse;
-            font-size: 13px;
-            border-radius: 10px;
-            overflow: hidden;
+            width: 100%; border-collapse: collapse; font-size: 13px;
+            border-radius: 10px; overflow: hidden;
         }
-        thead {
-            background: linear-gradient(135deg, #0ea5e9, #0284c7);
-        }
+        thead { background: linear-gradient(135deg, #0ea5e9, #0284c7); }
         th {
-            color: #fff;
-            padding: 12px 10px;
-            text-align: right;
-            font-weight: 700;
-            font-size: 12px;
-            border: none;
+            color: #fff; padding: 12px 10px; text-align: right;
+            font-weight: 700; font-size: 12px; border: none;
         }
         td {
-            padding: 11px 10px;
-            border-bottom: 1px solid #e2e8f0;
-            color: #334155;
+            padding: 11px 10px; border-bottom: 1px solid #e2e8f0; color: #334155;
         }
         tbody tr:nth-child(even) { background: #f8fafc; }
         tbody tr:hover { background: #f0f9ff; }
         tbody tr:last-child td { border-bottom: none; }
 
         .username {
-            font-weight: 700;
-            color: #0284c7;
-            font-family: 'Courier New', monospace;
-            font-size: 13px;
+            font-weight: 700; color: #0284c7;
+            font-family: 'Courier New', monospace; font-size: 13px;
         }
         .password {
             font-family: 'Courier New', monospace;
-            background: #fef3c7;
-            color: #92400e;
-            padding: 3px 8px;
-            border-radius: 4px;
-            font-size: 12px;
-            font-weight: 600;
+            background: #fef3c7; color: #92400e;
+            padding: 3px 8px; border-radius: 4px;
+            font-size: 12px; font-weight: 600;
         }
         .name-cell { font-weight: 600; color: #0f172a; }
 
         .badge {
-            display: inline-block;
-            padding: 3px 9px;
-            border-radius: 20px;
-            font-size: 10px;
-            font-weight: 700;
+            display: inline-block; padding: 3px 9px;
+            border-radius: 20px; font-size: 10px; font-weight: 700;
         }
         .badge-pppoe { background: #dbeafe; color: #1e40af; }
         .badge-hotspot { background: #fef3c7; color: #92400e; }
@@ -186,32 +131,82 @@
         .badge-paused { background: #fed7aa; color: #9a3412; }
         .badge-expired { background: #fee2e2; color: #991b1b; }
 
-        /* ============ التذييل ============ */
-        .footer {
-            margin-top: 30px;
-            padding-top: 20px;
+        /* ===== نمط البطاقات (Vouchers) ===== */
+        .vouchers { display: none; }
+        .vouchers.active { display: block; }
+        .table-view.hidden { display: none; }
+
+        .voucher-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 12px;
+        }
+        .voucher {
+            border: 2px dashed #0ea5e9;
+            border-radius: 10px;
+            padding: 12px;
+            background: #fff;
+            position: relative;
+            page-break-inside: avoid;
+        }
+        .voucher-header {
+            display: flex; justify-content: space-between; align-items: center;
+            margin-bottom: 8px; padding-bottom: 8px;
+            border-bottom: 1px solid #e2e8f0;
+        }
+        .voucher-brand {
+            font-size: 14px; font-weight: 900; color: #0ea5e9; letter-spacing: 1px;
+        }
+        .voucher-num {
+            font-size: 10px; color: #94a3b8; background: #f1f5f9;
+            padding: 2px 8px; border-radius: 10px;
+        }
+        .voucher-field {
+            display: flex; justify-content: space-between; align-items: center;
+            margin-bottom: 5px;
+        }
+        .voucher-field .lbl { font-size: 11px; color: #64748b; }
+        .voucher-field .val {
+            font-family: 'Courier New', monospace;
+            font-size: 14px; font-weight: 700;
+            background: #f0f9ff; color: #0369a1;
+            padding: 3px 10px; border-radius: 5px;
+            min-width: 80px; text-align: center;
+        }
+        .voucher-footer {
+            margin-top: 8px; padding-top: 8px;
             border-top: 1px solid #e2e8f0;
-            display: flex;
-            justify-content: space-between;
-            font-size: 11px;
-            color: #94a3b8;
+            text-align: center; font-size: 10px; color: #94a3b8;
+        }
+        .voucher-pkg {
+            display: inline-block; font-size: 10px; font-weight: 700;
+            background: #fef3c7; color: #92400e;
+            padding: 2px 8px; border-radius: 10px;
         }
 
-        /* ============ الطباعة ============ */
+        /* التذييل */
+        .footer {
+            margin-top: 30px; padding-top: 20px;
+            border-top: 1px solid #e2e8f0;
+            display: flex; justify-content: space-between;
+            font-size: 11px; color: #94a3b8;
+        }
+
+        /* الطباعة */
         @media print {
             body { background: #fff; padding: 0; }
             .controls { display: none !important; }
             .page {
-                box-shadow: none;
-                border-radius: 0;
-                padding: 15px;
-                max-width: 100%;
+                box-shadow: none; border-radius: 0;
+                padding: 15px; max-width: 100%;
             }
-            .stat-card { background: #f0f9ff !important; -webkit-print-color-adjust: exact; }
-            thead { -webkit-print-color-adjust: exact; }
-            th { -webkit-print-color-adjust: exact; }
-            tbody tr:nth-child(even) { -webkit-print-color-adjust: exact; }
-            @page { margin: 1cm; size: A4 landscape; }
+            .stat-card, thead, th, tbody tr:nth-child(even) {
+                -webkit-print-color-adjust: exact; print-color-adjust: exact;
+            }
+            .voucher {
+                -webkit-print-color-adjust: exact; print-color-adjust: exact;
+            }
+            @page { margin: 1cm; size: A4; }
         }
     </style>
 </head>
@@ -220,18 +215,18 @@
 <!-- شريط التحكم -->
 <div class="controls no-print">
     <div class="info">
-        📋 سيتم طباعة <strong>{{ subscribers|length }}</strong> مشترك
+        📋 <strong>{{ subscribers|length }}</strong> مشترك
         {% if filter_type %}
-            — النوع: <strong>{{ 'برودباند' if filter_type == 'pppoe' else 'هوت سبوت' }}</strong>
+            — <strong>{{ 'برودباند' if filter_type == 'pppoe' else 'هوت سبوت' }}</strong>
         {% endif %}
     </div>
     <div>
+        <button class="btn btn-toggle" onclick="toggleView()" id="toggleBtn">🎴 تبديل للبطاقات</button>
         <button class="btn btn-print" onclick="window.print()">🖨️ طباعة</button>
         <button class="btn btn-close" onclick="window.close()">✖ إغلاق</button>
     </div>
 </div>
 
-<!-- الصفحة -->
 <div class="page">
 
     <!-- الترويسة -->
@@ -272,62 +267,92 @@
             <div class="lbl">نشط</div>
         </div>
         <div class="stat-card">
-            <div class="num">{{ subscribers|selectattr('user_type', 'equalto', 'pppoe')|list|length }}</div>
-            <div class="lbl">برودباند</div>
+            <div class="num">{{ subscribers|selectattr('user_type', 'equalto', 'hotspot')|list|length }}</div>
+            <div class="lbl">هوت سبوت</div>
         </div>
     </div>
 
-    <!-- الجدول -->
-    <table>
-        <thead>
-            <tr>
-                <th style="width: 35px;">#</th>
-                <th>اسم المشترك</th>
-                <th>اسم المستخدم</th>
-                <th>كلمة المرور</th>
-                <th>الباقة</th>
-                <th>النوع</th>
-                <th>الحالة</th>
-                <th>الانتهاء</th>
-            </tr>
-        </thead>
-        <tbody>
+    <!-- عرض الجدول -->
+    <div class="table-view" id="tableView">
+        <table>
+            <thead>
+                <tr>
+                    <th style="width: 35px;">#</th>
+                    <th>اسم المشترك</th>
+                    <th>المستخدم</th>
+                    <th>كلمة المرور</th>
+                    <th>الباقة</th>
+                    <th>النوع</th>
+                    <th>الحالة</th>
+                    <th>الانتهاء</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for s in subscribers %}
+                <tr>
+                    <td style="text-align: center; color: #94a3b8; font-weight: 600;">{{ loop.index }}</td>
+                    <td class="name-cell">{{ s.name or s.username }}</td>
+                    <td><span class="username">{{ s.username }}</span></td>
+                    <td><span class="password">{{ s.password }}</span></td>
+                    <td>{{ s.package or '—' }}</td>
+                    <td>
+                        <span class="badge badge-{{ s.user_type or 'pppoe' }}">
+                            {{ 'برودباند' if (s.user_type or 'pppoe') == 'pppoe' else 'هوت سبوت' }}
+                        </span>
+                    </td>
+                    <td>
+                        {% if s.status == 'active' %}
+                            <span class="badge badge-active">نشط</span>
+                        {% elif s.status == 'paused' %}
+                            <span class="badge badge-paused">موقوف</span>
+                        {% elif s.status == 'expired' %}
+                            <span class="badge badge-expired">منتهي</span>
+                        {% else %}
+                            <span class="badge">{{ s.status }}</span>
+                        {% endif %}
+                    </td>
+                    <td style="font-size: 11px; color: #64748b;">
+                        {{ s.expires_at.strftime('%Y-%m-%d') if s.expires_at else '—' }}
+                    </td>
+                </tr>
+                {% else %}
+                <tr><td colspan="8" style="text-align: center; padding: 40px; color: #94a3b8;">📭 لا يوجد مشتركون</td></tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+
+    <!-- عرض البطاقات -->
+    <div class="vouchers" id="vouchersView">
+        <div class="voucher-grid">
             {% for s in subscribers %}
-            <tr>
-                <td style="text-align: center; color: #94a3b8; font-weight: 600;">{{ loop.index }}</td>
-                <td class="name-cell">{{ s.name or s.username }}</td>
-                <td><span class="username">{{ s.username }}</span></td>
-                <td><span class="password">{{ s.password }}</span></td>
-                <td>{{ s.package or '—' }}</td>
-                <td>
-                    <span class="badge badge-{{ s.user_type or 'pppoe' }}">
-                        {{ 'برودباند' if (s.user_type or 'pppoe') == 'pppoe' else 'هوت سبوت' }}
-                    </span>
-                </td>
-                <td>
-                    {% if s.status == 'active' %}
-                        <span class="badge badge-active">نشط</span>
-                    {% elif s.status == 'paused' %}
-                        <span class="badge badge-paused">موقوف</span>
-                    {% elif s.status == 'expired' %}
-                        <span class="badge badge-expired">منتهي</span>
-                    {% else %}
-                        <span class="badge">{{ s.status }}</span>
-                    {% endif %}
-                </td>
-                <td style="font-size: 11px; color: #64748b;">
-                    {{ s.expires_at.strftime('%Y-%m-%d') if s.expires_at else '—' }}
-                </td>
-            </tr>
+            <div class="voucher">
+                <div class="voucher-header">
+                    <span class="voucher-brand">⚡ ZINAR</span>
+                    <span class="voucher-num">#{{ loop.index }}</span>
+                </div>
+                <div class="voucher-field">
+                    <span class="lbl">المستخدم</span>
+                    <span class="val">{{ s.username }}</span>
+                </div>
+                <div class="voucher-field">
+                    <span class="lbl">المرور</span>
+                    <span class="val">{{ s.password }}</span>
+                </div>
+                <div class="voucher-field">
+                    <span class="lbl">الباقة</span>
+                    <span class="voucher-pkg">{{ s.package or '—' }}</span>
+                </div>
+                <div class="voucher-footer">
+                    {{ '📶 هوت سبوت' if (s.user_type or 'pppoe') == 'hotspot' else '🌐 برودباند' }}
+                    {% if s.expires_at %} • ينتهي {{ s.expires_at.strftime('%Y-%m-%d') }}{% endif %}
+                </div>
+            </div>
             {% else %}
-            <tr>
-                <td colspan="8" style="text-align: center; padding: 40px; color: #94a3b8;">
-                    📭 لا يوجد مشتركون للطباعة
-                </td>
-            </tr>
+            <p style="text-align:center; padding:40px; color:#94a3b8; grid-column: 1/-1;">📭 لا يوجد مشتركون</p>
             {% endfor %}
-        </tbody>
-    </table>
+        </div>
+    </div>
 
     <!-- التذييل -->
     <div class="footer">
@@ -337,5 +362,24 @@
 
 </div>
 
+<script>
+function toggleView() {
+    const tv = document.getElementById('tableView');
+    const vv = document.getElementById('vouchersView');
+    const btn = document.getElementById('toggleBtn');
+
+    if (vv.classList.contains('active')) {
+        vv.classList.remove('active');
+        tv.classList.remove('hidden');
+        btn.textContent = '🎴 تبديل للبطاقات';
+    } else {
+        vv.classList.add('active');
+        tv.classList.add('hidden');
+        btn.textContent = '📋 تبديل للجدول';
+    }
+}
+</script>
+
 </body>
 </html>
+HTMLEOF
