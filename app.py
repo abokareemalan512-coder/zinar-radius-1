@@ -181,6 +181,8 @@ def kick_user_via_ssh(router, username, user_type='pppoe'):
 
 
 def kick_subscriber(sub):
+    import os
+    if os.environ.get("RENDER") == "true": return
     """kick مشترك على كل الراوترات النشطة (لأنه قد يكون متصلًا بأي راوتر)"""
     if not sub:
         return
