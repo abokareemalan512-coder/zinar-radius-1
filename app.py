@@ -62,6 +62,15 @@ class Router(db.Model):
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
 
 
+class TrafficCache(db.Model):
+    __tablename__ = 'traffic_cache'
+    id = db.Column(db.Integer, primary_key=True)
+    iface = db.Column(db.String(50), default='ether1')
+    up = db.Column(db.Float, default=0.0)
+    down = db.Column(db.Float, default=0.0)
+    ts = db.Column(db.Integer, default=0)
+
+
 class AdminUser(db.Model):
     __tablename__ = 'admin_users'
     id = db.Column(db.Integer, primary_key=True)
@@ -207,16 +216,7 @@ def kick_subscriber(sub):
 
 # ============ Init ============
 
-def class TrafficCache(db.Model):
-    __tablename__ = 'traffic_cache'
-    id = db.Column(db.Integer, primary_key=True)
-    iface = db.Column(db.String(50), default='ether1')
-    up = db.Column(db.Float, default=0.0)
-    down = db.Column(db.Float, default=0.0)
-    ts = db.Column(db.Integer, default=0)
-
-
-init_database():
+def init_database():
     with app.app_context():
         try:
             db.create_all()
