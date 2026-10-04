@@ -69,6 +69,7 @@ class TrafficCache(db.Model):
     up = db.Column(db.Float, default=0.0)
     down = db.Column(db.Float, default=0.0)
     ts = db.Column(db.Integer, default=0)
+    ifaces_json = db.Column(db.Text, default='{}')
 
 
 class AdminUser(db.Model):
@@ -348,7 +349,7 @@ def check_admin_login():
     if request.endpoint is None: return
     if request.endpoint.startswith('static'): return
     if request.path.startswith('/api/'): return
-    public = ('login', 'logout', 'mobile_view')
+    public = ('login', 'logout', 'mobile', 'mobile_view', 'api_traffic', 'api_traffic_update', 'api_ifaces', 'sync.get_subscribers', 'sync.mark_first_use', 'api_auth', 'api_log')
     if request.endpoint in public: return
     if not session.get('admin_id'):
         return redirect(url_for('login'))
@@ -392,13 +393,30 @@ def logout():
 @app.route('/api/traffic')
 def api_traffic():
     db.session.remove()
+    iface = request.args.get('iface', 'ether1')
     try:
         row = TrafficCache.query.first()
         if row:
-            return jsonify({'up': row.up, 'down': row.down, 'ts': row.ts, 'iface': row.iface})
+            import json as _j
+            ifaces = _j.loads(row.ifaces_json or '{}')
+            d = ifaces.get(iface, {'up': 0, 'down': 0})
+            return jsonify({'up': d.get('up',0), 'down': d.get('down',0), 'ts': row.ts, 'iface': iface})
     except Exception:
         pass
-    return jsonify({'up': 0.0, 'down': 0.0, 'ts': 0, 'iface': 'ether1'})
+    return jsonify({'up': 0.0, 'down': 0.0, 'ts': 0, 'iface': iface})
+
+@app.route('/api/ifaces')
+def api_ifaces():
+    db.session.remove()
+    try:
+        import json as _j
+        row = TrafficCache.query.first()
+        if row:
+            ifaces = _j.loads(row.ifaces_json or '{}')
+            return jsonify({'ifaces': list(ifaces.keys())})
+    except Exception:
+        pass
+    return jsonify({'ifaces': ['ether1', 'ether2', 'ether3', 'bridge']})
 
 @app.route('/api/traffic/update', methods=['POST'])
 def api_traffic_update():
@@ -408,14 +426,20 @@ def api_traffic_update():
         return jsonify({'error': 'unauthorized'}), 401
     data = request.get_json() or {}
     try:
+        import json as _j
+        ifaces = data.get('ifaces', {})
+        total_up = sum(v.get('up',0) for v in ifaces.values()) if ifaces else data.get('up',0)
+        total_down = sum(v.get('down',0) for v in ifaces.values()) if ifaces else data.get('down',0)
         row = TrafficCache.query.first()
         if not row:
             row = TrafficCache()
             db.session.add(row)
-        row.up = data.get('up', 0)
-        row.down = data.get('down', 0)
+        row.up = total_up
+        row.down = total_down
         row.ts = data.get('ts', 0)
         row.iface = data.get('iface', 'ether1')
+        if ifaces:
+            row.ifaces_json = _j.dumps(ifaces)
         db.session.commit()
     except Exception as e:
         db.session.rollback()

@@ -20,10 +20,7 @@
     <div class="row">
       <label>اختر المنفذ</label>
       <select id="iface" onchange="update()">
-        <option value="ether1">ether1 (WAN)</option>
-        <option value="ether2">ether2</option>
-        <option value="ether3">ether3</option>
-        <option value="bridge">bridge</option>
+        <option value="">جاري التحميل...</option>
       </select>
     </div>
   </section>
@@ -110,6 +107,24 @@ async function update(){
     document.getElementById('status').style.color = '#e74c3c';
   }
 }
+async function loadIfaces(){
+  try{
+    const r = await fetch('/api/ifaces');
+    const d = await r.json();
+    const sel = document.getElementById('iface');
+    const cur = sel.value;
+    sel.innerHTML = '';
+    (d.ifaces||[]).forEach(n => {
+      const o = document.createElement('option');
+      o.value = n; o.textContent = n;
+      sel.appendChild(o);
+    });
+    if(cur && d.ifaces.includes(cur)) sel.value = cur;
+  }catch(e){}
+}
+loadIfaces();
+setTimeout(loadIfaces, 3000);
+
 setInterval(update, 2000);
 update();
 
