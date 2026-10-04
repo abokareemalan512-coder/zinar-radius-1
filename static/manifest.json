@@ -1,10 +1,10 @@
 {
-  "name": "ZINAR",
+  "name": "ZINAR - إدارة المشتركين",
   "short_name": "ZINAR",
-  "start_url": "/dashboard",
+  "start_url": "/mobile",
   "display": "standalone",
-  "background_color": "#0f172a",
-  "theme_color": "#3b82f6",
+  "background_color": "#0f1225",
+  "theme_color": "#0f1225",
   "orientation": "portrait",
   "icons": [
     {"src": "/static/icon-192.png", "sizes": "192x192", "type": "image/png"},

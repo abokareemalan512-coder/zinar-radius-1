@@ -378,6 +378,25 @@ def logout():
 
 # ============ Dashboard ============
 
+# ============ Traffic Cache ============
+_traffic_cache = {'up': 0.0, 'down': 0.0, 'ts': 0, 'iface': 'ether1'}
+
+@app.route('/api/traffic')
+def api_traffic():
+    return jsonify(_traffic_cache)
+
+@app.route('/api/traffic/update', methods=['POST'])
+def api_traffic_update():
+    token = request.headers.get('X-Sync-Token')
+    if token != 'zinar-sync-token-2026':
+        return jsonify({'error': 'unauthorized'}), 401
+    data = request.get_json() or {}
+    _traffic_cache['up'] = data.get('up', 0)
+    _traffic_cache['down'] = data.get('down', 0)
+    _traffic_cache['ts'] = data.get('ts', 0)
+    _traffic_cache['iface'] = data.get('iface', 'ether1')
+    return jsonify({'ok': True})
+
 @app.route('/dashboard')
 def dashboard():
     try:

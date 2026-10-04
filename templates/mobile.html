@@ -2,149 +2,136 @@
 <html lang="ar" dir="rtl">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>ZINAR - مراقبة السرعة</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<meta name="theme-color" content="#0f1225">
 <link rel="manifest" href="/static/manifest.json">
-<meta name="theme-color" content="#58a6ff">
-<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-<style>
-* { margin:0; padding:0; box-sizing:border-box; font-family:-apple-system,'Segoe UI',sans-serif; }
-body { background:#0d1117; color:#e6edf3; min-height:100vh; padding:20px; }
-.header { display:flex; align-items:center; justify-content:space-between; margin-bottom:20px; }
-.logo { display:flex; align-items:center; gap:10px; font-size:22px; font-weight:bold; color:#58a6ff; }
-.logo-icon { width:40px; height:40px; background:linear-gradient(135deg,#1f6feb,#58a6ff); border-radius:10px; display:flex; align-items:center; justify-content:center; font-size:22px; }
-.status { display:flex; align-items:center; gap:6px; font-size:12px; background:#161b22; padding:6px 12px; border-radius:20px; }
-.dot { width:8px; height:8px; background:#3fb950; border-radius:50%; animation:pulse 2s infinite; }
-@keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.4} }
-.selector { background:#161b22; border:1px solid #30363d; border-radius:12px; padding:16px; margin-bottom:20px; }
-.selector label { display:block; font-size:13px; color:#8b949e; margin-bottom:8px; }
-.selector select { width:100%; background:#0d1117; color:#e6edf3; border:1px solid #30363d; border-radius:8px; padding:12px; font-size:16px; }
-.cards { display:grid; grid-template-columns:1fr 1fr; gap:12px; margin-bottom:20px; }
-.card { background:#161b22; border:1px solid #30363d; border-radius:12px; padding:16px; text-align:center; }
-.card .icon { font-size:24px; margin-bottom:8px; }
-.card .label { font-size:13px; color:#8b949e; margin-bottom:6px; }
-.card .value { font-size:24px; font-weight:bold; }
-.card .unit { font-size:14px; color:#8b949e; }
-.download .value { color:#3fb950; }
-.upload .value { color:#f0883e; }
-.chart-box { background:#161b22; border:1px solid #30363d; border-radius:12px; padding:16px; }
-.chart-box h3 { font-size:14px; color:#8b949e; margin-bottom:12px; }
-canvas { max-height:200px; }
-</style>
+<title>ZINAR</title>
+<link rel="stylesheet" href="/static/mobile.css">
 </head>
 <body>
-<div class="header">
-    <div class="logo">
-        <div class="logo-icon">⚡</div>
-        <span>ZINAR</span>
-    </div>
-    <div class="status">
-        <div class="dot"></div>
-        <span>متصل</span>
-    </div>
-</div>
+<header class="topbar">
+  <div class="brand">
+    <span class="logo">⚡</span>
+    <span>ZINAR</span>
+  </div>
+  <div class="status-dot" id="status">● متصل</div>
+</header>
 
-<div class="selector">
-    <label>اختر المنفذ</label>
-    <select id="ifaceSelect"><option>جاري التحميل...</option></select>
-</div>
-
-<div class="cards">
-    <div class="card download">
-        <div class="icon">⬇️</div>
-        <div class="label">تحميل</div>
-        <div class="value" id="rxValue">0.0</div>
-        <div class="unit">Mbps</div>
+<main class="content">
+  <section class="card">
+    <div class="row">
+      <label>اختر المنفذ</label>
+      <select id="iface">
+        <option value="ether1">ether1 (WAN)</option>
+        <option value="ether2">ether2</option>
+        <option value="bridge">bridge</option>
+      </select>
     </div>
-    <div class="card upload">
-        <div class="icon">⬆️</div>
-        <div class="label">رفع</div>
-        <div class="value" id="txValue">0.0</div>
-        <div class="unit">Mbps</div>
+  </section>
+
+  <section class="grid2">
+    <div class="card stat">
+      <div class="icon up">↑</div>
+      <div class="label">رفع</div>
+      <div class="value" id="up">0.0</div>
+      <div class="unit">Mbps</div>
     </div>
-</div>
+    <div class="card stat">
+      <div class="icon down">↓</div>
+      <div class="label">تحميل</div>
+      <div class="value" id="down">0.0</div>
+      <div class="unit">Mbps</div>
+    </div>
+  </section>
 
-<div class="chart-box">
-    <h3>📈 آخر 60 ثانية</h3>
-    <canvas id="chart"></canvas>
-</div>
+  <section class="card chart-card">
+    <div class="card-head">
+      <span>📈 آخر 60 ثانية</span>
+    </div>
+    <canvas id="chart" height="180"></canvas>
+  </section>
 
+  <section class="grid2">
+    <a href="/subscribers" class="card stat link">
+      <div class="icon-user">👥</div>
+      <div class="value">{{ sub_count }}</div>
+      <div class="label">المشتركين</div>
+    </a>
+    <a href="/routers" class="card stat link">
+      <div class="icon-bolt">⚡</div>
+      <div class="value">{{ router_count }}</div>
+      <div class="label">الراوترات</div>
+    </a>
+  </section>
+</main>
+
+<nav class="bottom-nav">
+  <a href="/mobile" class="active">
+    <span>🏠</span><small>الرئيسية</small>
+  </a>
+  <a href="/subscribers">
+    <span>👥</span><small>المشتركين</small>
+  </a>
+  <a href="/packages">
+    <span>📦</span><small>الباقات</small>
+  </a>
+  <a href="/payments">
+    <span>💰</span><small>المدفوعات</small>
+  </a>
+  <a href="/logout">
+    <span>🚪</span><small>خروج</small>
+  </a>
+</nav>
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <script>
-const TOKEN = 'zinar-sync-token-2026';
-const API = '/api/traffic/get';
-const MAX_POINTS = 30;
-let labels = [], rxData = [], txData = [];
-let currentIface = null;
-let chart;
-
-function initChart() {
-    const ctx = document.getElementById('chart');
-    chart = new Chart(ctx, {
-        type: 'line',
-        data: { labels: [], datasets: [
-            { label:'تحميل', data:[], borderColor:'#3fb950', backgroundColor:'rgba(63,185,80,0.1)', tension:0.4, fill:true, pointRadius:0 },
-            { label:'رفع', data:[], borderColor:'#f0883e', backgroundColor:'rgba(240,136,62,0.1)', tension:0.4, fill:true, pointRadius:0 }
-        ]},
-        options: {
-            responsive:true, maintainAspectRatio:false,
-            plugins:{ legend:{ labels:{ color:'#8b949e', font:{size:11} } } },
-            scales: {
-                x:{ ticks:{ color:'#8b949e', font:{size:10} }, grid:{ color:'#30363d' } },
-                y:{ ticks:{ color:'#8b949e', font:{size:10} }, grid:{ color:'#30363d' }, beginAtZero:true }
-            }
-        }
-    });
-}
-
-async function fetchData() {
-    try {
-        const r = await fetch(API, { headers:{'X-Sync-Token': TOKEN} });
-        const d = await r.json();
-        if (!d.interfaces) return;
-
-        const sel = document.getElementById('ifaceSelect');
-        if (sel.options.length !== d.interfaces.length) {
-            sel.innerHTML = '';
-            d.interfaces.forEach(i => {
-                const o = document.createElement('option');
-                o.value = i; o.textContent = i;
-                sel.appendChild(o);
-            });
-            if (!currentIface) {
-                currentIface = d.interfaces[0];
-                sel.value = currentIface;
-            }
-        }
-
-        const t = d.traffic[currentIface];
-        if (t) {
-            document.getElementById('rxValue').textContent = t.rx.toFixed(1);
-            document.getElementById('txValue').textContent = t.tx.toFixed(1);
-
-            const now = new Date().toLocaleTimeString('ar', {hour:'2-digit',minute:'2-digit',second:'2-digit'});
-            labels.push(now); rxData.push(t.rx); txData.push(t.tx);
-            if (labels.length > MAX_POINTS) { labels.shift(); rxData.shift(); txData.shift(); }
-
-            chart.data.labels = labels;
-            chart.data.datasets[0].data = rxData;
-            chart.data.datasets[1].data = txData;
-            chart.update('none');
-        }
-    } catch(e) { console.error(e); }
-}
-
-document.getElementById('ifaceSelect').addEventListener('change', e => {
-    currentIface = e.target.value;
-    labels = []; rxData = []; txData = [];
+const ctx = document.getElementById('chart').getContext('2d');
+const chart = new Chart(ctx, {
+  type: 'line',
+  data: {
+    labels: [],
+    datasets: [
+      {label:'تحميل', data:[], borderColor:'#00e07a', backgroundColor:'rgba(0,224,122,0.1)', fill:true, tension:0.4},
+      {label:'رفع', data:[], borderColor:'#f5a623', backgroundColor:'rgba(245,166,35,0.1)', fill:true, tension:0.4}
+    ]
+  },
+  options: {
+    responsive:true, maintainAspectRatio:false,
+    plugins:{legend:{labels:{color:'#fff'}}},
+    scales:{
+      x:{ticks:{color:'#888'},grid:{color:'#222'}},
+      y:{ticks:{color:'#888'},grid:{color:'#222'},beginAtZero:true}
+    }
+  }
 });
 
-initChart();
-fetchData();
-setInterval(fetchData, 3000);
-</script>
-<script>
+async function update() {
+  const iface = document.getElementById('iface').value;
+  try {
+    const r = await fetch(`/api/traffic?iface=${iface}`);
+    const d = await r.json();
+    document.getElementById('up').textContent = d.up.toFixed(2);
+    document.getElementById('down').textContent = d.down.toFixed(2);
+    const t = new Date().toLocaleTimeString('en-GB');
+    chart.data.labels.push(t);
+    chart.data.datasets[0].data.push(d.down);
+    chart.data.datasets[1].data.push(d.up);
+    if (chart.data.labels.length > 30) {
+      chart.data.labels.shift();
+      chart.data.datasets[0].data.shift();
+      chart.data.datasets[1].data.shift();
+    }
+    chart.update('none');
+    document.getElementById('status').textContent = '● متصل';
+  } catch(e) {
+    document.getElementById('status').textContent = '● غير متصل';
+  }
+}
+setInterval(update, 2000);
+update();
+
 if ('serviceWorker' in navigator) {
-    navigator.serviceWorker.register('/static/service-worker.js');
+  navigator.serviceWorker.register('/static/sw.js');
 }
 </script>
 </body>
