@@ -333,7 +333,7 @@ def api_log():
 def check_admin_login():
     if request.endpoint is None: return
     if request.endpoint.startswith('static'): return
-    public = ('login', 'logout', 'api_auth', 'api_log', 'sync.get_subscribers')
+    public = ('login', 'logout', 'api_auth', 'api_log', 'sync.get_subscribers', 'sync.traffic_get', 'sync.traffic_update')
     if request.endpoint in public: return
     if not session.get('admin_id'):
         return redirect(url_for('login'))
