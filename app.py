@@ -207,7 +207,16 @@ def kick_subscriber(sub):
 
 # ============ Init ============
 
-def init_database():
+def class TrafficCache(db.Model):
+    __tablename__ = 'traffic_cache'
+    id = db.Column(db.Integer, primary_key=True)
+    iface = db.Column(db.String(50), default='ether1')
+    up = db.Column(db.Float, default=0.0)
+    down = db.Column(db.Float, default=0.0)
+    ts = db.Column(db.Integer, default=0)
+
+
+init_database():
     with app.app_context():
         try:
             db.create_all()
@@ -379,21 +388,13 @@ def logout():
 
 # ============ Dashboard ============
 
-# ============ Traffic Cache (DB-based) ============
-def _ensure_traffic_table():
-    from sqlalchemy import text
-    with db.engine.begin() as conn:
-        conn.execute(text("CREATE TABLE IF NOT EXISTS traffic_cache (id SERIAL PRIMARY KEY, iface VARCHAR(50), up FLOAT, down FLOAT, ts INTEGER)"))
-
+# ============ Traffic Cache (ORM) ============
 @app.route('/api/traffic')
 def api_traffic():
     try:
-        from sqlalchemy import text
-        _ensure_traffic_table()
-        with db.engine.connect() as conn:
-            r = conn.execute(text("SELECT up, down, ts, iface FROM traffic_cache LIMIT 1")).fetchone()
-            if r:
-                return jsonify({'up': r[0], 'down': r[1], 'ts': r[2], 'iface': r[3]})
+        row = TrafficCache.query.first()
+        if row:
+            return jsonify({'up': row.up, 'down': row.down, 'ts': row.ts, 'iface': row.iface})
     except Exception:
         pass
     return jsonify({'up': 0.0, 'down': 0.0, 'ts': 0, 'iface': 'ether1'})
@@ -405,17 +406,17 @@ def api_traffic_update():
         return jsonify({'error': 'unauthorized'}), 401
     data = request.get_json() or {}
     try:
-        from sqlalchemy import text
-        _ensure_traffic_table()
-        with db.engine.begin() as conn:
-            r = conn.execute(text("SELECT id FROM traffic_cache LIMIT 1")).fetchone()
-            if r:
-                conn.execute(text("UPDATE traffic_cache SET up=:u, down=:d, ts=:t, iface=:i WHERE id=:id"),
-                    {'u': data.get('up', 0), 'd': data.get('down', 0), 't': data.get('ts', 0), 'i': data.get('iface', 'ether1'), 'id': r[0]})
-            else:
-                conn.execute(text("INSERT INTO traffic_cache (up, down, ts, iface) VALUES (:u, :d, :t, :i)"),
-                    {'u': data.get('up', 0), 'd': data.get('down', 0), 't': data.get('ts', 0), 'i': data.get('iface', 'ether1')})
+        row = TrafficCache.query.first()
+        if not row:
+            row = TrafficCache()
+            db.session.add(row)
+        row.up = data.get('up', 0)
+        row.down = data.get('down', 0)
+        row.ts = data.get('ts', 0)
+        row.iface = data.get('iface', 'ether1')
+        db.session.commit()
     except Exception as e:
+        db.session.rollback()
         return jsonify({'error': str(e)}), 500
     return jsonify({'ok': True})
 
