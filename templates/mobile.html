@@ -4,6 +4,8 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>ZINAR - مراقبة السرعة</title>
+<link rel="manifest" href="/static/manifest.json">
+<meta name="theme-color" content="#58a6ff">
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <style>
 * { margin:0; padding:0; box-sizing:border-box; font-family:-apple-system,'Segoe UI',sans-serif; }
@@ -139,6 +141,11 @@ document.getElementById('ifaceSelect').addEventListener('change', e => {
 initChart();
 fetchData();
 setInterval(fetchData, 3000);
+</script>
+<script>
+if ('serviceWorker' in navigator) {
+    navigator.serviceWorker.register('/static/service-worker.js');
+}
 </script>
 </body>
 </html>
