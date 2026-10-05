@@ -389,40 +389,103 @@ def logout():
 
 # ============ Dashboard ============
 
-# ============ Traffic Cache (ORM) ============
+# ============ Traffic Cache (ORM) - FIXED ============
+def get_traffic_from_router(iface='ether1'):
+    try:
+        router = Router.query.filter_by(is_master=True, is_active=True).first()
+        if not router:
+            router = Router.query.filter_by(is_active=True).first()
+        if not router:
+            return None
+        ssh = paramiko.SSHClient()
+        ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
+        ssh.connect(hostname=router.ip_address, port=router.port or 22, username=router.username, password=router.password, timeout=5, allow_agent=False, look_for_keys=False)
+        cmd = '/interface print terse'
+        stdin, stdout, stderr = ssh.exec_command(cmd, timeout=5)
+        out = stdout.read().decode('utf-8','ignore')
+        ifaces = []
+        for line in out.split('\n'):
+            if 'name=' in line:
+                try:
+                    n = line.split('name=')[1].split()[0]
+                    ifaces.append(n)
+                except: pass
+        cmd2 = f'/interface monitor-traffic interface={iface} once as-value'
+        stdin, stdout, stderr = ssh.exec_command(cmd2, timeout=5)
+        out2 = stdout.read().decode('utf-8','ignore')
+        ssh.close()
+        rx = tx = 0
+        for part in out2.replace('\n',' ').split():
+            if 'rx-bits-per-second' in part:
+                try: rx = int(part.split('=')[1]) / 1000000.0
+                except: pass
+            if 'tx-bits-per-second' in part:
+                try: tx = int(part.split('=')[1]) / 1000000.0
+                except: pass
+        return {'ifaces': ifaces, 'rx': rx, 'tx': tx}
+    except Exception as e:
+        logger.warning(f"traffic SSH fail: {e}")
+        return None
+
 @app.route('/api/traffic')
 def api_traffic():
     db.session.remove()
     iface = request.args.get('iface', 'ether1')
+    if 'جاري' in iface or 'اختر' in iface or len(iface) < 2:
+        iface = 'ether1'
     try:
         row = TrafficCache.query.first()
-        if row:
-            import json as _j
+        if row and row.ifaces_json:
+            import json as _j, time as _time
             ifaces = _j.loads(row.ifaces_json or '{}')
-            d = ifaces.get(iface, {'up': 0, 'down': 0})
-            return jsonify({'up': d.get('up',0), 'down': d.get('down',0), 'ts': row.ts, 'iface': iface})
-    except Exception:
-        pass
+            if row.ts and (_time.time() - row.ts) < 15:
+                d = ifaces.get(iface)
+                if d:
+                    return jsonify({'up': float(d.get('up',0)), 'down': float(d.get('down',0)), 'ts': row.ts, 'iface': iface, 'source':'cache'})
+    except: pass
+    live = get_traffic_from_router(iface)
+    if live:
+        try:
+            import json as _j, time as _time
+            row = TrafficCache.query.first()
+            if not row:
+                row = TrafficCache()
+                db.session.add(row)
+            existing = {}
+            try: existing = _j.loads(row.ifaces_json or '{}')
+            except: existing = {}
+            existing[iface] = {'up': live['tx'], 'down': live['rx']}
+            row.ifaces_json = _j.dumps(existing)
+            row.up = live['tx']
+            row.down = live['rx']
+            row.ts = int(_time.time())
+            db.session.commit()
+        except:
+            db.session.rollback()
+        return jsonify({'up': round(live['tx'],2), 'down': round(live['rx'],2), 'iface': iface})
     return jsonify({'up': 0.0, 'down': 0.0, 'ts': 0, 'iface': iface})
 
 @app.route('/api/ifaces')
 def api_ifaces():
     db.session.remove()
+    live = get_traffic_from_router('ether1')
+    if live and live.get('ifaces'):
+        return jsonify({'ifaces': live['ifaces']})
     try:
         import json as _j
         row = TrafficCache.query.first()
-        if row:
+        if row and row.ifaces_json:
             ifaces = _j.loads(row.ifaces_json or '{}')
-            return jsonify({'ifaces': list(ifaces.keys())})
-    except Exception:
-        pass
-    return jsonify({'ifaces': ['ether1', 'ether2', 'ether3', 'bridge']})
+            if ifaces:
+                return jsonify({'ifaces': list(ifaces.keys())})
+    except: pass
+    return jsonify({'ifaces': ['ether1', 'ether2', 'ether3', 'ether4', 'bridge', 'wlan1']})
 
 @app.route('/api/traffic/update', methods=['POST'])
 def api_traffic_update():
     db.session.remove()
     token = request.headers.get('X-Sync-Token')
-    if token != 'zinar-sync-token-2026':
+    if token!= 'zinar-sync-token-2026':
         return jsonify({'error': 'unauthorized'}), 401
     data = request.get_json() or {}
     try:
@@ -445,45 +508,6 @@ def api_traffic_update():
         db.session.rollback()
         return jsonify({'error': str(e)}), 500
     return jsonify({'ok': True})
-
-@app.route('/dashboard')
-def dashboard():
-    try:
-        routers_list = Router.query.all()
-        routers_count = len(routers_list)
-        master = Router.query.filter_by(is_master=True).first()
-        sub_count = Subscriber.query.count()
-        active_subs = Subscriber.query.filter_by(status='active').count()
-        pending_pays = Payment.query.filter_by(status='pending').count()
-
-        start, end = _day_bounds()
-        today_revenue = db.session.query(db.func.sum(Payment.amount)).filter(
-            Payment.status == 'completed',
-            Payment.created_at >= start,
-            Payment.created_at < end
-        ).scalar() or 0
-
-        new_users_today = Subscriber.query.filter(
-            Subscriber.created_at >= start,
-            Subscriber.created_at < end
-        ).count()
-
-        preview = Subscriber.query.order_by(Subscriber.created_at.desc()).limit(8).all()
-
-        return render_template(
-            'dashboard.html',
-            routers_count=routers_count, routers_online=routers_count,
-            sub_count=sub_count, active_subs=active_subs, active_sessions=active_subs,
-            today_revenue=today_revenue, active_vouchers=0,
-            new_users_today=new_users_today, pending_pays=pending_pays,
-            subscribers=preview, has_master=master is not None,
-            admin_name=session.get('admin_name', 'مدير'),
-        )
-    except Exception as e:
-        logger.error(f"❌ dashboard: {e}")
-        flash(f'❌ {str(e)}', 'danger')
-        return render_template('error.html', error=str(e)), 500
-
 
 # ============ Admin Profile ============
 
