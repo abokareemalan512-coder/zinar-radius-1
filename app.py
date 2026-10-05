@@ -62,15 +62,6 @@ class Router(db.Model):
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
 
 
-class TrafficCache(db.Model):
-    __tablename__ = 'traffic_cache'
-    id = db.Column(db.Integer, primary_key=True)
-    iface = db.Column(db.String(50), default='ether1')
-    up = db.Column(db.Float, default=0.0)
-    down = db.Column(db.Float, default=0.0)
-    ts = db.Column(db.Integer, default=0)
-    ifaces_json = db.Column(db.Text, default='{}')
-
 
 class AdminUser(db.Model):
     __tablename__ = 'admin_users'
@@ -349,7 +340,7 @@ def check_admin_login():
     if request.endpoint is None: return
     if request.endpoint.startswith('static'): return
     if request.path.startswith('/api/'): return
-    public = ('login', 'logout', 'mobile', 'mobile_view', 'api_traffic', 'api_traffic_update', 'api_ifaces', 'sync.get_subscribers', 'sync.mark_first_use', 'api_auth', 'api_log')
+    public = ('login', 'logout', 'mobile', 'mobile_view', 'sync.get_subscribers', 'sync.mark_first_use', 'api_auth', 'api_log')
     if request.endpoint in public: return
     if not session.get('admin_id'):
         return redirect(url_for('login'))
@@ -390,125 +381,6 @@ def logout():
 # ============ Dashboard ============
 
 # ============ Traffic Cache (ORM) - FIXED ============
-def get_traffic_from_router(iface='ether1'):
-    try:
-        router = Router.query.filter_by(is_master=True, is_active=True).first()
-        if not router:
-            router = Router.query.filter_by(is_active=True).first()
-        if not router:
-            return None
-        ssh = paramiko.SSHClient()
-        ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
-        ssh.connect(hostname=router.ip_address, port=router.port or 22, username=router.username, password=router.password, timeout=5, allow_agent=False, look_for_keys=False)
-        cmd = '/interface print terse'
-        stdin, stdout, stderr = ssh.exec_command(cmd, timeout=5)
-        out = stdout.read().decode('utf-8','ignore')
-        ifaces = []
-        for line in out.split('\n'):
-            if 'name=' in line:
-                try:
-                    n = line.split('name=')[1].split()[0]
-                    ifaces.append(n)
-                except: pass
-        cmd2 = f'/interface monitor-traffic interface={iface} once as-value'
-        stdin, stdout, stderr = ssh.exec_command(cmd2, timeout=5)
-        out2 = stdout.read().decode('utf-8','ignore')
-        ssh.close()
-        rx = tx = 0
-        for part in out2.replace('\n',' ').split():
-            if 'rx-bits-per-second' in part:
-                try: rx = int(part.split('=')[1]) / 1000000.0
-                except: pass
-            if 'tx-bits-per-second' in part:
-                try: tx = int(part.split('=')[1]) / 1000000.0
-                except: pass
-        return {'ifaces': ifaces, 'rx': rx, 'tx': tx}
-    except Exception as e:
-        logger.warning(f"traffic SSH fail: {e}")
-        return None
-
-@app.route('/api/traffic')
-def api_traffic():
-    db.session.remove()
-    iface = request.args.get('iface', 'ether1')
-    if 'جاري' in iface or 'اختر' in iface or len(iface) < 2:
-        iface = 'ether1'
-    try:
-        row = TrafficCache.query.first()
-        if row and row.ifaces_json:
-            import json as _j, time as _time
-            ifaces = _j.loads(row.ifaces_json or '{}')
-            if row.ts and (_time.time() - row.ts) < 15:
-                d = ifaces.get(iface)
-                if d:
-                    return jsonify({'up': float(d.get('up',0)), 'down': float(d.get('down',0)), 'ts': row.ts, 'iface': iface, 'source':'cache'})
-    except: pass
-    live = get_traffic_from_router(iface)
-    if live:
-        try:
-            import json as _j, time as _time
-            row = TrafficCache.query.first()
-            if not row:
-                row = TrafficCache()
-                db.session.add(row)
-            existing = {}
-            try: existing = _j.loads(row.ifaces_json or '{}')
-            except: existing = {}
-            existing[iface] = {'up': live['tx'], 'down': live['rx']}
-            row.ifaces_json = _j.dumps(existing)
-            row.up = live['tx']
-            row.down = live['rx']
-            row.ts = int(_time.time())
-            db.session.commit()
-        except:
-            db.session.rollback()
-        return jsonify({'up': round(live['tx'],2), 'down': round(live['rx'],2), 'iface': iface})
-    return jsonify({'up': 0.0, 'down': 0.0, 'ts': 0, 'iface': iface})
-
-@app.route('/api/ifaces')
-def api_ifaces():
-    db.session.remove()
-    live = get_traffic_from_router('ether1')
-    if live and live.get('ifaces'):
-        return jsonify({'ifaces': live['ifaces']})
-    try:
-        import json as _j
-        row = TrafficCache.query.first()
-        if row and row.ifaces_json:
-            ifaces = _j.loads(row.ifaces_json or '{}')
-            if ifaces:
-                return jsonify({'ifaces': list(ifaces.keys())})
-    except: pass
-    return jsonify({'ifaces': ['ether1', 'ether2', 'ether3', 'ether4', 'bridge', 'wlan1']})
-
-@app.route('/api/traffic/update', methods=['POST'])
-def api_traffic_update():
-    db.session.remove()
-    token = request.headers.get('X-Sync-Token')
-    if token!= 'zinar-sync-token-2026':
-        return jsonify({'error': 'unauthorized'}), 401
-    data = request.get_json() or {}
-    try:
-        import json as _j
-        ifaces = data.get('ifaces', {})
-        total_up = sum(v.get('up',0) for v in ifaces.values()) if ifaces else data.get('up',0)
-        total_down = sum(v.get('down',0) for v in ifaces.values()) if ifaces else data.get('down',0)
-        row = TrafficCache.query.first()
-        if not row:
-            row = TrafficCache()
-            db.session.add(row)
-        row.up = total_up
-        row.down = total_down
-        row.ts = data.get('ts', 0)
-        row.iface = data.get('iface', 'ether1')
-        if ifaces:
-            row.ifaces_json = _j.dumps(ifaces)
-        db.session.commit()
-    except Exception as e:
-        db.session.rollback()
-        return jsonify({'error': str(e)}), 500
-    return jsonify({'ok': True})
-
 # ============ Admin Profile ============
 
 @app.route('/admin/change-credentials', methods=['POST'])
