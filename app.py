@@ -1,4 +1,3 @@
-# app.py — DB Master + API + Automatic Kick
 import os
 import io
 import csv
@@ -16,7 +15,12 @@ from flask import (
 from flask_sqlalchemy import SQLAlchemy
 from werkzeug.security import generate_password_hash, check_password_hash
 import paramiko
-import radius_sync
+
+# محاولة استيراد radius_sync مع حماية في حال عدم وجود الموديول
+try:
+    import radius_sync
+except ImportError:
+    radius_sync = None
 
 # ============ الإعدادات ============
 app = Flask(__name__)
@@ -26,7 +30,7 @@ app.config['MAX_CONTENT_LENGTH'] = 5 * 1024 * 1024
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-# ============ Database ============
+# ============ Database Config ============
 database_url = os.environ.get('DATABASE_URL')
 if not database_url:
     database_url = 'sqlite:///zinar.db'
@@ -44,8 +48,11 @@ logger.info(f"📊 DB: ...@{_masked}")
 
 db = SQLAlchemy(app)
 
-from api_sync import sync_bp
-app.register_blueprint(sync_bp)
+try:
+    from api_sync import sync_bp
+    app.register_blueprint(sync_bp)
+except ImportError:
+    logger.warning("⚠️ Blueprint api_sync غير موجود، تم التجاوز.")
 
 # ============ Models ============
 
@@ -60,7 +67,6 @@ class Router(db.Model):
     is_master = db.Column(db.Boolean, default=False)
     is_active = db.Column(db.Boolean, default=True)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
-
 
 
 class AdminUser(db.Model):
@@ -108,7 +114,27 @@ class Package(db.Model):
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
 
 
+class SystemEvent(db.Model):
+    __tablename__ = 'system_events'
+    id = db.Column(db.Integer, primary_key=True)
+    admin_name = db.Column(db.String(50))
+    action = db.Column(db.String(100))
+    target = db.Column(db.String(100))
+    details = db.Column(db.String(255))
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+
 # ============ Helpers ============
+
+def log_event(action, target="", details="", admin_name=None):
+    try:
+        if not admin_name:
+            admin_name = session.get('admin_name', 'النظام')
+        evt = SystemEvent(admin_name=admin_name, action=action, target=target, details=details)
+        db.session.add(evt)
+        db.session.commit()
+    except Exception as e:
+        logger.warning(f"⚠️ فشل تسجيل الحدث: {e}")
 
 def add_months(source_date, months):
     month = source_date.month - 1 + months
@@ -145,10 +171,6 @@ def _day_bounds(day=None):
 # ============ Kick via SSH ============
 
 def kick_user_via_ssh(router, username, user_type='pppoe'):
-    """
-    قطع اتصال مستخدم نشط على الراوتر عبر SSH.
-    لا يحذف الحساب — فقط kick.
-    """
     if not router:
         return False, "no router"
 
@@ -182,19 +204,15 @@ def kick_user_via_ssh(router, username, user_type='pppoe'):
 
 
 def kick_subscriber(sub):
-    import os
     if os.environ.get("RENDER") == "true": return
-    """kick مشترك على كل الراوترات النشطة (لأنه قد يكون متصلًا بأي راوتر)"""
     if not sub:
         return
 
-    # kick على الراوتر المرتبط (إن وُجد)
     if sub.router_id:
         r = Router.query.get(sub.router_id)
         if r:
             kick_user_via_ssh(r, sub.username, sub.user_type or 'pppoe')
 
-    # kick على كل الراوترات النشطة الأخرى (لتغطية كل الحالات)
     other_routers = Router.query.filter(
         Router.is_active == True,
         Router.id != (sub.router_id or 0)
@@ -206,7 +224,7 @@ def kick_subscriber(sub):
             pass
 
 
-# ============ Init ============
+# ============ Init DB ============
 
 def init_database():
     with app.app_context():
@@ -221,7 +239,7 @@ def init_database():
                 db.session.commit()
             logger.info("✅ تم تهيئة قاعدة البيانات")
         except Exception as e:
-            logger.error(f"❌ {e}")
+            logger.error(f"❌ خطأ تهيئة قاعدة البيانات: {e}")
 
 
 def ensure_columns():
@@ -330,7 +348,6 @@ def api_log():
 
 # ============ Auth Guard ============
 
-
 @app.route('/mobile')
 def mobile_view():
     return render_template('mobile.html')
@@ -346,7 +363,7 @@ def check_admin_login():
         return redirect(url_for('login'))
 
 
-# ============ Auth ============
+# ============ Routes ============
 
 @app.route('/')
 def index():
@@ -365,6 +382,7 @@ def login():
         if admin and check_password_hash(admin.password, p):
             session['admin_id'] = admin.id
             session['admin_name'] = admin.username
+            log_event('تسجيل دخول', 'لوحة التحكم', 'تسجيل دخول ناجح')
             flash('✅ تم تسجيل الدخول', 'success')
             return redirect(url_for('dashboard'))
         flash('❌ بيانات غير صحيحة', 'danger')
@@ -373,6 +391,7 @@ def login():
 
 @app.route('/logout')
 def logout():
+    log_event('تسجيل خروج', 'لوحة التحكم', 'تسجيل خروج المدير')
     session.clear()
     flash('✅ تم تسجيل الخروج', 'success')
     return redirect(url_for('login'))
@@ -380,18 +399,15 @@ def logout():
 
 # ============ Dashboard ============
 
-# ============ Traffic Cache (ORM) - FIXED ============
-# ============ Dashboard ============
-
 @app.route('/dashboard')
 def dashboard():
     try:
         routers_list = Router.query.all()
         routers_count = len(routers_list)
+        routers_online = Router.query.filter_by(is_active=True).count()
         master = Router.query.filter_by(is_master=True).first()
         sub_count = Subscriber.query.count()
         active_subs = Subscriber.query.filter_by(status='active').count()
-        pending_pays = Payment.query.filter_by(status='pending').count()
 
         start, end = _day_bounds()
         today_revenue = db.session.query(db.func.sum(Payment.amount)).filter(
@@ -405,19 +421,23 @@ def dashboard():
             Subscriber.created_at < end
         ).count()
 
-        preview = Subscriber.query.order_by(Subscriber.created_at.desc()).limit(8).all()
+        events_list = SystemEvent.query.order_by(SystemEvent.created_at.desc()).limit(20).all()
 
         return render_template(
             'dashboard.html',
-            routers_count=routers_count, routers_online=routers_count,
-            sub_count=sub_count, active_subs=active_subs, active_sessions=active_subs,
-            today_revenue=today_revenue, active_vouchers=0,
-            new_users_today=new_users_today, pending_pays=pending_pays,
-            subscribers=preview, has_master=master is not None,
+            routers_count=routers_count,
+            routers_online=routers_online,
+            routers=routers_list,
+            sub_count=sub_count,
+            active_subs=active_subs,
+            today_revenue=today_revenue,
+            new_users_today=new_users_today,
+            has_master=master is not None,
+            events=events_list,
             admin_name=session.get('admin_name', 'مدير'),
         )
     except Exception as e:
-        logger.error(f"❌ dashboard: {e}")
+        logger.error(f"❌ dashboard error: {e}")
         flash(f'❌ {str(e)}', 'danger')
         return render_template('error.html', error=str(e)), 500
 
@@ -462,14 +482,15 @@ def change_admin_credentials():
             admin.password = generate_password_hash(np)
 
         db.session.commit()
-        flash('✅ تم التحديث', 'success')
+        log_event('تعديل بيانات الحساب', 'المدير', f'تحديث بيانات المدير {admin.username}')
+        flash('✅ تم التحديث بنجاح', 'success')
     except Exception as e:
         db.session.rollback()
         flash(f'❌ {str(e)}', 'danger')
     return redirect(url_for('dashboard'))
 
 
-# ============ Routers (DB only) ============
+# ============ Routers ============
 
 @app.route('/routers', methods=['GET', 'POST'])
 def routers():
@@ -497,6 +518,7 @@ def routers():
             db.session.add(Router(name=name, ip_address=ip, username=un,
                                   password=pw, port=port, is_master=is_master, is_active=True))
             db.session.commit()
+            log_event('إضافة راوتر', name, f'IP: {ip}')
             flash(f'✅ الراوتر "{name}" أُضيف', 'success')
         except Exception as e:
             db.session.rollback()
@@ -513,7 +535,8 @@ def set_master_router(router_id):
         r = Router.query.get_or_404(router_id)
         r.is_master = True
         db.session.commit()
-        flash('✅ تم التحديث', 'success')
+        log_event('تعيين راوتر رئيسي', r.name)
+        flash('✅ تم التحديث بنجاح', 'success')
     except Exception as e:
         db.session.rollback()
         flash(f'❌ {str(e)}', 'danger')
@@ -546,7 +569,8 @@ def update_router(router_id):
         except ValueError: r.port = 22
 
         db.session.commit()
-        flash('✅ تم التحديث', 'success')
+        log_event('تعديل راوتر', name, f'IP: {ip}')
+        flash('✅ تم التحديث بنجاح', 'success')
     except Exception as e:
         db.session.rollback()
         flash(f'❌ {str(e)}', 'danger')
@@ -557,9 +581,11 @@ def update_router(router_id):
 def delete_router(router_id):
     try:
         r = Router.query.get_or_404(router_id)
+        r_name = r.name
         db.session.delete(r)
         db.session.commit()
-        flash('✅ تم الحذف من قاعدة البيانات', 'success')
+        log_event('حذف راوتر', r_name)
+        flash('✅ تم الحذف بنجاح', 'success')
     except Exception as e:
         db.session.rollback()
         flash(f'❌ {str(e)}', 'danger')
@@ -599,7 +625,7 @@ def subscribers():
 
         subs = q.order_by(Subscriber.created_at.desc()).all()
     except Exception as e:
-        logger.error(f"❌ {e}")
+        logger.error(f"❌ error subscribers: {e}")
         subs = []
 
     return render_template('subscribers.html',
@@ -624,7 +650,7 @@ def add_subscriber():
             flash('❌ الاسم وكلمة المرور مطلوبان', 'danger')
             return redirect(url_for('add_subscriber'))
         if Subscriber.query.filter_by(username=un).first():
-            flash(f'❌ "{un}" موجود', 'danger')
+            flash(f'❌ "{un}" موجود مسبقاً', 'danger')
             return redirect(url_for('add_subscriber'))
 
         try:
@@ -634,8 +660,10 @@ def add_subscriber():
                 expires_at=None, status='active'
             ))
             db.session.commit()
-            radius_sync.sync_user(un, pw)
-            flash(f'✅ "{un}" أُضيف — 📌 في قاعدة البيانات فقط', 'success')
+            if radius_sync:
+                radius_sync.sync_user(un, pw)
+            log_event('إضافة مشترك', un, f'الباقة: {pkg}')
+            flash(f'✅ المشترك "{un}" أُضيف بنجاح', 'success')
             return redirect(url_for('subscribers'))
         except Exception as e:
             db.session.rollback()
@@ -687,14 +715,11 @@ def bulk_add():
 
         usernames = []
         if cm == 'numbers':
-            for _ in range(cnt):
-                usernames.append(f"{prefix}{''.join(random.choices(N, k=rl))}")
+            for _ in range(cnt): usernames.append(f"{prefix}{''.join(random.choices(N, k=rl))}")
         elif cm == 'letters':
-            for _ in range(cnt):
-                usernames.append(f"{prefix}{''.join(random.choices(L, k=rl))}")
+            for _ in range(cnt): usernames.append(f"{prefix}{''.join(random.choices(L, k=rl))}")
         else:
-            for _ in range(cnt):
-                usernames.append(f"{prefix}{''.join(random.choices(M, k=rl))}")
+            for _ in range(cnt): usernames.append(f"{prefix}{''.join(random.choices(M, k=rl))}")
 
         created = failed = 0
         for un in usernames:
@@ -714,11 +739,14 @@ def bulk_add():
                 failed += 1
 
         db.session.commit()
-        for un in usernames:
-            sub = Subscriber.query.filter_by(username=un).first()
-            if sub:
-                radius_sync.sync_user(sub.username, sub.password)
-        flash(f'✅ {created} مشترك' + (f' — فشل {failed}' if failed else ''),
+        if radius_sync:
+            for un in usernames:
+                sub = Subscriber.query.filter_by(username=un).first()
+                if sub:
+                    radius_sync.sync_user(sub.username, sub.password)
+
+        log_event('إضافة جملة', f'{created} مشترك', f'الباقة: {pkg}')
+        flash(f'✅ تم إيجاد {created} مشترك' + (f' — فشل {failed}' if failed else ''),
               'success' if not failed else 'warning')
         return redirect(url_for('subscribers'))
 
@@ -734,18 +762,19 @@ def toggle_subscriber(sub_id):
         if sub.status == 'active':
             sub.status = 'paused'
             db.session.commit()
-            radius_sync.pause_user(sub.username)
-            # 👢 kick فوري
+            if radius_sync: radius_sync.pause_user(sub.username)
             kick_subscriber(sub)
+            log_event('إيقاف مشترك', sub.username)
             flash(f'⏸ "{sub.username}" موقوف وتم قطعه', 'warning')
         else:
             if sub.expires_at and sub.expires_at < datetime.utcnow():
-                flash('⚠️ منتهي', 'danger')
+                flash('⚠️ الحساب منتهي الإشتراك', 'danger')
             else:
                 sub.status = 'active'
                 db.session.commit()
-                radius_sync.resume_user(sub.username, sub.password)
-                flash(f'▶ "{sub.username}" نشط', 'success')
+                if radius_sync: radius_sync.resume_user(sub.username, sub.password)
+                log_event('تنشيط مشترك', sub.username)
+                flash(f'▶ "{sub.username}" نشط الأن', 'success')
     except Exception as e:
         db.session.rollback()
         flash(f'❌ {str(e)}', 'danger')
@@ -760,9 +789,9 @@ def reset_subscriber(sub_id):
         sub.first_used_at = None
         sub.status = 'active'
         db.session.commit()
-        # 👢 kick لإعادة الاتصال من جديد
         kick_subscriber(sub)
-        flash('🔄 تم التصفير — ⏳ سيبدأ من جديد', 'success')
+        log_event('تصفير مشترك', sub.username)
+        flash('🔄 تم تصفير عداد المشترك بنجاح', 'success')
     except Exception as e:
         db.session.rollback()
         flash(f'❌ {str(e)}', 'danger')
@@ -778,7 +807,8 @@ def extend_subscriber(sub_id):
         sub.expires_at = calculate_expiry(pkg, base) if pkg else base + timedelta(days=30)
         sub.status = 'active'
         db.session.commit()
-        flash(f'➕ ينتهي {sub.expires_at.strftime("%Y-%m-%d")}', 'success')
+        log_event('تتمديد اشتراك', sub.username, f'تاريخ الانتهاء الجديد: {sub.expires_at.strftime("%Y-%m-%d")}')
+        flash(f'➕ ينتهي في {sub.expires_at.strftime("%Y-%m-%d")}', 'success')
     except Exception as e:
         db.session.rollback()
         flash(f'❌ {str(e)}', 'danger')
@@ -797,6 +827,7 @@ def update_subscriber(sub_id):
         pkg = request.form.get('package', '').strip()
         if pkg: sub.package = pkg
         db.session.commit()
+        log_event('تعديل مشترك', sub.username)
         flash('✅ تم التحديث في قاعدة البيانات', 'success')
     except Exception as e:
         db.session.rollback()
@@ -808,12 +839,13 @@ def update_subscriber(sub_id):
 def delete_subscriber(sub_id):
     try:
         sub = Subscriber.query.get_or_404(sub_id)
-        # 👢 kick قبل الحذف
+        un = sub.username
         kick_subscriber(sub)
-        radius_sync.delete_user(sub.username)
+        if radius_sync: radius_sync.delete_user(un)
         db.session.delete(sub)
         db.session.commit()
-        flash('✅ تم الحذف وقطع الاتصال', 'success')
+        log_event('حذف مشترك', un)
+        flash('✅ تم الحذف وقطع الاتصال بنجاح', 'success')
     except Exception as e:
         db.session.rollback()
         flash(f'❌ {str(e)}', 'danger')
@@ -834,14 +866,15 @@ def bulk_delete_subscribers():
         kicked = 0
         for sub in subs:
             try:
-                if kick_subscriber(sub):
-                    kicked += 1
+                kick_subscriber(sub)
+                kicked += 1
             except Exception:
                 pass
-            radius_sync.delete_user(sub.username)
+            if radius_sync: radius_sync.delete_user(sub.username)
             db.session.delete(sub)
             deleted += 1
         db.session.commit()
+        log_event('حذف جملة', f'{deleted} مشترك')
         flash(f'🗑 تم حذف {deleted} مشترك — تم قطع {kicked}', 'success')
     except Exception as e:
         db.session.rollback()
@@ -869,7 +902,7 @@ def delete_expired_subscribers():
                 seen.add(s.id); unique.append(s)
 
         if not unique:
-            flash('ℹ️ لا يوجد منتهون', 'info')
+            flash('ℹ️ لا يوجد مشتركين منتهين', 'info')
             return redirect(url_for('subscribers'))
 
         deleted = 0
@@ -878,10 +911,11 @@ def delete_expired_subscribers():
                 kick_subscriber(sub)
             except Exception:
                 pass
-            radius_sync.delete_user(sub.username)
+            if radius_sync: radius_sync.delete_user(sub.username)
             db.session.delete(sub); deleted += 1
         db.session.commit()
-        flash(f'🗑 تم حذف {deleted} منتهي', 'success')
+        log_event('حذف المنتهين', f'{deleted} مشترك')
+        flash(f'🗑 تم حذف {deleted} مشترك منتهي', 'success')
     except Exception as e:
         db.session.rollback()
         flash(f'❌ {str(e)}', 'danger')
@@ -896,8 +930,7 @@ def export_subscribers(format):
     if ids:
         try:
             idl = [int(x) for x in ids.split(',') if x.strip().isdigit()]
-            subs = Subscriber.query.filter(Subscriber.id.in_(idl))\
-                                   .order_by(Subscriber.created_at.desc()).all()
+            subs = Subscriber.query.filter(Subscriber.id.in_(idl)).order_by(Subscriber.created_at.desc()).all()
         except Exception: subs = []
     else:
         q = Subscriber.query
@@ -910,118 +943,81 @@ def export_subscribers(format):
     if format == 'csv':
         out = io.StringIO(); out.write('\ufeff')
         w = csv.writer(out)
-        w.writerow(['#', 'الاسم', 'المستخدم', 'المرور', 'الباقة', 'النوع', 'الحالة', 'الانتهاء'])
+        w.writerow(['#', 'الاسم', 'المستخدم', 'كلمة المرور', 'الباقة', 'النوع', 'الحالة', 'تاريخ الانتهاء'])
         for i, s in enumerate(subs, 1):
-            w.writerow([i, s.name or '', s.username, s.password,
-                        s.package or '', s.user_type or 'pppoe', s.status,
-                        s.expires_at.strftime('%Y-%m-%d') if s.expires_at else '⏳'])
-        out.seek(0)
-        return send_file(io.BytesIO(out.getvalue().encode('utf-8')),
-                         mimetype='text/csv', as_attachment=True,
-                         download_name=f'subs_{ts}.csv')
+            w.writerow([
+                i,
+                s.name or '',
+                s.username,
+                s.password,
+                s.package or '',
+                s.user_type or 'pppoe',
+                s.status or 'active',
+                s.expires_at.strftime('%Y-%m-%d %H:%M') if s.expires_at else 'غير محدد'
+            ])
+        
+        mem = io.BytesIO()
+        mem.write(out.getvalue().encode('utf-8'))
+        mem.seek(0)
+        
+        return send_file(
+            mem,
+            mimetype='text/csv',
+            as_attachment=True,
+            download_name=f'subscribers_{ts}.csv'
+        )
 
-    elif format == 'txt':
-        lines = ['=' * 60, 'ZINAR — قائمة المشتركين',
-                 datetime.now().strftime("%Y-%m-%d %H:%M"),
-                 f'العدد: {len(subs)}', '=' * 60, '']
-        for i, s in enumerate(subs, 1):
-            lines.append(f'{i}. {s.name or s.username}')
-            lines.append(f'   User: {s.username}')
-            lines.append(f'   Pass: {s.password}')
-            lines.append(f'   Pkg : {s.package or "-"}')
-            if s.expires_at: lines.append(f'   Exp : {s.expires_at.strftime("%Y-%m-%d")}')
-            lines.append('-' * 60)
-        return send_file(io.BytesIO('\n'.join(lines).encode('utf-8')),
-                         mimetype='text/plain', as_attachment=True,
-                         download_name=f'subs_{ts}.txt')
-
-    elif format == 'print':
-        return render_template('print_subscribers.html',
-                               subscribers=subs, now=datetime.utcnow(),
-                               filter_type=ft)
-
-    flash('❌ صيغة غير مدعومة', 'danger')
     return redirect(url_for('subscribers'))
 
 
 # ============ Packages ============
 
-@app.route('/packages')
+@app.route('/packages', methods=['GET', 'POST'])
 def packages():
-    return render_template('packages.html',
-                           packages=Package.query.order_by(Package.id).all())
-
-
-@app.route('/packages/add', methods=['POST'])
-def add_package():
-    name = request.form.get('name', '').strip()
-    speed = request.form.get('speed', '').strip()
-    price = request.form.get('price', '0').strip()
-    dur = request.form.get('duration', '1').strip()
-    unit = request.form.get('duration_unit', 'days').strip()
-    ut = request.form.get('user_type', 'pppoe').strip()
-
-    if unit not in ('days', 'months'): unit = 'days'
-    if ut not in ('pppoe', 'hotspot'): ut = 'pppoe'
-    if not name:
-        flash('❌ اسم الباقة مطلوب', 'danger')
-        return redirect(url_for('packages'))
-    if Package.query.filter_by(name=name).first():
-        flash('❌ الاسم موجود', 'danger')
-        return redirect(url_for('packages'))
-
-    try:
-        db.session.add(Package(name=name, speed=speed, price=float(price or 0),
-                               duration=int(dur or 1), duration_unit=unit, user_type=ut))
-        db.session.commit()
-        flash(f'✅ تم إضافة "{name}"', 'success')
-    except Exception as e:
-        db.session.rollback()
-        flash(f'❌ {str(e)}', 'danger')
-    return redirect(url_for('packages'))
-
-
-@app.route('/packages/update/<int:pkg_id>', methods=['POST'])
-def update_package(pkg_id):
-    try:
-        p = Package.query.get_or_404(pkg_id)
+    if request.method == 'POST':
         name = request.form.get('name', '').strip()
         speed = request.form.get('speed', '').strip()
         price = request.form.get('price', '0').strip()
-        dur = request.form.get('duration', '1').strip()
+        duration = request.form.get('duration', '30').strip()
         unit = request.form.get('duration_unit', 'days').strip()
         ut = request.form.get('user_type', 'pppoe').strip()
 
-        if unit not in ('days', 'months'): unit = 'days'
-        if ut not in ('pppoe', 'hotspot'): ut = 'pppoe'
         if not name:
-            flash('❌ الاسم مطلوب', 'danger')
-            return redirect(url_for('packages'))
-        if Package.query.filter(Package.name == name, Package.id != pkg_id).first():
-            flash('❌ الاسم موجود', 'danger')
+            flash('❌ اسم الباقة مطلوب', 'danger')
             return redirect(url_for('packages'))
 
-        p.name = name
-        p.speed = speed
-        p.price = float(price or 0)
-        p.duration = int(dur or 1)
-        p.duration_unit = unit
-        p.user_type = ut
-        db.session.commit()
-        flash('✅ تم التحديث', 'success')
-    except Exception as e:
-        db.session.rollback()
-        flash(f'❌ {str(e)}', 'danger')
-    return redirect(url_for('packages'))
+        if Package.query.filter_by(name=name).first():
+            flash('❌ اسم الباقة موجود بالفعل', 'danger')
+            return redirect(url_for('packages'))
+
+        try:
+            p_val = float(price) if price else 0
+            d_val = int(duration) if duration else 30
+            db.session.add(Package(
+                name=name, speed=speed, price=p_val,
+                duration=d_val, duration_unit=unit, user_type=ut
+            ))
+            db.session.commit()
+            log_event('إضافة باقة', name, f'السعر: {p_val}')
+            flash(f'✅ الباقة "{name}" أُضيفت بنجاح', 'success')
+        except Exception as e:
+            db.session.rollback()
+            flash(f'❌ {str(e)}', 'danger')
+        return redirect(url_for('packages'))
+
+    pkgs = Package.query.order_by(Package.created_at.desc()).all()
+    return render_template('packages.html', packages=pkgs)
 
 
 @app.route('/packages/delete/<int:pkg_id>')
 def delete_package(pkg_id):
     try:
-        p = Package.query.get_or_404(pkg_id)
-        db.session.delete(p)
+        pkg = Package.query.get_or_404(pkg_id)
+        pkg_name = pkg.name
+        db.session.delete(pkg)
         db.session.commit()
-        flash('✅ تم الحذف', 'success')
+        log_event('حذف باقة', pkg_name)
+        flash('✅ تم حذف الباقة بنجاح', 'success')
     except Exception as e:
         db.session.rollback()
         flash(f'❌ {str(e)}', 'danger')
@@ -1032,33 +1028,12 @@ def delete_package(pkg_id):
 
 @app.route('/payments')
 def payments():
-    return render_template('payments.html',
-        payments=Payment.query.order_by(Payment.created_at.desc()).all())
+    pay_list = Payment.query.order_by(Payment.created_at.desc()).all()
+    return render_template('payments.html', payments=pay_list)
 
 
-@app.route('/payments/<int:pid>/complete', methods=['POST'])
-def complete_payment(pid):
-    try:
-        p = Payment.query.get_or_404(pid)
-        p.status = 'completed'
-        db.session.commit()
-        return jsonify({'ok': True})
-    except Exception as e:
-        db.session.rollback()
-        return jsonify({'ok': False, 'error': str(e)}), 500
-
-
-# ============ Errors ============
-
-@app.errorhandler(404)
-def not_found(e):
-    return render_template('error.html', error='الصفحة غير موجودة'), 404
-
-
-@app.errorhandler(500)
-def server_error(e):
-    return render_template('error.html', error='خطأ داخلي'), 500
-
+# ============ Main ============
 
 if __name__ == '__main__':
-    app.run(host='0.0.0.0', port=int(os.environ.get('PORT', 5000)), debug=False)
+    port = int(os.environ.get('PORT', 5000))
+    app.run(host='0.0.0.0', port=port, debug=True)
