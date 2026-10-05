@@ -2,265 +2,186 @@
 {% block title %}لوحة التحكم{% endblock %}
 
 {% block content %}
-<div class="d-flex justify-content-between align-items-center mb-4">
-    <h2>🏠 لوحة التحكم</h2>
-
-    <!-- ✅ بطاقة admin قابلة للضغط -->
+<div class="d-flex justify-content-between align-items-center mb-2">
+    <h6>🏠 لوحة التحكم</h6>
     <button type="button" class="user-badge" data-bs-toggle="modal" data-bs-target="#changeCredModal">
         <div class="user-avatar">{{ admin_name[0]|upper }}</div>
         <div class="user-info">
-            <span class="user-greeting">مرحباً بك 👋</span>
+            <span class="user-greeting">مرحباً</span>
             <span class="user-name">{{ admin_name }}</span>
         </div>
-        <i class="bi bi-gear text-accent ms-2"></i>
+        <i class="bi bi-gear text-accent ms-1"></i>
     </button>
 </div>
 
-<!-- بطاقات الإحصائيات -->
-<div class="row g-3 mb-4">
-    <div class="col-md-3">
-        <div class="card p-3 text-center">
-            <div class="fs-1 text-accent">📡</div>
-            <h3 class="mb-1">{{ routers_count }}</h3>
-            <p class="text-muted mb-0">إجمالي الراوترات</p>
-            <small class="text-accent">🟢 متصل: {{ routers_online }}</small>
+<div class="row g-2 mb-2">
+    <div class="col-6 col-md-3">
+        <div class="card p-2 text-center">
+            <div class="fs-5 text-accent">📡</div>
+            <h6 class="mb-0">{{ routers_count }}</h6>
+            <small class="text-muted" style="font-size:10px">الراوترات</small>
         </div>
     </div>
-    <div class="col-md-3">
-        <div class="card p-3 text-center">
-            <div class="fs-1 text-accent">👥</div>
-            <h3 class="mb-1">{{ sub_count }}</h3>
-            <p class="text-muted mb-0">إجمالي المشتركين</p>
-            <small class="text-accent">✅ نشط: {{ active_subs }}</small>
+    <div class="col-6 col-md-3">
+        <div class="card p-2 text-center">
+            <div class="fs-5 text-accent">👥</div>
+            <h6 class="mb-0">{{ sub_count }}</h6>
+            <small class="text-muted" style="font-size:10px">المشتركين</small>
         </div>
     </div>
-    <div class="col-md-3">
-        <div class="card p-3 text-center">
-            <div class="fs-1 text-accent">💰</div>
-            <h3 class="mb-1">{{ "%.0f"|format(today_revenue) }}</h3>
-            <p class="text-muted mb-0">إيرادات اليوم</p>
-            <small class="text-accent">⏳ معلقة: {{ pending_pays }}</small>
+    <div class="col-6 col-md-3">
+        <div class="card p-2 text-center">
+            <div class="fs-5 text-accent">💰</div>
+            <h6 class="mb-0">{{ "%.0f"|format(today_revenue) }}</h6>
+            <small class="text-muted" style="font-size:10px">إيرادات اليوم</small>
         </div>
     </div>
-    <div class="col-md-3">
-        <div class="card p-3 text-center">
-            <div class="fs-1 text-accent">✨</div>
-            <h3 class="mb-1">{{ new_users_today }}</h3>
-            <p class="text-muted mb-0">مشتركون جدد اليوم</p>
-            <small class="text-accent">📊 نشط: {{ active_sessions }}</small>
+    <div class="col-6 col-md-3">
+        <div class="card p-2 text-center">
+            <div class="fs-5 text-accent">✨</div>
+            <h6 class="mb-0">{{ new_users_today }}</h6>
+            <small class="text-muted" style="font-size:10px">جدد اليوم</small>
         </div>
     </div>
 </div>
 
-<!-- حالة النظام + إجراءات سريعة -->
-<div class="row g-3 mb-4">
+<div class="row g-2 mb-2">
     <div class="col-md-6">
-        <div class="card p-3">
-            <h5 class="mb-3">⚙️ حالة النظام</h5>
-            <div class="d-flex justify-content-between mb-2">
+        <div class="card p-2 h-100">
+            <div style="font-size:12px;font-weight:bold" class="mb-1">⚙️ حالة النظام</div>
+            <div class="d-flex justify-content-between" style="font-size:11px">
                 <span>الراوتر الرئيسي:</span>
                 {% if has_master %}
-                    <span class="badge bg-success">✅ محدد</span>
+                    <span class="badge bg-success" style="font-size:10px">✅ محدد</span>
                 {% else %}
-                    <span class="badge bg-warning">⚠️ غير محدد</span>
+                    <span class="badge bg-warning" style="font-size:10px">⚠️ غير محدد</span>
                 {% endif %}
             </div>
-            <div class="d-flex justify-content-between mb-2">
-                <span>الراوترات المتصلة:</span>
+            <div class="d-flex justify-content-between" style="font-size:11px">
+                <span>المتصلة:</span>
                 <span class="text-accent">{{ routers_online }} / {{ routers_count }}</span>
             </div>
-            <div class="d-flex justify-content-between">
-                <span>المشتركون النشطون:</span>
+            <div class="d-flex justify-content-between" style="font-size:11px">
+                <span>النشطون:</span>
                 <span class="text-accent">{{ active_subs }}</span>
             </div>
         </div>
     </div>
 
     <div class="col-md-6">
-        <div class="card p-3">
-            <h5 class="mb-3">⚡ إجراءات سريعة</h5>
-            <div class="d-grid gap-2">
-                <a href="{{ url_for('add_subscriber') }}" class="btn btn-primary">➕ إضافة مشترك جديد</a>
-                <a href="{{ url_for('routers') }}" class="btn btn-primary">📡 إدارة الراوترات</a>
-                <a href="{{ url_for('payments') }}" class="btn btn-primary">💰 عرض الدفعات</a>
+        <div class="card p-2 h-100">
+            <div style="font-size:12px;font-weight:bold" class="mb-1">⚡ إجراءات سريعة</div>
+            <div class="d-grid gap-1">
+                <a href="{{ url_for('add_subscriber') }}" class="btn btn-primary btn-sm" style="font-size:11px;padding:3px">➕ إضافة مشترك</a>
+                <a href="{{ url_for('routers') }}" class="btn btn-primary btn-sm" style="font-size:11px;padding:3px">📡 الراوترات</a>
+                <a href="{{ url_for('payments') }}" class="btn btn-primary btn-sm" style="font-size:11px;padding:3px">💰 الدفعات</a>
             </div>
         </div>
     </div>
 </div>
 
-<!-- آخر المشتركين -->
-<div class="card">
-    <div class="card-header d-flex justify-content-between align-items-center">
-        <h5 class="mb-0">👥 آخر المشتركين</h5>
-        <a href="{{ url_for('subscribers') }}" class="btn btn-sm btn-primary">عرض الكل</a>
+<div class="card mb-2">
+    <div class="card-header py-1"><small style="font-size:11px;font-weight:bold">📡 حالة الراوترات</small></div>
+    <div class="card-body py-1">
+        {% for r in routers %}
+        <div class="d-flex justify-content-between align-items-center py-1" style="font-size:11px;border-bottom:1px solid #1e2444">
+            <span>{{ r.name }} <span class="text-muted" style="font-size:10px">({{ r.ip_address }})</span></span>
+            {% if r.is_active %}
+                <span class="badge bg-success" style="font-size:10px">🟢 متصل</span>
+            {% else %}
+                <span class="badge bg-danger" style="font-size:10px">🔴 غير متصل</span>
+            {% endif %}
+        </div>
+        {% else %}
+        <p class="text-muted mb-0 text-center py-1" style="font-size:11px">لا يوجد راوترات</p>
+        {% endfor %}
     </div>
+</div>
+
+<div class="card">
+    <div class="card-header py-1"><small style="font-size:11px;font-weight:bold">📋 سجل الأحداث (آخر 20)</small></div>
     <div class="table-responsive">
-        <table class="table table-hover mb-0">
+        <table class="table table-sm table-hover mb-0">
             <thead>
-                <tr>
-                    <th>#</th>
-                    <th>اسم المشترك</th>
-                    <th>اسم المستخدم</th>
-                    <th>الباقة</th>
-                    <th>الحالة</th>
-                    <th>تاريخ الإضافة</th>
+                <tr style="font-size:11px">
+                    <th style="padding:3px">الوقت</th>
+                    <th style="padding:3px">المدير</th>
+                    <th style="padding:3px">الإجراء</th>
+                    <th style="padding:3px">الهدف</th>
+                    <th style="padding:3px">التفاصيل</th>
                 </tr>
             </thead>
             <tbody>
-                {% for sub in subscribers %}
-                <tr>
-                    <td>{{ sub.id }}</td>
-                    <td class="text-accent">{{ sub.name or sub.username }}</td>
-                    <td>{{ sub.username }}</td>
-                    <td>{{ sub.package or '-' }}</td>
-                    <td>
-                        {% if sub.status == 'active' %}
-                            <span class="badge bg-success">نشط</span>
-                        {% elif sub.status == 'paused' %}
-                            <span class="badge bg-warning">موقوف</span>
-                        {% elif sub.status == 'expired' %}
-                            <span class="badge bg-danger">منتهي</span>
-                        {% else %}
-                            <span class="badge bg-secondary">{{ sub.status }}</span>
-                        {% endif %}
-                    </td>
-                    <td>{{ sub.created_at.strftime('%Y-%m-%d') if sub.created_at else '-' }}</td>
+                {% for e in events %}
+                <tr style="font-size:11px">
+                    <td style="padding:3px">{{ e.created_at.strftime('%m-%d %H:%M') if e.created_at else '-' }}</td>
+                    <td style="padding:3px;color:#00e0a0">{{ e.admin_name or '-' }}</td>
+                    <td style="padding:3px">{{ e.action or '-' }}</td>
+                    <td style="padding:3px">{{ e.target or '-' }}</td>
+                    <td style="padding:3px;color:#888">{{ e.details or '' }}</td>
                 </tr>
                 {% else %}
-                <tr>
-                    <td colspan="6" class="text-center py-4 text-muted">
-                        لا يوجد مشتركون بعد
-                    </td>
-                </tr>
+                <tr><td colspan="5" class="text-center py-2 text-muted" style="font-size:11px">لا يوجد أحداث بعد</td></tr>
                 {% endfor %}
             </tbody>
         </table>
     </div>
 </div>
 
-<!-- ============ Modal تغيير بيانات الدخول ============ -->
 <div class="modal fade" id="changeCredModal" tabindex="-1">
     <div class="modal-dialog modal-dialog-centered">
         <div class="modal-content">
             <form method="POST" action="{{ url_for('change_admin_credentials') }}">
                 <div class="modal-header border-secondary">
-                    <h5 class="modal-title text-accent">
-                        <i class="bi bi-shield-lock"></i> تغيير بيانات الدخول
-                    </h5>
+                    <h6 class="modal-title text-accent">🔐 تغيير بيانات الدخول</h6>
                     <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
                 </div>
-
                 <div class="modal-body">
-
-                    <div class="alert alert-warning small">
-                        ⚠️ <strong>مطلوب:</strong> يجب إدخال كلمة المرور الحالية لتأكيد التغيير.
+                    <div class="alert alert-warning" style="font-size:11px">⚠️ مطلوب كلمة المرور الحالية.</div>
+                    <div class="mb-2">
+                        <label class="form-label" style="font-size:11px">كلمة المرور الحالية *</label>
+                        <input type="password" name="current_password" class="form-control form-control-sm" required>
                     </div>
-
-                    <div class="mb-3">
-                        <label class="form-label">
-                            <i class="bi bi-key text-accent"></i> كلمة المرور الحالية *
-                        </label>
-                        <input type="password" name="current_password"
-                               class="form-control" required autocomplete="current-password">
+                    <hr class="border-secondary my-2">
+                    <div class="mb-2">
+                        <label class="form-label" style="font-size:11px">اسم المستخدم الجديد</label>
+                        <input type="text" name="new_username" class="form-control form-control-sm" value="{{ admin_name }}">
                     </div>
-
-                    <hr class="border-secondary my-3">
-
-                    <div class="mb-3">
-                        <label class="form-label">
-                            <i class="bi bi-person text-accent"></i> اسم المستخدم الجديد
-                        </label>
-                        <input type="text" name="new_username" class="form-control"
-                               value="{{ admin_name }}"
-                               autocomplete="username">
-                        <small class="text-muted">اتركه كما هو إذا لا تريد تغييره</small>
+                    <div class="mb-2">
+                        <label class="form-label" style="font-size:11px">كلمة المرور الجديدة</label>
+                        <input type="password" name="new_password" class="form-control form-control-sm" minlength="6">
                     </div>
-
-                    <div class="mb-3">
-                        <label class="form-label">
-                            <i class="bi bi-lock text-accent"></i> كلمة المرور الجديدة
-                        </label>
-                        <input type="password" name="new_password" class="form-control"
-                               placeholder="اتركها فارغة للإبقاء على الحالية"
-                               minlength="6" autocomplete="new-password">
-                        <small class="text-muted">6 أحرف على الأقل</small>
+                    <div class="mb-2">
+                        <label class="form-label" style="font-size:11px">تأكيد كلمة المرور</label>
+                        <input type="password" name="confirm_password" class="form-control form-control-sm" minlength="6">
                     </div>
-
-                    <div class="mb-3">
-                        <label class="form-label">
-                            <i class="bi bi-lock-fill text-accent"></i> تأكيد كلمة المرور الجديدة
-                        </label>
-                        <input type="password" name="confirm_password" class="form-control"
-                               placeholder="أعد كتابة كلمة المرور الجديدة"
-                               minlength="6" autocomplete="new-password">
-                    </div>
-
                 </div>
-
                 <div class="modal-footer border-secondary">
-                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">إلغاء</button>
-                    <button type="submit" class="btn btn-primary">
-                        <i class="bi bi-save"></i> حفظ التغييرات
-                    </button>
+                    <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">إلغاء</button>
+                    <button type="submit" class="btn btn-primary btn-sm">💾 حفظ</button>
                 </div>
             </form>
         </div>
     </div>
 </div>
 
-<!-- ============ الأنماط ============ -->
 <style>
-    .user-badge {
-        display: flex;
-        align-items: center;
-        gap: 12px;
-        background: var(--bg-card);
-        border: 1px solid var(--bg-hover);
-        border-radius: 50px;
-        padding: 6px 16px 6px 6px;
-        transition: 0.3s;
-        cursor: pointer;
-        color: inherit;
-        font-family: inherit;
-    }
-    .user-badge:hover {
-        border-color: var(--accent);
-        box-shadow: 0 0 15px var(--accent-glow);
-        background: var(--bg-card);
-    }
-    .user-badge:focus {
-        outline: none;
-        border-color: var(--accent);
-        box-shadow: 0 0 15px var(--accent-glow);
-    }
-    .user-avatar {
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        width: 40px;
-        height: 40px;
-        background: linear-gradient(135deg, var(--accent), #0ea5e9);
-        color: #0f172a;
-        font-weight: 800;
-        font-size: 18px;
-        border-radius: 50%;
-        box-shadow: 0 3px 10px var(--accent-glow);
-    }
-    .user-info {
-        display: flex;
-        flex-direction: column;
-        line-height: 1.2;
-        text-align: right;
-    }
-    .user-greeting {
-        font-size: 11px;
-        color: var(--text-muted);
-    }
-    .user-name {
-        font-size: 14px;
-        font-weight: 700;
-        color: var(--accent);
-    }
+.user-badge {
+    display:flex; align-items:center; gap:8px;
+    background:var(--bg-card); border:1px solid var(--bg-hover);
+    border-radius:50px; padding:4px 10px 4px 4px;
+    cursor:pointer; color:inherit; font-family:inherit;
+}
+.user-badge:hover { border-color:var(--accent); }
+.user-avatar {
+    display:flex; align-items:center; justify-content:center;
+    width:28px; height:28px;
+    background:linear-gradient(135deg,var(--accent),#0ea5e9);
+    color:#0f172a; font-weight:800; font-size:12px; border-radius:50%;
+}
+.user-info { display:flex; flex-direction:column; line-height:1.1; text-align:right; }
+.user-greeting { font-size:9px; color:var(--text-muted); }
+.user-name { font-size:11px; font-weight:700; color:var(--accent); }
 </style>
 
 {% endblock %}
