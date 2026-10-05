@@ -381,6 +381,47 @@ def logout():
 # ============ Dashboard ============
 
 # ============ Traffic Cache (ORM) - FIXED ============
+# ============ Dashboard ============
+
+@app.route('/dashboard')
+def dashboard():
+    try:
+        routers_list = Router.query.all()
+        routers_count = len(routers_list)
+        master = Router.query.filter_by(is_master=True).first()
+        sub_count = Subscriber.query.count()
+        active_subs = Subscriber.query.filter_by(status='active').count()
+        pending_pays = Payment.query.filter_by(status='pending').count()
+
+        start, end = _day_bounds()
+        today_revenue = db.session.query(db.func.sum(Payment.amount)).filter(
+            Payment.status == 'completed',
+            Payment.created_at >= start,
+            Payment.created_at < end
+        ).scalar() or 0
+
+        new_users_today = Subscriber.query.filter(
+            Subscriber.created_at >= start,
+            Subscriber.created_at < end
+        ).count()
+
+        preview = Subscriber.query.order_by(Subscriber.created_at.desc()).limit(8).all()
+
+        return render_template(
+            'dashboard.html',
+            routers_count=routers_count, routers_online=routers_count,
+            sub_count=sub_count, active_subs=active_subs, active_sessions=active_subs,
+            today_revenue=today_revenue, active_vouchers=0,
+            new_users_today=new_users_today, pending_pays=pending_pays,
+            subscribers=preview, has_master=master is not None,
+            admin_name=session.get('admin_name', 'مدير'),
+        )
+    except Exception as e:
+        logger.error(f"❌ dashboard: {e}")
+        flash(f'❌ {str(e)}', 'danger')
+        return render_template('error.html', error=str(e)), 500
+
+
 # ============ Admin Profile ============
 
 @app.route('/admin/change-credentials', methods=['POST'])
