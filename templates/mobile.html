@@ -3,132 +3,107 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-<meta name="theme-color" content="#0f1225">
-<link rel="manifest" href="/static/manifest.json">
-<title>ZINAR</title>
-<link rel="stylesheet" href="/static/mobile.css">
+<title>ZINAR - خفيف</title>
+<style>
+  body{background:#0a0c1a; color:#fff; font-family:system-ui; margin:0; padding:0; padding-bottom:80px}
+  .topbar{padding:18px; background:#141735; display:flex; justify-content:space-between; font-size:18px; font-weight:bold}
+  .card{background:#151a35; border-radius:18px; margin:12px; padding:16px; border:1px solid #1f2750}
+  .grid2{display:grid; grid-template-columns:1fr 1fr; gap:0}
+  .stat{text-align:center; padding:20px 10px}
+  .stat .value{font-size:32px; font-weight:800; margin:8px 0}
+  .stat .label{color:#8a92c0; font-size:14px}
+  .up{color:#ffaa00} .down{color:#00ff88}
+  .link{text-decoration:none; color:#fff; display:block}
+  .link:active{transform:scale(0.97)}
+  select{width:100%; background:#0a0c1a; color:#fff; border:1px solid #2a3366; padding:12px; border-radius:12px; font-size:16px}
+  .bottom-nav{position:fixed; bottom:0; left:0; right:0; background:#141735; display:flex; justify-content:space-around; padding:10px 0; border-top:1px solid #1f2750}
+  .bottom-nav a{color:#6c769e; text-decoration:none; text-align:center; font-size:22px}
+  .bottom-nav a.active{color:#00ff88}
+  .bottom-nav small{display:block; font-size:11px; margin-top:2px}
+  #status{font-size:13px}
+</style>
 </head>
 <body>
 <header class="topbar">
-  <div class="brand"><span class="logo">⚡</span> ZINAR</div>
-  <div class="status-dot" id="status">● متصل</div>
+  <div>⚡ ZINAR</div>
+  <div id="status" style="color:#00ff88">● متصل</div>
 </header>
 
-<main class="content">
+<main>
+  <div class="card">
+    <label style="color:#8a92c0; font-size:13px; display:block; margin-bottom:8px">اختر المنفذ</label>
+    <select id="iface"><option>جاري التحميل...</option></select>
+  </div>
 
-  <section class="card">
-    <div class="row">
-      <label>اختر المنفذ</label>
-      <select id="iface" onchange="update()">
-        <option value="">جاري التحميل...</option>
-      </select>
-    </div>
-  </section>
-
-  <section class="grid2">
+  <div class="grid2">
     <div class="card stat">
-      <div class="icon up">↑</div>
-      <div class="label">رفع</div>
-      <div class="value" id="up">0.0</div>
-      <div class="unit">Mbps</div>
+      <div style="font-size:24px">↑</div>
+      <div class="value up" id="up">0.0</div>
+      <div class="label">رفع Mbps</div>
     </div>
     <div class="card stat">
-      <div class="icon down">↓</div>
-      <div class="label">تحميل</div>
-      <div class="value" id="down">0.0</div>
-      <div class="unit">Mbps</div>
+      <div style="font-size:24px">↓</div>
+      <div class="value down" id="down">0.0</div>
+      <div class="label">تحميل Mbps</div>
     </div>
-  </section>
+  </div>
 
-  <section class="card chart-card">
-    <div class="card-head">📈 آخر 60 ثانية</div>
-    <canvas id="chart" height="180"></canvas>
-  </section>
-
-  <section class="grid2">
+  <div class="grid2">
     <a href="/subscribers" class="card stat link">
-      <div class="icon-user">👥</div>
-      <div class="value">{{ sub_count }}</div>
-      <div class="label">المشتركين</div>
+      <div style="font-size:28px">👥</div>
+      <div class="value" id="sub_count">{{ sub_count }}</div>
+      <div class="label">اضغط لعرض المشتركين</div>
     </a>
     <a href="/routers" class="card stat link">
-      <div class="icon-bolt">⚡</div>
-      <div class="value">{{ router_count }}</div>
-      <div class="label">الراوترات</div>
+      <div style="font-size:28px">📡</div>
+      <div class="value" id="router_count">{{ router_count }}</div>
+      <div class="label">النواشر - اضغط للفحص</div>
     </a>
-  </section>
+  </div>
+
+  <div class="card" style="text-align:center; color:#8a92c0; font-size:12px">
+    آخر تحديث: <span id="time">--:--:--</span> | خفيف للعين والبطارية
+  </div>
 </main>
 
 <nav class="bottom-nav">
   <a href="/mobile" class="active"><span>🏠</span><small>الرئيسية</small></a>
   <a href="/subscribers"><span>👥</span><small>المشتركين</small></a>
-  <a href="/packages"><span>📦</span><small>الباقات</small></a>
-  <a href="/payments"><span>💰</span><small>المدفوعات</small></a>
+  <a href="/nawashir"><span>📡</span><small>النواشر</small></a>
   <a href="/logout"><span>🚪</span><small>خروج</small></a>
 </nav>
 
-<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
 <script>
-const ctx = document.getElementById('chart').getContext('2d');
-const chart = new Chart(ctx, {
-  type:'line',
-  data:{ labels:[], datasets:[
-    {label:'تحميل', data:[], borderColor:'#00e07a', backgroundColor:'rgba(0,224,122,0.1)', fill:true, tension:0.4, pointRadius:0},
-    {label:'رفع', data:[], borderColor:'#f5a623', backgroundColor:'rgba(245,166,35,0.1)', fill:true, tension:0.4, pointRadius:0}
-  ]},
-  options:{ responsive:true, maintainAspectRatio:false, animation:false,
-    plugins:{legend:{labels:{color:'#fff', font:{size:11}}}},
-    scales:{ x:{ticks:{color:'#888', maxTicksLimit:6, font:{size:9}}, grid:{color:'#1e2444'}},
-             y:{ticks:{color:'#888', font:{size:10}}, grid:{color:'#1e2444'}, beginAtZero:true}}
-  }
-});
-
-async function update(){
-  const iface = document.getElementById('iface').value;
-  try{
-    const r = await fetch(`/api/traffic?iface=${iface}`);
-    const d = await r.json();
-    document.getElementById('up').textContent = (d.up||0).toFixed(1);
-    document.getElementById('down').textContent = (d.down||0).toFixed(1);
-    const t = new Date().toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit',second:'2-digit'});
-    chart.data.labels.push(t);
-    chart.data.datasets[0].data.push(d.down||0);
-    chart.data.datasets[1].data.push(d.up||0);
-    if(chart.data.labels.length > 30){
-      chart.data.labels.shift();
-      chart.data.datasets[0].data.shift();
-      chart.data.datasets[1].data.shift();
-    }
-    chart.update('none');
-    document.getElementById('status').textContent = '● متصل';
-    document.getElementById('status').style.color = '#00e07a';
-  }catch(e){
-    document.getElementById('status').textContent = '● غير متصل';
-    document.getElementById('status').style.color = '#e74c3c';
-  }
-}
+let ifaceEl = document.getElementById('iface');
 async function loadIfaces(){
   try{
-    const r = await fetch('/api/ifaces');
-    const d = await r.json();
-    const sel = document.getElementById('iface');
-    const cur = sel.value;
-    sel.innerHTML = '';
-    (d.ifaces||[]).forEach(n => {
-      const o = document.createElement('option');
-      o.value = n; o.textContent = n;
-      sel.appendChild(o);
+    let r = await fetch('/api/ifaces'); let d = await r.json();
+    let cur = ifaceEl.value;
+    ifaceEl.innerHTML='';
+    (d.ifaces||[]).forEach(n=>{
+      let o=document.createElement('option'); o.value=n; o.textContent=n; ifaceEl.appendChild(o);
     });
-    if(cur && d.ifaces.includes(cur)) sel.value = cur;
+    if(cur) ifaceEl.value=cur;
   }catch(e){}
 }
+async function updateTraffic(){
+  let iface = ifaceEl.value; if(!iface) return;
+  try{
+    let r = await fetch(`/api/traffic?iface=${iface}`); let d = await r.json();
+    document.getElementById('up').textContent = (d.up||0).toFixed(1);
+    document.getElementById('down').textContent = (d.down||0).toFixed(1);
+    document.getElementById('time').textContent = new Date().toLocaleTimeString('ar-SY');
+    document.getElementById('status').textContent='● متصل';
+    document.getElementById('status').style.color='#00ff88';
+  }catch(e){
+    document.getElementById('status').textContent='● غير متصل';
+    document.getElementById('status').style.color='#ff4444';
+  }
+}
+ifaceEl.addEventListener('change', updateTraffic);
 loadIfaces();
-setTimeout(loadIfaces, 3000);
-
-setInterval(update, 10000);
-update();
-
-if('serviceWorker' in navigator) navigator.serviceWorker.register('/static/sw.js');
+setInterval(updateTraffic, 15000); // كل 15 ثانية بدل 10 مشان البطارية
+setTimeout(updateTraffic, 1000);
 </script>
 </body>
 </html>
