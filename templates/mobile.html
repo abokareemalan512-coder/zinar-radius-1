@@ -125,7 +125,7 @@ async function loadIfaces(){
 loadIfaces();
 setTimeout(loadIfaces, 3000);
 
-setInterval(update, 2000);
+setInterval(update, 10000);
 update();
 
 if('serviceWorker' in navigator) navigator.serviceWorker.register('/static/sw.js');
