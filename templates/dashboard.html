@@ -5,7 +5,7 @@
 <div class="d-flex justify-content-between align-items-center mb-2">
     <h6>🏠 لوحة التحكم</h6>
     <button type="button" class="user-badge" data-bs-toggle="modal" data-bs-target="#changeCredModal">
-        <div class="user-avatar">{{ admin_name[0]|upper }}</div>
+        <div class="user-avatar">{{ (admin_name or 'A')[0]|upper }}</div>
         <div class="user-info">
             <span class="user-greeting">مرحباً</span>
             <span class="user-name">{{ admin_name }}</span>
@@ -32,7 +32,7 @@
     <div class="col-6 col-md-3">
         <div class="card p-2 text-center">
             <div class="fs-5 text-accent">💰</div>
-            <h6 class="mb-0">{{ "%.0f"|format(today_revenue) }}</h6>
+            <h6 class="mb-0">{{ "%.0f"|format(today_revenue or 0) }}</h6>
             <small class="text-muted" style="font-size:10px">إيرادات اليوم</small>
         </div>
     </div>
@@ -48,7 +48,7 @@
 <div class="row g-2 mb-2">
     <div class="col-md-6">
         <div class="card p-2 h-100">
-            <div style="font-size:12px;font-weight:bold" class="mb-1">⚙️ حالة النظام</div>
+            <div style="font-size:12px;font-weight:bold" class="mb-1">⚙️️ حالة النظام</div>
             <div class="d-flex justify-content-between" style="font-size:11px">
                 <span>الراوتر الرئيسي:</span>
                 {% if has_master %}
