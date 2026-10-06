@@ -83,6 +83,34 @@
         </div>
     </div>
 
+    <!-- أيقونة Telegram صغيرة -->
+<div class="col-md-1">
+    <div class="card shadow-sm border-0" style="background: rgba(18, 35, 58, 0.9); border: 1px solid rgba(255,255,255,0.08);">
+        <div class="card-body text-center py-3">
+            <div class="d-flex justify-content-center align-items-center mb-2">
+                <div class="rounded-circle d-flex align-items-center justify-content-center"
+                     style="width: 40px; height: 40px; background: linear-gradient(135deg, #2a7ae2, #32a8ff);">
+                    <i class="bi bi-telegram text-white" style="font-size: 1.2rem;"></i>
+                </div>
+            </div>
+
+            <h6 class="text-white mb-2" style="font-size: 0.9rem;">تيلجرام</h6>
+
+            {% if telegram_settings and telegram_settings.enabled %}
+                <span class="badge bg-success px-2 py-1" style="font-size: 0.75rem;">✅ مفعل</span>
+            {% else %}
+                <span class="badge bg-danger px-2 py-1" style="font-size: 0.75rem;">❌ معطل</span>
+            {% endif %}
+
+            <div class="mt-2">
+                <a href="{{ url_for('admin_settings') }}" class="btn btn-sm btn-primary w-100" style="font-size: 0.75rem; padding: 0.4rem;">
+                    <i class="bi bi-gear" style="font-size: 0.8rem;"></i> إعدادات
+                </a>
+            </div>
+        </div>
+    </div>
+</div>
+ 
     <div class="col-md-6">
         <div class="card action-card border-0 p-3">
             <h6 class="mb-3 fw-bold text-white">📊 حالة النظام</h6>
@@ -107,34 +135,6 @@
                     <span>🔐 الأمان:</span>
                     <span class="text-success fw-bold">✓ محمي</span>
                 </div>
-            </div>
-        </div>
-    </div>
-</div>
-
-<!-- أيقونة Telegram صغيرة -->
-<div class="col-md-3">
-    <div class="card shadow-sm border-0" style="background: rgba(18, 35, 58, 0.9); border: 1px solid rgba(255,255,255,0.08);">
-        <div class="card-body text-center py-3">
-            <div class="d-flex justify-content-center align-items-center mb-2">
-                <div class="rounded-circle d-flex align-items-center justify-content-center"
-                     style="width: 40px; height: 40px; background: linear-gradient(135deg, #2a7ae2, #32a8ff);">
-                    <i class="bi bi-telegram text-white" style="font-size: 1.2rem;"></i>
-                </div>
-            </div>
-
-            <h6 class="text-white mb-2" style="font-size: 0.9rem;">تيلجرام</h6>
-
-            {% if telegram_settings and telegram_settings.enabled %}
-                <span class="badge bg-success px-2 py-1" style="font-size: 0.75rem;">✅ مفعل</span>
-            {% else %}
-                <span class="badge bg-danger px-2 py-1" style="font-size: 0.75rem;">❌ معطل</span>
-            {% endif %}
-
-            <div class="mt-2">
-                <a href="{{ url_for('admin_settings') }}" class="btn btn-sm btn-primary w-100" style="font-size: 0.75rem; padding: 0.4rem;">
-                    <i class="bi bi-gear" style="font-size: 0.8rem;"></i> إعدادات
-                </a>
             </div>
         </div>
     </div>
