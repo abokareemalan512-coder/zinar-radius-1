@@ -1,212 +1,48 @@
-{% extends "base.html" %}
-{% block title %}إدارة السيرفرات والراوترات{% endblock %}
+<!DOCTYPE html>
+<html dir="rtl" lang="ar">
+<head>
+    <title>إدارة الراوترات</title>
+</head>
+<body>
+    <h1>الراوترات</h1>
+    <a href="/add-router">+ إضافة راوتر</a>
+    
+    <table>
+        <tr>
+            <th>الاسم</th>
+            <th>IP</th>
+            <th>المستخدم</th>
+            <th>المنفذ</th>
+            <th>حالة</th>
+            <th>إجراءات</th>
+        </tr>
+        {% for router in routers %}
+        <tr>
+            <td>{{ router.name }}</td>
+            <td>{{ router.ip_address }}</td>
+            <td>{{ router.username }}</td>
+            <td>{{ router.port }}</td>
+            <td>{% if router.is_active %}🟢 نشط{% else %}🔴 معطل{% endif %}</td>
+            <td>
+                {% if router.is_master %}<span style="color: gold;">⭐ رئيسي</span>{% endif %}
+                <a href="/routers/set_master/{{ router.id }}">جعل رئيسي</a>
+                <a href="/routers/delete/{{ router.id }}">حذف</a>
+            </td>
+        </tr>
+        {% endfor %}
+    </table>
 
-{% block content %}
-<div class="d-flex justify-content-between align-items-center mb-3">
-    <h6 class="mb-0">📡 إدارة سيرفرات الشبكة عبر VPN</h6>
-    <button class="btn btn-primary btn-sm" data-bs-toggle="modal" data-bs-target="#addRouterModal" style="font-size:11px;">
-        <i class="bi bi-plus-lg"></i> إضافة سيرفر جديد
-    </button>
-</div>
-
-<div class="card">
-    <div class="table-responsive">
-        <table class="table table-hover align-middle mb-0">
-            <thead>
-                <tr style="font-size:11px">
-                    <th style="padding:6px">#</th>
-                    <th style="padding:6px">اسم السيرفر</th>
-                    <th style="padding:6px">عنوان IP (VPN)</th>
-                    <th style="padding:6px">المنفذ</th>
-                    <th style="padding:6px">المستخدم</th>
-                    <th style="padding:6px">الحالة بالواجهة</th>
-                    <th style="padding:6px">الرئيسي</th>
-                    <th style="padding:6px">إجراءات التحكم</th>
-                </tr>
-            </thead>
-            <tbody>
-                {% for r in routers %}
-                <tr style="font-size:11px">
-                    <td style="padding:6px">{{ r.id }}</td>
-                    <td style="padding:6px" class="text-accent fw-bold">{{ r.name }}</td>
-                    <td style="padding:6px"><code class="text-info">{{ r.ip_address }}</code></td>
-                    <td style="padding:6px">{{ r.port }}</td>
-                    <td style="padding:6px">{{ r.username }}</td>
-                    <td style="padding:6px">
-                        {% if r.is_active %}
-                            <span class="badge bg-success bg-opacity-20 text-success border border-success px-2 py-1" style="font-size:10px">
-                                🟢 متصل
-                            </span>
-                        {% else %}
-                            <span class="badge bg-danger bg-opacity-20 text-danger border border-danger px-2 py-1" style="font-size:10px">
-                                🔴 غير متصل
-                            </span>
-                        {% endif %}
-                    </td>
-                    <td style="padding:6px">
-                        {% if r.is_master %}
-                            <span class="badge bg-success" style="font-size:10px">⭐ رئيسي</span>
-                        {% else %}
-                            <a href="{{ url_for('set_master_router', router_id=r.id) }}"
-                               class="btn btn-sm btn-outline-primary py-0 px-1" title="تعيين رئيسي" style="font-size:10px">
-                                <i class="bi bi-star"></i>
-                            </a>
-                        {% endif %}
-                    </td>
-                    <td style="padding:6px">
-                        <div class="d-flex gap-1 flex-wrap">
-                            <a href="{{ url_for('toggle_router', router_id=r.id) }}"
-                               class="btn btn-sm {% if r.is_active %}btn-warning{% else %}btn-success{% endif %} py-0 px-1"
-                               title="إيقاف / تشغيل" style="font-size:10px">
-                                {% if r.is_active %}
-                                    <i class="bi bi-pause-fill"></i>
-                                {% else %}
-                                    <i class="bi bi-play-fill"></i>
-                                {% endif %}
-                            </a>
-
-                            <a href="{{ url_for('test_router', router_id=r.id) }}"
-                               class="btn btn-sm btn-info py-0 px-1" title="اختبار الاتصال بالـ IP" style="font-size:10px">
-                                <i class="bi bi-wifi"></i>
-                            </a>
-
-                            <a href="{{ url_for('router_users', router_id=r.id, type='pppoe') }}"
-                               class="btn btn-sm btn-outline-info py-0 px-1" title="المشتركون" style="font-size:10px">
-                                <i class="bi bi-people"></i>
-                            </a>
-
-                            <button class="btn btn-sm btn-primary py-0 px-1" style="font-size:10px"
-                                    onclick='openEditModal({{ r.id }}, "{{ r.name|e }}", "{{ r.ip_address|e }}", "{{ r.username|e }}", {{ r.port }})' title="تعديل بيانات الراوتر">
-                                <i class="bi bi-pencil"></i>
-                            </button>
-
-                            <a href="{{ url_for('delete_router', router_id=r.id) }}"
-                               class="btn btn-sm btn-danger py-0 px-1" style="font-size:10px"
-                               onclick="return confirm('هل أنت متأكد من حذف هذا السيرفر؟')" title="حذف">
-                                <i class="bi bi-trash"></i>
-                            </a>
-                        </div>
-                    </td>
-                </tr>
-                {% else %}
-                <tr>
-                    <td colspan="8" class="text-center py-4 text-muted" style="font-size:11px">
-                        📭 لا توجد سيرفرات مضافة حالياً
-                    </td>
-                </tr>
-                {% endfor %}
-            </tbody>
-        </table>
-    </div>
-</div>
-
-<!-- Modal إضافة راوتر جديد -->
-<div class="modal fade" id="addRouterModal" tabindex="-1">
-    <div class="modal-dialog modal-dialog-centered">
-        <div class="modal-content">
-            <form method="POST" action="{{ url_for('routers') }}">
-                <div class="modal-header border-secondary">
-                    <h6 class="modal-title text-accent">
-                        <i class="bi bi-plus-circle"></i> إضافة سيرفر مايكروتيك جديد (VPN)
-                    </h6>
-                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
-                </div>
-                <div class="modal-body" style="font-size:11px">
-                    <div class="mb-2">
-                        <label class="form-label">اسم السيرفر</label>
-                        <input type="text" name="name" class="form-control form-control-sm" placeholder="مثال: السيرفر الأول" required>
-                    </div>
-                    <div class="mb-2">
-                        <label class="form-label">عنوان IP داخل الـ VPN</label>
-                        <input type="text" name="ip_address" class="form-control form-control-sm" placeholder="10.10.10.1" required>
-                    </div>
-                    <div class="row">
-                        <div class="col-md-6 mb-2">
-                            <label class="form-label">اسم المستخدم</label>
-                            <input type="text" name="username" class="form-control form-control-sm" value="admin" required>
-                        </div>
-                        <div class="col-md-6 mb-2">
-                            <label class="form-label">كلمة المرور</label>
-                            <input type="password" name="password" class="form-control form-control-sm" required>
-                        </div>
-                    </div>
-                    <div class="mb-2">
-                        <label class="form-label">منفذ الـ API (الافتراضي 8728)</label>
-                        <input type="number" name="port" class="form-control form-control-sm" value="8728" min="1" max="65535" required>
-                    </div>
-                    <div class="form-check">
-                        <input type="checkbox" name="is_master" class="form-check-input" id="isMaster">
-                        <label class="form-check-label" for="isMaster">⭐ سيرفر رئيسي (Master)</label>
-                    </div>
-                </div>
-                <div class="modal-footer border-secondary">
-                    <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">إلغاء</button>
-                    <button type="submit" class="btn btn-primary btn-sm">
-                        <i class="bi bi-save"></i> حفظ وإضافة
-                    </button>
-                </div>
-            </form>
-        </div>
-    </div>
-</div>
-
-<!-- Modal تعديل راوتر -->
-<div class="modal fade" id="editRouterModal" tabindex="-1">
-    <div class="modal-dialog modal-dialog-centered">
-        <div class="modal-content">
-            <form method="POST" id="editRouterForm">
-                <div class="modal-header border-secondary">
-                    <h6 class="modal-title text-accent">
-                        <i class="bi bi-pencil-square"></i> تعديل بيانات السيرفر (VPN)
-                    </h6>
-                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
-                </div>
-                <div class="modal-body" style="font-size:11px">
-                    <div class="mb-2">
-                        <label class="form-label">اسم السيرفر</label>
-                        <input type="text" name="name" id="edit_name" class="form-control form-control-sm" required>
-                    </div>
-                    <div class="mb-2">
-                        <label class="form-label">عنوان IP داخل الـ VPN</label>
-                        <input type="text" name="ip_address" id="edit_ip" class="form-control form-control-sm" placeholder="10.10.10.x" required>
-                    </div>
-                    <div class="row">
-                        <div class="col-md-6 mb-2">
-                            <label class="form-label">اسم المستخدم</label>
-                            <input type="text" name="username" id="edit_username" class="form-control form-control-sm" required>
-                        </div>
-                        <div class="col-md-6 mb-2">
-                            <label class="form-label">كلمة المرور الجديدة</label>
-                            <input type="password" name="password" id="edit_password"
-                                   class="form-control form-control-sm" placeholder="اتركها فارغة لعدم التغيير">
-                        </div>
-                    </div>
-                    <div class="mb-2">
-                        <label class="form-label">المنفذ</label>
-                        <input type="number" name="port" id="edit_port" class="form-control form-control-sm"
-                               min="1" max="65535" required>
-                    </div>
-                </div>
-                <div class="modal-footer border-secondary">
-                    <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">إلغاء</button>
-                    <button type="submit" class="btn btn-primary btn-sm">
-                        <i class="bi bi-save"></i> حفظ التعديلات
-                    </button>
-                </div>
-            </form>
-        </div>
-    </div>
-</div>
-
-<script>
-function openEditModal(id, name, ip, username, port) {
-    document.getElementById('editRouterForm').action = '/routers/update/' + id;
-    document.getElementById('edit_name').value = name;
-    document.getElementById('edit_ip').value = ip;
-    document.getElementById('edit_username').value = username;
-    document.getElementById('edit_port').value = port;
-    document.getElementById('edit_password').value = '';
-    new bootstrap.Modal(document.getElementById('editRouterModal')).show();
-}
-</script>
-{% endblock %}
+    <h2>إضافة راوتر جديد</h2>
+    <form method="POST" action="/routers">
+        <input type="text" name="name" placeholder="اسم الراوتر" required>
+        <input type="text" name="ip_address" placeholder="عنوان IP" required>
+        <input type="text" name="username" placeholder="اسم المستخدم" required>
+        <input type="password" name="password" placeholder="كلمة المرور" required>
+        <input type="number" name="port" placeholder="المنفذ" value="22">
+        <label>
+            <input type="checkbox" name="is_master"> جعله رئيسياً
+        </label>
+        <button type="submit">إضافة</button>
+    </form>
+</body>
+</html>
