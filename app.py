@@ -15,7 +15,11 @@ from flask import (
 from flask_sqlalchemy import SQLAlchemy
 from werkzeug.security import generate_password_hash, check_password_hash
 import paramiko
-import requests
+
+try:
+    import requests
+except ImportError:
+    requests = None
 
 # محاولة استيراد radius_sync مع حماية في حال عدم وجود الموديول
 try:
@@ -136,7 +140,7 @@ class TelegramSetting(db.Model):
     notify_new_subscriber = db.Column(db.Boolean, default=True)
     notify_subscriber_expired = db.Column(db.Boolean, default=True)
     notify_bulk_add = db.Column(db.Boolean, default=True)
-    notify_admin_action = db.Column(db.Boolean, default=True)
+    notify_admin_action = db.Column(db.Boolean, default=False)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
@@ -198,7 +202,10 @@ def _day_bounds(day=None):
 # ============ Telegram Helper ============
 
 def get_telegram_settings():
-    return TelegramSetting.query.first()
+    try:
+        return TelegramSetting.query.first()
+    except Exception:
+        return None
 
 
 def log_telegram(message, message_type='info', status='success'):
@@ -211,6 +218,10 @@ def log_telegram(message, message_type='info', status='success'):
 
 
 def send_telegram_message(message, message_type='info', force=False):
+    if not requests:
+        logger.warning("⚠️ مكتبة requests غير مثبتة")
+        return False, 'requests library not installed'
+
     settings = get_telegram_settings()
     if not settings:
         return False, 'No Telegram settings found'
@@ -218,8 +229,8 @@ def send_telegram_message(message, message_type='info', force=False):
     if not force and (not settings.enabled or not settings.token or not settings.chat_id):
         return False, 'Telegram disabled or incomplete settings'
 
-    token = settings.token.strip()
-    chat_id = str(settings.chat_id).strip()
+    token = settings.token.strip() if settings.token else ''
+    chat_id = str(settings.chat_id).strip() if settings.chat_id else ''
 
     if not token or not chat_id:
         return False, 'Missing telegram token or chat id'
@@ -233,7 +244,7 @@ def send_telegram_message(message, message_type='info', force=False):
     }
 
     try:
-        response = requests.post(url, data=payload, timeout=10)
+        response = requests.post(url, json=payload, timeout=10)
         response.raise_for_status()
         result = response.json()
         if result.get("ok"):
@@ -243,7 +254,7 @@ def send_telegram_message(message, message_type='info', force=False):
             log_telegram(message, message_type=message_type, status='failed')
             return False, result.get("description", "Unknown Telegram error")
     except Exception as e:
-        log_telegram(message, message_type=message_type, status='failed')
+        log_telegram(str(e), message_type=message_type, status='failed')
         logger.warning(f"⚠️ فشل إرسال رسالة تلجرام: {e}")
         return False, str(e)
 
@@ -254,7 +265,7 @@ def notify_new_subscriber(username):
         return False
     if not settings.token or not settings.chat_id:
         return False
-    msg = f"*مشترك جديد*\n👤 المستخدم: `{username}`\n🕒 الوقت: {datetime.utcnow().strftime('%Y-%m-%d %H:%M:%S')} UTC"
+    msg = f"*🆕 مشترك جديد*\n👤 المستخدم: `{username}`\n🕒 الوقت: {datetime.utcnow().strftime('%Y-%m-%d %H:%M:%S')} UTC"
     return send_telegram_message(msg, message_type='new_subscriber')[0]
 
 
@@ -264,7 +275,7 @@ def notify_expired_subscriber(username):
         return False
     if not settings.token or not settings.chat_id:
         return False
-    msg = f"*اشتراك منتهي*\n👤 المستخدم: `{username}`\n⚠️ تم إنهاء الاشتراك"
+    msg = f"*⏰ اشتراك منتهي*\n👤 المستخدم: `{username}`\n⚠️ تم إنهاء الاشتراك"
     return send_telegram_message(msg, message_type='expired_subscriber')[0]
 
 
@@ -274,7 +285,7 @@ def notify_bulk_add(created, failed, package_name):
         return False
     if not settings.token or not settings.chat_id:
         return False
-    msg = f"*إضافة جماعية*\n📦 الباقة: `{package_name or 'غير محددة'}`\n✅ تم إنشاء: `{created}`\n❌ فشل: `{failed}`"
+    msg = f"*📦 إضافة جماعية*\n📦 الباقة: `{package_name or 'غير محددة'}`\n✅ تم إنشاء: `{created}`\n❌ فشل: `{failed}`"
     return send_telegram_message(msg, message_type='bulk_add')[0]
 
 
@@ -284,7 +295,7 @@ def notify_admin_action(action_text):
         return False
     if not settings.token or not settings.chat_id:
         return False
-    msg = f"*إجراء إداري*\n{action_text}"
+    msg = f"*⚙️ إجراء إداري*\n{action_text}"
     return send_telegram_message(msg, message_type='admin_action')[0]
 
 
@@ -358,6 +369,18 @@ def init_database():
                     email='admin@zinar.com'
                 ))
                 db.session.commit()
+            
+            # تأكد من وجود إعدادات التلجرام الافتراضية
+            if not TelegramSetting.query.first():
+                db.session.add(TelegramSetting(
+                    enabled=False,
+                    notify_new_subscriber=True,
+                    notify_subscriber_expired=True,
+                    notify_bulk_add=True,
+                    notify_admin_action=False
+                ))
+                db.session.commit()
+            
             logger.info("✅ تم تهيئة قاعدة البيانات")
         except Exception as e:
             logger.error(f"❌ خطأ تهيئة قاعدة البيانات: {e}")
@@ -439,7 +462,10 @@ def api_auth():
     if sub.expires_at and sub.expires_at < now:
         sub.status = 'expired'
         db.session.commit()
-        notify_expired_subscriber(sub.username)
+        try:
+            notify_expired_subscriber(sub.username)
+        except Exception:
+            pass
         return jsonify({'result': 'deny', 'reason': 'expired'})
 
     if not sub.expires_at:
@@ -659,7 +685,10 @@ def routers():
             ))
             db.session.commit()
             log_event('إضافة راوتر', name, f'IP: {ip}')
-            notify_admin_action(f"إضافة راوتر: `{name}` - IP: `{ip}`")
+            try:
+                notify_admin_action(f"🖥️ إضافة راوتر: `{name}` - IP: `{ip}`")
+            except Exception:
+                pass
             flash(f'✅ الراوتر "{name}" أُضيف', 'success')
         except Exception as e:
             db.session.rollback()
@@ -677,7 +706,10 @@ def set_master_router(router_id):
         r.is_master = True
         db.session.commit()
         log_event('تعيين راوتر رئيسي', r.name)
-        notify_admin_action(f"تعيين راوتر رئيسي: `{r.name}`")
+        try:
+            notify_admin_action(f"⭐ تعيين راوتر رئيسي: `{r.name}`")
+        except Exception:
+            pass
         flash('✅ تم التحديث بنجاح', 'success')
     except Exception as e:
         db.session.rollback()
@@ -715,7 +747,10 @@ def update_router(router_id):
 
         db.session.commit()
         log_event('تعديل راوتر', name, f'IP: {ip}')
-        notify_admin_action(f"تعديل راوتر: `{name}` - IP: `{ip}`")
+        try:
+            notify_admin_action(f"✏️ تعديل راوتر: `{name}` - IP: `{ip}`")
+        except Exception:
+            pass
         flash('✅ تم التحديث بنجاح', 'success')
     except Exception as e:
         db.session.rollback()
@@ -731,7 +766,10 @@ def delete_router(router_id):
         db.session.delete(r)
         db.session.commit()
         log_event('حذف راوتر', r_name)
-        notify_admin_action(f"حذف راوتر: `{r_name}`")
+        try:
+            notify_admin_action(f"🗑️ حذف راوتر: `{r_name}`")
+        except Exception:
+            pass
         flash('✅ تم الحذف بنجاح', 'success')
     except Exception as e:
         db.session.rollback()
@@ -819,11 +857,16 @@ def add_subscriber():
             db.session.commit()
 
             if radius_sync:
-                radius_sync.sync_user(un, pw)
+                try:
+                    radius_sync.sync_user(un, pw)
+                except Exception:
+                    pass
 
             log_event('إضافة مشترك', un, f'الباقة: {pkg}')
-            notify_new_subscriber(un)
-            notify_admin_action(f"إضافة مشترك جديد: `{un}` - الباقة: `{pkg}`")
+            try:
+                notify_new_subscriber(un)
+            except Exception:
+                pass
 
             flash(f'✅ المشترك "{un}" أُضيف بنجاح', 'success')
             return redirect(url_for('subscribers'))
@@ -921,10 +964,6 @@ def bulk_add():
                     status='active'
                 ))
                 created += 1
-                try:
-                    send_telegram_message(f"New subscriber: `{un}`", message_type='new_subscriber')
-                except Exception:
-                    pass
             except Exception:
                 failed += 1
 
@@ -934,11 +973,16 @@ def bulk_add():
             for un in usernames:
                 sub = Subscriber.query.filter_by(username=un).first()
                 if sub:
-                    radius_sync.sync_user(sub.username, sub.password)
+                    try:
+                        radius_sync.sync_user(sub.username, sub.password)
+                    except Exception:
+                        pass
 
         log_event('إضافة جملة', f'{created} مشترك', f'الباقة: {pkg}')
-        notify_bulk_add(created, failed, pkg)
-        notify_admin_action(f"إضافة جماعية: `{created}` مضاف - `{failed}` فشل - الباقة: `{pkg}`")
+        try:
+            notify_bulk_add(created, failed, pkg)
+        except Exception:
+            pass
 
         flash(
             f'✅ تم إيجاد {created} مشترك' + (f' — فشل {failed}' if failed else ''),
@@ -961,10 +1005,12 @@ def toggle_subscriber(sub_id):
             sub.status = 'paused'
             db.session.commit()
             if radius_sync:
-                radius_sync.pause_user(sub.username)
+                try:
+                    radius_sync.pause_user(sub.username)
+                except Exception:
+                    pass
             kick_subscriber(sub)
             log_event('إيقاف مشترك', sub.username)
-            notify_admin_action(f"إيقاف مشترك: `{sub.username}`")
             flash(f'⏸ "{sub.username}" موقوف وتم قطعه', 'warning')
         else:
             if sub.expires_at and sub.expires_at < datetime.utcnow():
@@ -973,9 +1019,11 @@ def toggle_subscriber(sub_id):
                 sub.status = 'active'
                 db.session.commit()
                 if radius_sync:
-                    radius_sync.resume_user(sub.username, sub.password)
+                    try:
+                        radius_sync.resume_user(sub.username, sub.password)
+                    except Exception:
+                        pass
                 log_event('تنشيط مشترك', sub.username)
-                notify_admin_action(f"تنشيط مشترك: `{sub.username}`")
                 flash(f'▶ "{sub.username}" نشط الأن', 'success')
     except Exception as e:
         db.session.rollback()
@@ -993,7 +1041,6 @@ def reset_subscriber(sub_id):
         db.session.commit()
         kick_subscriber(sub)
         log_event('تصفير مشترك', sub.username)
-        notify_admin_action(f"تصفير حساب مشترك: `{sub.username}`")
         flash('🔄 تم تصفير عداد المشترك بنجاح', 'success')
     except Exception as e:
         db.session.rollback()
@@ -1011,7 +1058,6 @@ def extend_subscriber(sub_id):
         sub.status = 'active'
         db.session.commit()
         log_event('تتمديد اشتراك', sub.username, f'تاريخ الانتهاء الجديد: {sub.expires_at.strftime("%Y-%m-%d")}')
-        notify_admin_action(f"تمديد اشتراك: `{sub.username}` - جديد: `{sub.expires_at.strftime('%Y-%m-%d')}`")
         flash(f'➕ ينتهي في {sub.expires_at.strftime("%Y-%m-%d")}', 'success')
     except Exception as e:
         db.session.rollback()
@@ -1035,7 +1081,6 @@ def update_subscriber(sub_id):
             sub.package = pkg
         db.session.commit()
         log_event('تعديل مشترك', sub.username)
-        notify_admin_action(f"تعديل مشترك: `{sub.username}`")
         flash('✅ تم التحديث في قاعدة البيانات', 'success')
     except Exception as e:
         db.session.rollback()
@@ -1050,11 +1095,13 @@ def delete_subscriber(sub_id):
         un = sub.username
         kick_subscriber(sub)
         if radius_sync:
-            radius_sync.delete_user(un)
+            try:
+                radius_sync.delete_user(un)
+            except Exception:
+                pass
         db.session.delete(sub)
         db.session.commit()
         log_event('حذف مشترك', un)
-        notify_admin_action(f"حذف مشترك: `{un}`")
         flash('✅ تم الحذف وقطع الاتصال بنجاح', 'success')
     except Exception as e:
         db.session.rollback()
@@ -1081,12 +1128,14 @@ def bulk_delete_subscribers():
             except Exception:
                 pass
             if radius_sync:
-                radius_sync.delete_user(sub.username)
+                try:
+                    radius_sync.delete_user(sub.username)
+                except Exception:
+                    pass
             db.session.delete(sub)
             deleted += 1
         db.session.commit()
         log_event('حذف جملة', f'{deleted} مشترك')
-        notify_admin_action(f"حذف جماعي: `{deleted}` مشترك - تم قطع: `{kicked}`")
         flash(f'🗑 تم حذف {deleted} مشترك — تم قطع {kicked}', 'success')
     except Exception as e:
         db.session.rollback()
@@ -1126,13 +1175,15 @@ def delete_expired_subscribers():
             except Exception:
                 pass
             if radius_sync:
-                radius_sync.delete_user(sub.username)
+                try:
+                    radius_sync.delete_user(sub.username)
+                except Exception:
+                    pass
             db.session.delete(sub)
             deleted += 1
 
         db.session.commit()
         log_event('حذف المنتهين', f'{deleted} مشترك')
-        notify_admin_action(f"حذف المشتركين المنتهين: `{deleted}`")
         flash(f'🗑 تم حذف {deleted} مشترك منتهي', 'success')
     except Exception as e:
         db.session.rollback()
@@ -1223,7 +1274,6 @@ def packages():
             ))
             db.session.commit()
             log_event('إضافة باقة', name, f'السعر: {p_val}')
-            notify_admin_action(f"إضافة باقة: `{name}` - السعر: `{p_val}`")
             flash(f'✅ الباقة "{name}" أُضيفت بنجاح', 'success')
         except Exception as e:
             db.session.rollback()
@@ -1247,7 +1297,6 @@ def update_package(pkg_id):
 
         db.session.commit()
         log_event('تعديل باقة', pkg.name, f'السعر: {pkg.price}')
-        notify_admin_action(f"تعديل باقة: `{pkg.name}`")
         flash('✅ تم تحديث الباقة بنجاح', 'success')
     except Exception as e:
         db.session.rollback()
@@ -1263,7 +1312,6 @@ def delete_package(pkg_id):
         db.session.delete(pkg)
         db.session.commit()
         log_event('حذف باقة', pkg_name)
-        notify_admin_action(f"حذف باقة: `{pkg_name}`")
         flash('✅ تم حذف الباقة بنجاح', 'success')
     except Exception as e:
         db.session.rollback()
@@ -1282,7 +1330,7 @@ def admin_settings():
             notify_new_subscriber=True,
             notify_subscriber_expired=True,
             notify_bulk_add=True,
-            notify_admin_action=True
+            notify_admin_action=False
         )
     logs = TelegramLog.query.order_by(TelegramLog.created_at.desc()).limit(10).all()
     total_notifications = TelegramLog.query.count()
@@ -1329,7 +1377,7 @@ def test_telegram():
         return jsonify({'success': False, 'error': 'الإعدادات غير مكتملة'})
 
     ok, msg = send_telegram_message(
-        "*اختبار الإشعار*\\n✅ تم إرسال رسالة اختبار بنجاح",
+        "✅ *اختبار الإشعار*\nتم إرسال رسالة اختبار بنجاح من النظام",
         message_type='test',
         force=True
     )
@@ -1351,4 +1399,4 @@ def payments():
 
 if __name__ == '__main__':
     port = int(os.environ.get('PORT', 5000))
-    app.run(host='0.0.0.0', port=port, debug=True)
+    app.run(host='0.0.0.0', port=port, debug=False)
