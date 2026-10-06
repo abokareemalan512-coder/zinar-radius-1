@@ -12,6 +12,16 @@ from flask import (
     Flask, render_template, request, redirect, url_for,
     flash, jsonify, session, send_file
 )
+# === تلجرام ===
+TELEGRAM_BOT_TOKEN = "8777776360:AAEeesJoSnuaE2sE1GpEZNI0qez-kGz_Jd4"
+TELEGRAM_CHAT_ID = "1017610955"
+
+def send_telegram(msg):
+    try:
+        import requests
+        url = f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/sendMessage"
+        requests.post(url, json={"chat_id": TELEGRAM_CHAT_ID, "text": msg, "parse_mode":"Markdown"}, timeout=5)
+    except: pass
 from flask_sqlalchemy import SQLAlchemy
 from werkzeug.security import generate_password_hash, check_password_hash
 import paramiko
@@ -637,7 +647,7 @@ def subscribers():
 
 @app.route('/add-subscriber', methods=['GET', 'POST'])
 @app.route('/subscribers/add', methods=['GET', 'POST'])
-def add_subscriber():
+db.session.add():
     if request.method == 'POST':
         name = request.form.get('name', '').strip()
         un = request.form.get('username', '').strip()
@@ -732,9 +742,12 @@ def bulk_add():
                 failed += 1; continue
             try:
                 db.session.add(Subscriber(name=un, username=un, password=pw,
-                                          package=pkg, user_type=ut,
-                                          expires_at=None, status='active'))
+                    package=pkg, user_type=ut,
+                    expires_at=None, status='active'))
                 created += 1
+                try:
+                    send_telegram(f"New subscriber: {un}")
+                except: pass
             except Exception:
                 failed += 1
 
