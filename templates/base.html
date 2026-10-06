@@ -4,216 +4,109 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>{% block title %}ZINAR{% endblock %} | ZINAR</title>
+
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.rtl.min.css" rel="stylesheet">
     <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css" rel="stylesheet">
+
     <style>
-        :root {
-            --bg-main: #0f172a;
-            --bg-card: #1e293b;
-            --bg-hover: #334155;
-            --text-main: #f1f5f9;
-            --text-muted: #94a3b8;
-            --accent: #38bdf8;
-            --accent-hover: #7dd3fc;
-            --accent-glow: rgba(56, 189, 248, 0.35);
+        :root{
+            --bg-main:#0f172a;
+            --bg-card:#1e293b;
+            --bg-hover:#334155;
+            --text-main:#f1f5f9;
+            --text-muted:#94a3b8;
+            --accent:#38bdf8;
+            --accent-hover:#7dd3fc;
+            --accent-glow:rgba(56,189,248,0.35);
         }
-        * { box-sizing: border-box; }
-        body {
-            background-color: var(--bg-main) !important;
-            color: var(--text-main);
-            font-family: 'Segoe UI', Tahoma, sans-serif;
-            margin: 0;
+        *{box-sizing:border-box}
+        body{
+            background-color:var(--bg-main) !important;
+            color:var(--text-main);
+            margin:0;
+            font-family:'Segoe UI', Tahoma, sans-serif;
         }
-        .layout { display: flex; min-height: 100vh; }
-        .sidebar {
-            width: 240px;
-            background-color: var(--bg-card);
-            border-left: 1px solid var(--bg-hover);
-            padding: 20px 12px;
-            flex-shrink: 0;
+        .layout{display:flex;min-height:100vh}
+        .sidebar{
+            width:240px;
+            background-color:var(--bg-card);
+            border-left:1px solid var(--bg-hover);
+            padding:20px 12px;
+            flex-shrink:0;
         }
-        .brand {
-            text-align: center;
-            padding: 20px 0 24px;
-            border-bottom: 1px solid var(--bg-hover);
-            margin-bottom: 20px;
+        .brand{
+            text-align:center;
+            padding:20px 0 24px;
+            border-bottom:1px solid var(--bg-hover);
+            margin-bottom:20px;
         }
-        .brand-logo {
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            gap: 12px;
+        .brand-icon{
+            display:inline-flex;
+            align-items:center;
+            justify-content:center;
+            width:46px;
+            height:46px;
+            background:linear-gradient(135deg,var(--accent),#0ea5e9);
+            border-radius:12px;
+            font-size:24px;
+            box-shadow:0 4px 12px var(--accent-glow);
         }
-        .brand-icon {
-            display: inline-flex;
-            align-items: center;
-            justify-content: center;
-            width: 46px;
-            height: 46px;
-            background: linear-gradient(135deg, var(--accent), #0ea5e9);
-            border-radius: 12px;
-            font-size: 24px;
-            box-shadow: 0 4px 12px var(--accent-glow);
+        .main{flex:1;padding:24px;overflow-x:auto}
+        .card{
+            background-color:var(--bg-card) !important;
+            border:1px solid var(--bg-hover) !important;
+            color:var(--text-main) !important;
+            border-radius:12px;
         }
-        .brand-text { text-align: right; }
-        .brand-text h4 {
-            margin: 0;
-            font-size: 22px;
-            font-weight: 800;
-            letter-spacing: 2px;
-            background: linear-gradient(135deg, var(--accent), #7dd3fc);
-            -webkit-background-clip: text;
-            -webkit-text-fill-color: transparent;
-            background-clip: text;
-        }
-        .brand-text small {
-            display: block;
-            color: var(--text-muted);
-            font-size: 10px;
-            margin-top: 2px;
-            letter-spacing: 1px;
-        }
-        .sidebar .nav-item {
-            display: flex;
-            align-items: center;
-            gap: 10px;
-            padding: 10px 14px;
-            color: var(--text-main);
-            text-decoration: none;
-            border-radius: 8px;
-            margin-bottom: 4px;
-            transition: 0.2s;
-        }
-        .sidebar .nav-item:hover, .sidebar .nav-item.active {
-            background-color: var(--bg-hover);
-            color: var(--accent);
-        }
-        .sidebar .btn-add {
-            background-color: var(--accent);
-            color: #0f172a;
-            font-weight: bold;
-            text-align: center;
-            padding: 12px;
-            border-radius: 8px;
-            text-decoration: none;
-            display: block;
-            margin-top: 20px;
-        }
-        .sidebar .btn-add:hover { background-color: var(--accent-hover); }
-        .main { flex: 1; padding: 24px; overflow-x: auto; }
-        .card {
-            background-color: var(--bg-card) !important;
-            border: 1px solid var(--bg-hover) !important;
-            color: var(--text-main) !important;
-            border-radius: 12px;
-        }
-        .table { color: var(--text-main) !important; margin: 0; }
-        .table thead th {
-            background-color: var(--bg-hover) !important;
-            color: var(--accent) !important;
-            border-color: var(--bg-hover) !important;
-            padding: 12px;
-        }
-        .table td { border-color: var(--bg-hover) !important; padding: 12px; vertical-align: middle; }
-        .table-hover tbody tr:hover { background-color: var(--bg-hover) !important; }
-        .text-accent { color: var(--accent) !important; }
-        a { color: var(--accent); text-decoration: none; }
-        a:hover { color: var(--accent-hover); }
-        .btn-primary {
-            background-color: var(--accent) !important;
-            border-color: var(--accent) !important;
-            color: #0f172a !important;
-            font-weight: 600;
-        }
-        .btn-primary:hover {
-            background-color: var(--accent-hover) !important;
-            box-shadow: 0 0 12px var(--accent-glow);
-        }
-        .btn-danger { background-color: #ef4444 !important; border-color: #ef4444 !important; }
-        .btn-secondary { background-color: var(--bg-hover) !important; border-color: var(--bg-hover) !important; color: var(--text-main) !important; }
-        .btn-info { background-color: #06b6d4 !important; border-color: #06b6d4 !important; color: #fff !important; }
-        .btn-warning { background-color: #f59e0b !important; border-color: #f59e0b !important; color: #000 !important; }
-        .btn-success { background-color: #16a34a !important; border-color: #16a34a !important; }
-        .form-control, .form-select {
-            background-color: var(--bg-main) !important;
-            border: 1px solid var(--bg-hover) !important;
-            color: var(--text-main) !important;
-            padding: 10px 12px;
-        }
-        .form-control:focus, .form-select:focus {
-            border-color: var(--accent) !important;
-            box-shadow: 0 0 0 0.25rem var(--accent-glow) !important;
-            background-color: var(--bg-main) !important;
-            color: var(--text-main) !important;
-        }
-        .form-control::placeholder { color: var(--text-muted); }
-        .form-label { color: var(--text-muted); margin-bottom: 6px; }
-        h1, h2, h3, h4, h5, h6 { color: var(--text-main); }
-        .badge.bg-success { background-color: #16a34a !important; }
-        .badge.bg-warning { background-color: #f59e0b !important; color: #000; }
-        .badge.bg-secondary { background-color: var(--bg-hover) !important; }
-        .badge.bg-danger { background-color: #ef4444 !important; }
-        .alert-success { background-color: #064e3b; color: #6ee7b7; border-color: #16a34a; }
-        .alert-danger  { background-color: #7f1d1d; color: #fca5a5; border-color: #ef4444; }
-        .alert-warning { background-color: #78350f; color: #fcd34d; border-color: #f59e0b; }
-        .alert-info    { background-color: #0c4a6e; color: #7dd3fc; border-color: var(--accent); }
-        .modal-content { background-color: var(--bg-card) !important; color: var(--text-main) !important; border: 1px solid var(--bg-hover); }
-        @media (max-width: 768px) {
-            .layout { flex-direction: column; }
-            .sidebar { width: 100%; }
+        .nav-item.active{
+            background-color:var(--bg-hover);
+            color:var(--accent);
         }
     </style>
-    <link rel="manifest" href="/static/manifest.json">
-    <meta name="theme-color" content="#3b82f6">
-    <link rel="apple-touch-icon" href="/static/icon-192.png">
-    <script>if("serviceWorker" in navigator){navigator.serviceWorker.register("/static/sw.js");}</script>
 </head>
 <body>
-<div class="layout">
-    <aside class="sidebar">
-        <div class="brand">
-            <div class="brand-logo">
-                <span class="brand-icon">⚡</span>
-                <div class="brand-text">
+    <div class="layout">
+        <aside class="sidebar">
+            <div class="brand">
+                <div class="brand-icon">⚡</div>
+                <div>
                     <h4>ZINAR</h4>
-                    <small>نظام إدارة المشتركين</small>
                 </div>
             </div>
-        </div>
-        <a href="{{ url_for('dashboard') }}" class="nav-item {% if request.endpoint == 'dashboard' %}active{% endif %}">
-            <i class="bi bi-speedometer2"></i> لوحة التحكم
-        </a>
-        <a href="{{ url_for('subscribers') }}" class="nav-item {% if request.endpoint in ['subscribers','add_subscriber'] %}active{% endif %}">
-            <i class="bi bi-people"></i> المشتركين
-        </a>
-        <a href="{{ url_for('packages') }}" class="nav-item {% if request.endpoint == 'packages' %}active{% endif %}">
-            <i class="bi bi-box-seam"></i> الباقات
-        </a>
-        <a href="{{ url_for('payments') }}" class="nav-item {% if request.endpoint == 'payments' %}active{% endif %}">
-            <i class="bi bi-cash-coin"></i> الدفعات
-        </a>
-        <a href="{{ url_for('admin_settings') }}" class="nav-item {% if request.endpoint == 'admin_settings' %}active{% endif %}">
-            <i class="bi bi-gear"></i> إعدادات النظام
-        </a>
-        <a href="{{ url_for('logout') }}" class="nav-item">
-            <i class="bi bi-box-arrow-right"></i> خروج
-        </a>
-        <a href="{{ url_for('add_subscriber') }}" class="btn-add">
-            <i class="bi bi-person-plus"></i> إضافة مشترك
-        </a>
-    </aside>
-    <main class="main">
-        {% with messages = get_flashed_messages(with_categories=true) %}
-            {% for category, message in messages %}
-                <div class="alert alert-{{ category }} alert-dismissible fade show">
-                    {{ message }}
-                    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
-                </div>
-            {% endfor %}
-        {% endwith %}
-        {% block content %}{% endblock %}
-    </main>
-</div>
-<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+
+            <a href="{{ url_for('dashboard') }}" class="nav-item {% if request.endpoint == 'dashboard' %}active{% endif %}">
+                لوحة التحكم
+            </a>
+            <a href="{{ url_for('subscribers') }}" class="nav-item {% if request.endpoint in ['subscribers','add_subscriber'] %}active{% endif %}">
+                المشتركين
+            </a>
+            <a href="{{ url_for('packages') }}" class="nav-item {% if request.endpoint == 'packages' %}active{% endif %}">
+                الباقات
+            </a>
+            <a href="{{ url_for('payments') }}" class="nav-item {% if request.endpoint == 'payments' %}active{% endif %}">
+                الدفعات
+            </a>
+            <a href="{{ url_for('admin_settings') }}" class="nav-item {% if request.endpoint == 'admin_settings' %}active{% endif %}">
+                إعدادات النظام
+            </a>
+            <a href="{{ url_for('logout') }}" class="nav-item">
+                خروج
+            </a>
+        </aside>
+
+        <main class="main">
+            {% with messages = get_flashed_messages(with_categories=true) %}
+                {% for category, message in messages %}
+                    <div class="alert alert-{{ category }} alert-dismissible fade show">
+                        {{ message }}
+                        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                    </div>
+                {% endfor %}
+            {% endwith %}
+            {% block content %}{% endblock %}
+        </main>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
 </body>
 </html>
