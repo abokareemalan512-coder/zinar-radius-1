@@ -32,7 +32,6 @@
             padding: 20px 12px;
             flex-shrink: 0;
         }
-        /* شعار ZINAR المحسّن */
         .brand {
             text-align: center;
             padding: 20px 0 24px;
@@ -164,10 +163,10 @@
             .sidebar { width: 100%; }
         }
     </style>
-<link rel="manifest" href="/static/manifest.json">
-<meta name="theme-color" content="#3b82f6">
-<link rel="apple-touch-icon" href="/static/icon-192.png">
-<script>if("serviceWorker" in navigator){navigator.serviceWorker.register("/static/sw.js");}</script>
+    <link rel="manifest" href="/static/manifest.json">
+    <meta name="theme-color" content="#3b82f6">
+    <link rel="apple-touch-icon" href="/static/icon-192.png">
+    <script>if("serviceWorker" in navigator){navigator.serviceWorker.register("/static/sw.js");}</script>
 </head>
 <body>
 <div class="layout">
@@ -190,9 +189,11 @@
         <a href="{{ url_for('packages') }}" class="nav-item {% if request.endpoint == 'packages' %}active{% endif %}">
             <i class="bi bi-box-seam"></i> الباقات
         </a>
-        </a>
         <a href="{{ url_for('payments') }}" class="nav-item {% if request.endpoint == 'payments' %}active{% endif %}">
             <i class="bi bi-cash-coin"></i> الدفعات
+        </a>
+        <a href="{{ url_for('admin_settings') }}" class="nav-item {% if request.endpoint == 'admin_settings' %}active{% endif %}">
+            <i class="bi bi-gear"></i> إعدادات النظام
         </a>
         <a href="{{ url_for('logout') }}" class="nav-item">
             <i class="bi bi-box-arrow-right"></i> خروج
