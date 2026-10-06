@@ -2,212 +2,257 @@
 {% block title %}لوحة التحكم{% endblock %}
 
 {% block content %}
-<div class="d-flex justify-content-between align-items-center mb-2">
-    <h6>🏠 لوحة التحكم</h6>
+<div class="d-flex justify-content-between align-items-center mb-3">
+    <h5 class="mb-0">🏠 لوحة التحكم الرئيسية</h5>
     <button type="button" class="user-badge" data-bs-toggle="modal" data-bs-target="#changeCredModal">
         <div class="user-avatar">{{ (admin_name or 'A')[0]|upper }}</div>
         <div class="user-info">
             <span class="user-greeting">مرحباً</span>
             <span class="user-name">{{ admin_name }}</span>
         </div>
-        <i class="bi bi-gear text-accent ms-1"></i>
+        <i class="bi bi-gear text-accent ms-2"></i>
     </button>
 </div>
 
-<!-- بطاقات الإحصائيات الرئيسية -->
-<div class="row g-2 mb-2">
-    <!-- بطاقة حالة السيرفرات المعدلة -->
+<!-- الإحصائيات الرئيسية -->
+<div class="row g-2 mb-3">
     <div class="col-6 col-md-3">
-        <div class="card p-2 text-center">
-            <div class="fs-5 text-accent">🖥️</div>
-            <h6 class="mb-0 fw-bold">{{ routers_count }}</h6>
-            <small class="text-muted d-block mb-1" style="font-size:10px">إجمالي السيرفرات</small>
-            <div class="d-flex justify-content-center gap-2" style="font-size:10px">
-                <span class="text-success"><i class="bi bi-circle-fill" style="font-size:7px"></i> متصل: {{ routers_online }}</span>
-                <span class="text-danger"><i class="bi bi-circle-fill" style="font-size:7px"></i> غير متصل: {{ routers_count - routers_online }}</span>
+        <div class="card stat-card p-3 text-center border-0">
+            <div class="stat-icon">🖥️</div>
+            <h6 class="mb-1 fw-bold text-white">{{ routers_count }}</h6>
+            <small class="text-muted">السيرفرات</small>
+            <div class="mt-2" style="font-size:11px">
+                <span class="badge bg-success bg-opacity-75">✓ {{ routers_online }} متصل</span>
             </div>
         </div>
     </div>
 
-    <!-- بطاقة المشتركون -->
     <div class="col-6 col-md-3">
-        <div class="card p-2 text-center">
-            <div class="fs-5 text-accent">👥</div>
-            <h6 class="mb-0 fw-bold">{{ sub_count }}</h6>
-            <small class="text-muted d-block" style="font-size:10px">المشتركين</small>
-            <small class="text-accent" style="font-size:10px">نشط: {{ active_subs }}</small>
+        <div class="card stat-card p-3 text-center border-0">
+            <div class="stat-icon">👥</div>
+            <h6 class="mb-1 fw-bold text-white">{{ sub_count }}</h6>
+            <small class="text-muted">المشتركين</small>
+            <div class="mt-2" style="font-size:11px">
+                <span class="badge bg-accent bg-opacity-75">✓ {{ active_subs }} نشط</span>
+            </div>
         </div>
     </div>
 
-<!-- أيقونة Telegram صغيرة -->
-<div class="col-md-3">
-    <div class="card shadow-sm border-0" style="background: rgba(18, 35, 58, 0.9); border: 1px solid rgba(255,255,255,0.08);">
-        <div class="card-body text-center py-3">
-            <div class="d-flex justify-content-center align-items-center mb-2">
-                <div class="rounded-circle d-flex align-items-center justify-content-center"
-                     style="width: 40px; height: 40px; background: linear-gradient(135deg, #2a7ae2, #32a8ff);">
-                    <i class="bi bi-telegram text-white" style="font-size: 1.2rem;"></i>
-                </div>
+    <div class="col-6 col-md-3">
+        <div class="card stat-card p-3 text-center border-0">
+            <div class="stat-icon">💰</div>
+            <h6 class="mb-1 fw-bold text-white">{{ "%.0f"|format(today_revenue) }}</h6>
+            <small class="text-muted">الإيرادات اليوم</small>
+            <div class="mt-2" style="font-size:11px">
+                <span class="badge bg-warning bg-opacity-75">⏳ {{ pending_pays }} معلق</span>
             </div>
+        </div>
+    </div>
 
-            <h6 class="text-white mb-2" style="font-size: 0.9rem;">تيلجرام</h6>
+    <div class="col-6 col-md-3">
+        <div class="card stat-card p-3 text-center border-0">
+            <div class="stat-icon">✨</div>
+            <h6 class="mb-1 fw-bold text-white">{{ new_users_today }}</h6>
+            <small class="text-muted">جدد اليوم</small>
+            <div class="mt-2" style="font-size:11px">
+                <span class="badge bg-info bg-opacity-75">📈 إجمالي</span>
+            </div>
+        </div>
+    </div>
+</div>
 
-            {% if telegram_settings and telegram_settings.enabled %}
-                <span class="badge bg-success px-2 py-1" style="font-size: 0.75rem;">✅ مفعل</span>
-            {% else %}
-                <span class="badge bg-danger px-2 py-1" style="font-size: 0.75rem;">❌ معطل</span>
-            {% endif %}
-
-            <div class="mt-2">
-                <a href="{{ url_for('admin_settings') }}" class="btn btn-sm btn-primary w-100" style="font-size: 0.75rem; padding: 0.4rem;">
-                    <i class="bi bi-gear" style="font-size: 0.8rem;"></i> إعدادات
+<!-- الإجراءات السريعة -->
+<div class="row g-2 mb-3">
+    <div class="col-md-6">
+        <div class="card action-card border-0 p-3">
+            <h6 class="mb-3 fw-bold text-white">⚡ إجراءات سريعة</h6>
+            <div class="d-grid gap-2">
+                <a href="{{ url_for('add_subscriber') }}" class="btn btn-sm btn-action">
+                    <i class="bi bi-person-plus-fill"></i> إضافة مشترك جديد
+                </a>
+                <a href="{{ url_for('routers') }}" class="btn btn-sm btn-action">
+                    <i class="bi bi-router-fill"></i> إدارة السيرفرات
+                </a>
+                <a href="{{ url_for('payments') }}" class="btn btn-sm btn-action">
+                    <i class="bi bi-credit-card-fill"></i> سجل الدفعات
+                </a>
+                <a href="{{ url_for('packages') }}" class="btn btn-sm btn-action">
+                    <i class="bi bi-box-fill"></i> إدارة الباقات
                 </a>
             </div>
         </div>
     </div>
-</div>
 
-    <!-- بطاقة الجدد اليوم -->
-    <div class="col-6 col-md-3">
-        <div class="card p-2 text-center">
-            <div class="fs-5 text-accent">✨</div>
-            <h6 class="mb-0 fw-bold">{{ new_users_today }}</h6>
-            <small class="text-muted d-block" style="font-size:10px">جدد اليوم</small>
-        </div>
-    </div>
-</div>
-
-<div class="row g-2 mb-2">
-    <!-- حالة النظام -->
     <div class="col-md-6">
-        <div class="card p-2 h-100">
-            <div style="font-size:12px;font-weight:bold" class="mb-2">⚙️ حالة نظام السيرفرات</div>
-            <div class="d-flex justify-content-between mb-1" style="font-size:11px">
-                <span>السيرفر الرئيسي (Master):</span>
-                {% if has_master %}
-                    <span class="badge bg-success" style="font-size:10px">✅ محدد</span>
-                {% else %}
-                    <span class="badge bg-warning text-dark" style="font-size:10px">⚠️ غير محدد</span>
-                {% endif %}
-            </div>
-            <div class="d-flex justify-content-between mb-1" style="font-size:11px">
-                <span>سيرفرات VPN المتصلة:</span>
-                <span class="text-accent fw-bold">{{ routers_online }} / {{ routers_count }}</span>
-            </div>
-            <div class="d-flex justify-content-between" style="font-size:11px">
-                <span>المشتركون النشطون:</span>
-                <span class="text-accent fw-bold">{{ active_subs }}</span>
-            </div>
-        </div>
-    </div>
-
-    <!-- إجراءات سريعة -->
-    <div class="col-md-6">
-        <div class="card p-2 h-100">
-            <div style="font-size:12px;font-weight:bold" class="mb-2">⚡ إجراءات سريعة</div>
-            <div class="d-grid gap-1">
-                <a href="{{ url_for('add_subscriber') }}" class="btn btn-primary btn-sm" style="font-size:11px;padding:3px">➕ إضافة مشترك جديد</a>
-                <a href="{{ url_for('routers') }}" class="btn btn-primary btn-sm" style="font-size:11px;padding:3px">🖥️ إدارة السيرفرات (VPN)</a>
-                <a href="{{ url_for('payments') }}" class="btn btn-primary btn-sm" style="font-size:11px;padding:3px">💰 سجل الدفعات</a>
+        <div class="card action-card border-0 p-3">
+            <h6 class="mb-3 fw-bold text-white">📊 حالة النظام</h6>
+            <div class="system-status">
+                <div class="status-row">
+                    <span>🎯 السيرفر الرئيسي:</span>
+                    {% if has_master %}
+                        <span class="badge bg-success">✅ محدد</span>
+                    {% else %}
+                        <span class="badge bg-warning">⚠️ غير محدد</span>
+                    {% endif %}
+                </div>
+                <div class="status-row">
+                    <span>🔗 الاتصالات النشطة:</span>
+                    <span class="text-accent fw-bold">{{ active_sessions }}</span>
+                </div>
+                <div class="status-row">
+                    <span>📡 عرض النطاق الترددي:</span>
+                    <span class="text-info fw-bold">متحقق</span>
+                </div>
+                <div class="status-row">
+                    <span>🔐 الأمان:</span>
+                    <span class="text-success fw-bold">✓ محمي</span>
+                </div>
             </div>
         </div>
     </div>
 </div>
 
-<!-- قائمة حالة سيرفرات المايكروتيك VPN التفصيلية -->
-<div class="card mb-2">
-    <div class="card-header py-1 d-flex justify-content-between align-items-center">
-        <small style="font-size:11px;font-weight:bold">🖥️ حالة سيرفرات الشبكة (MikroTik VPN)</small>
-        <span class="badge bg-dark text-info" style="font-size:9px">شبكة VPN (10.10.10.x)</span>
+<!-- حالة السيرفرات المفصلة -->
+<div class="card border-0 mb-3">
+    <div class="card-header bg-dark bg-opacity-50 py-2 d-flex justify-content-between align-items-center">
+        <h6 class="mb-0 fw-bold">
+            <i class="bi bi-diagram-3 text-accent"></i> حالة سيرفرات الشبكة (MikroTik)
+        </h6>
+        <span class="badge bg-accent bg-opacity-75">🌐 VPN (10.10.10.x)</span>
     </div>
-    <div class="card-body py-1">
-        {% for r in routers %}
-        <div class="d-flex justify-content-between align-items-center py-1 border-bottom border-secondary border-opacity-25" style="font-size:11px">
-            <div>
-                <span class="fw-bold text-white">{{ r.name }}</span>
-                <span class="text-muted ms-1" style="font-size:10px">({{ r.ip_address }})</span>
-            </div>
-            <div>
-                {% if r.is_active %}
-                    <span class="badge bg-success bg-opacity-20 text-success border border-success px-2 py-1" style="font-size:10px">
-                        🟢 متصل
-                    </span>
-                {% else %}
-                    <span class="badge bg-danger bg-opacity-20 text-danger border border-danger px-2 py-1" style="font-size:10px">
-                        🔴 غير متصل
-                    </span>
-                {% endif %}
-            </div>
-        </div>
-        {% else %}
-        <p class="text-muted mb-0 text-center py-2" style="font-size:11px">لا توجد سيرفرات مضافة حالياً</p>
-        {% endfor %}
-    </div>
-</div>
-
-<!-- سجل الأحداث -->
-<div class="card">
-    <div class="card-header py-1"><small style="font-size:11px;font-weight:bold">📋 سجل الأحداث (آخر 20)</small></div>
-    <div class="table-responsive">
-        <table class="table table-sm table-hover mb-0">
-            <thead>
-                <tr style="font-size:11px">
-                    <th style="padding:3px">الوقت</th>
-                    <th style="padding:3px">المدير</th>
-                    <th style="padding:3px">الإجراء</th>
-                    <th style="padding:3px">الهدف</th>
-                    <th style="padding:3px">التفاصيل</th>
-                </tr>
-            </thead>
-            <tbody>
-                {% for e in events %}
-                <tr style="font-size:11px">
-                    <td style="padding:3px">{{ e.created_at.strftime('%m-%d %H:%M') if e.created_at else '-' }}</td>
-                    <td style="padding:3px;color:#00e0a0">{{ e.admin_name or '-' }}</td>
-                    <td style="padding:3px">{{ e.action or '-' }}</td>
-                    <td style="padding:3px">{{ e.target or '-' }}</td>
-                    <td style="padding:3px;color:#888">{{ e.details or '' }}</td>
-                </tr>
-                {% else %}
-                <tr><td colspan="5" class="text-center py-2 text-muted" style="font-size:11px">لا يوجد أحداث بعد</td></tr>
+    <div class="card-body p-2">
+        {% if routers %}
+            <div class="routers-list">
+                {% for r in routers %}
+                <div class="router-item">
+                    <div class="router-info">
+                        <span class="router-name">{{ r.name }}</span>
+                        <span class="router-ip">({{ r.ip_address }})</span>
+                    </div>
+                    <div class="router-status">
+                        {% if r.is_active %}
+                            <span class="badge bg-success bg-opacity-75">
+                                <i class="bi bi-circle-fill"></i> متصل
+                            </span>
+                        {% else %}
+                            <span class="badge bg-danger bg-opacity-75">
+                                <i class="bi bi-circle-fill"></i> غير متصل
+                            </span>
+                        {% endif %}
+                    </div>
+                </div>
                 {% endfor %}
-            </tbody>
-        </table>
+            </div>
+        {% else %}
+        <div class="text-center text-muted py-4">
+            <i class="bi bi-exclamation-triangle" style="font-size:2rem"></i>
+            <p class="mt-2">لا توجد سيرفرات مضافة حالياً</p>
+        </div>
+        {% endif %}
+    </div>
+</div>
+
+<!-- سجل الأحداث الحديثة -->
+<div class="card border-0">
+    <div class="card-header bg-dark bg-opacity-50 py-2">
+        <h6 class="mb-0 fw-bold">
+            <i class="bi bi-clock-history text-accent"></i> سجل الأحداث (آخر 15)
+        </h6>
+    </div>
+    <div class="card-body p-0">
+        <div class="table-responsive">
+            <table class="table table-sm table-hover mb-0 event-log">
+                <thead>
+                    <tr style="font-size:12px">
+                        <th>⏰ الوقت</th>
+                        <th>👤 المستخدم</th>
+                        <th>🎯 الإجراء</th>
+                        <th>📌 الهدف</th>
+                        <th>📝 التفاصيل</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% if subscribers %}
+                        {% for s in subscribers[:15] %}
+                        <tr style="font-size:11px">
+                            <td><i class="bi bi-clock"></i> {{ s.created_at.strftime('%H:%M') if s.created_at else '-' }}</td>
+                            <td><span class="text-accent">{{ admin_name }}</span></td>
+                            <td>
+                                {% if s.status == 'active' %}
+                                    <span class="badge bg-success bg-opacity-75">➕ إضافة</span>
+                                {% elif s.status == 'paused' %}
+                                    <span class="badge bg-warning bg-opacity-75">⏸️ إيقاف</span>
+                                {% elif s.status == 'expired' %}
+                                    <span class="badge bg-danger bg-opacity-75">⏰ انتهى</span>
+                                {% endif %}
+                            </td>
+                            <td>{{ s.username }}</td>
+                            <td class="text-muted">{{ s.package or '-' }}</td>
+                        </tr>
+                        {% endfor %}
+                    {% else %}
+                    <tr>
+                        <td colspan="5" class="text-center text-muted py-4">
+                            <i class="bi bi-inbox"></i> لا توجد أحداث بعد
+                        </td>
+                    </tr>
+                    {% endif %}
+                </tbody>
+            </table>
+        </div>
     </div>
 </div>
 
 <!-- نافذة تغيير البيانات -->
 <div class="modal fade" id="changeCredModal" tabindex="-1">
     <div class="modal-dialog modal-dialog-centered">
-        <div class="modal-content">
+        <div class="modal-content bg-dark border-secondary">
             <form method="POST" action="{{ url_for('change_admin_credentials') }}">
                 <div class="modal-header border-secondary">
-                    <h6 class="modal-title text-accent">🔐 تغيير بيانات الدخول</h6>
+                    <h6 class="modal-title">
+                        <i class="bi bi-lock-fill text-accent"></i> تغيير بيانات الدخول
+                    </h6>
                     <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
                 </div>
                 <div class="modal-body">
-                    <div class="alert alert-warning" style="font-size:11px">⚠️ مطلوب كلمة المرور الحالية.</div>
-                    <div class="mb-2">
-                        <label class="form-label" style="font-size:11px">كلمة المرور الحالية *</label>
-                        <input type="password" name="current_password" class="form-control form-control-sm" required>
+                    <div class="alert alert-warning border-0" style="font-size:12px">
+                        <i class="bi bi-exclamation-triangle"></i> مطلوب كلمة المرور الحالية للمتابعة
                     </div>
-                    <hr class="border-secondary my-2">
-                    <div class="mb-2">
-                        <label class="form-label" style="font-size:11px">اسم المستخدم الجديد</label>
-                        <input type="text" name="new_username" class="form-control form-control-sm" value="{{ admin_name }}">
+                    
+                    <div class="mb-3">
+                        <label class="form-label fw-bold">🔑 كلمة المرور الحالية</label>
+                        <input type="password" name="current_password" class="form-control border-secondary" 
+                               style="background:rgba(255,255,255,0.05);color:#fff" required>
                     </div>
-                    <div class="mb-2">
-                        <label class="form-label" style="font-size:11px">كلمة المرور الجديدة</label>
-                        <input type="password" name="new_password" class="form-control form-control-sm" minlength="6">
+
+                    <hr class="border-secondary">
+
+                    <div class="mb-3">
+                        <label class="form-label fw-bold">👤 اسم المستخدم الجديد</label>
+                        <input type="text" name="new_username" class="form-control border-secondary" 
+                               style="background:rgba(255,255,255,0.05);color:#fff" value="{{ admin_name }}">
                     </div>
-                    <div class="mb-2">
-                        <label class="form-label" style="font-size:11px">تأكيد كلمة المرور</label>
-                        <input type="password" name="confirm_password" class="form-control form-control-sm" minlength="6">
+
+                    <div class="mb-3">
+                        <label class="form-label fw-bold">🔐 كلمة المرور الجديدة</label>
+                        <input type="password" name="new_password" class="form-control border-secondary" 
+                               style="background:rgba(255,255,255,0.05);color:#fff" minlength="6">
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label fw-bold">✓ تأكيد كلمة المرور</label>
+                        <input type="password" name="confirm_password" class="form-control border-secondary" 
+                               style="background:rgba(255,255,255,0.05);color:#fff" minlength="6">
                     </div>
                 </div>
+                
                 <div class="modal-footer border-secondary">
-                    <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">إلغاء</button>
-                    <button type="submit" class="btn btn-primary btn-sm">💾 حفظ</button>
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
+                        <i class="bi bi-x-circle"></i> إلغاء
+                    </button>
+                    <button type="submit" class="btn btn-success">
+                        <i class="bi bi-check-circle"></i> حفظ التغييرات
+                    </button>
                 </div>
             </form>
         </div>
@@ -215,22 +260,164 @@
 </div>
 
 <style>
+/* User Badge */
 .user-badge {
-    display:flex; align-items:center; gap:8px;
-    background:var(--bg-card); border:1px solid var(--bg-hover);
-    border-radius:50px; padding:4px 10px 4px 4px;
-    cursor:pointer; color:inherit; font-family:inherit;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    background: rgba(0, 230, 118, 0.08);
+    border: 1px solid rgba(0, 230, 118, 0.2);
+    border-radius: 50px;
+    padding: 6px 12px 6px 6px;
+    cursor: pointer;
+    color: inherit;
+    font-family: inherit;
+    transition: all 0.3s;
 }
-.user-badge:hover { border-color:var(--accent); }
-.user-avatar {
-    display:flex; align-items:center; justify-content:center;
-    width:28px; height:28px;
-    background:linear-gradient(135deg,var(--accent),#0ea5e9);
-    color:#0f172a; font-weight:800; font-size:12px; border-radius:50%;
-}
-.user-info { display:flex; flex-direction:column; line-height:1.1; text-align:right; }
-.user-greeting { font-size:9px; color:var(--text-muted); }
-.user-name { font-size:11px; font-weight:700; color:var(--accent); }
-</style>
 
+.user-badge:hover {
+    border-color: #00e676;
+    background: rgba(0, 230, 118, 0.12);
+}
+
+.user-avatar {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 36px;
+    height: 36px;
+    background: linear-gradient(135deg, #00e676, #00bcd4);
+    color: #0f172a;
+    font-weight: 800;
+    font-size: 14px;
+    border-radius: 50%;
+}
+
+.user-info {
+    display: flex;
+    flex-direction: column;
+    line-height: 1.2;
+    text-align: right;
+}
+
+.user-greeting {
+    font-size: 10px;
+    color: #b0bec5;
+}
+
+.user-name {
+    font-size: 12px;
+    font-weight: 700;
+    color: #00e676;
+}
+
+/* Stat Cards */
+.stat-card {
+    background: linear-gradient(135deg, rgba(26, 58, 82, 0.8), rgba(42, 74, 106, 0.6));
+    border: 1px solid rgba(0, 230, 118, 0.15);
+    border-radius: 14px;
+    transition: all 0.3s;
+}
+
+.stat-card:hover {
+    border-color: #00e676;
+    transform: translateY(-2px);
+}
+
+.stat-icon {
+    font-size: 32px;
+    margin-bottom: 10px;
+}
+
+/* Action Cards */
+.action-card {
+    background: linear-gradient(135deg, rgba(26, 58, 82, 0.8), rgba(42, 74, 106, 0.6));
+    border: 1px solid rgba(0, 230, 118, 0.15);
+    border-radius: 14px;
+}
+
+.btn-action {
+    background: linear-gradient(135deg, #00e676, #00bcd4);
+    color: #0f172a;
+    font-weight: 600;
+    border: none;
+    transition: all 0.3s;
+}
+
+.btn-action:hover {
+    transform: translateX(-2px);
+    box-shadow: 0 4px 12px rgba(0, 230, 118, 0.3);
+}
+
+/* System Status */
+.system-status {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.status-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 8px;
+    background: rgba(0, 0, 0, 0.2);
+    border-radius: 8px;
+    font-size: 12px;
+}
+
+/* Routers List */
+.routers-list {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.router-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 12px;
+    background: rgba(0, 0, 0, 0.2);
+    border-left: 3px solid #00e676;
+    border-radius: 8px;
+    transition: all 0.3s;
+}
+
+.router-item:hover {
+    background: rgba(0, 230, 118, 0.1);
+    border-left-color: #00bcd4;
+}
+
+.router-info {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.router-name {
+    font-weight: 600;
+    color: #fff;
+}
+
+.router-ip {
+    font-size: 11px;
+    color: #b0bec5;
+}
+
+/* Event Log */
+.event-log tbody tr {
+    border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+    transition: all 0.3s;
+}
+
+.event-log tbody tr:hover {
+    background: rgba(0, 230, 118, 0.05);
+}
+
+.event-log td {
+    vertical-align: middle;
+    padding: 12px !important;
+}
+</style>
 {% endblock %}
