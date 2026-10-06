@@ -1,48 +1,183 @@
-{% extends 'base.html' %}
-{% block title %}إعدادات حساب المسؤول{% endblock %}
+{% extends "base.html" %}
+{% block title %}إعدادات التلجرام{% endblock %}
 
 {% block content %}
-<div class="container-fluid" style="max-width: 800px;">
-    <div class="d-flex justify-content-between align-items-center mb-4">
-        <div>
-            <h3 class="fw-bold m-0 text-white"><i class="fa-solid fa-user-gear text-info me-2"></i> إعدادات حساب المنصة (Admin)</h3>
-            <span class="text-muted fs-6">تعديل اسم المستخدم وكلمة المرور للدخول إلى منصة إدارة زينار</span>
+<div class="container py-4">
+    <h2 class="mb-4">⚙️ إعدادات التلجرام</h2>
+
+    <div class="row g-4">
+        <!-- قسم الإعدادات -->
+        <div class="col-lg-6">
+            <div class="card shadow-sm">
+                <div class="card-header bg-primary text-white">
+                    <h5 class="mb-0">
+                        <i class="bi bi-telegram"></i> إعدادات الاتصال
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <form method="POST" action="{{ url_for('save_telegram_settings') }}">
+                        <div class="mb-3">
+                            <label class="form-label">🤖 Bot Token</label>
+                            <input type="password" name="telegram_token" class="form-control"
+                                   value="{{ telegram_settings.token or '' }}"
+                                   placeholder="8777776360:AAEeesJoSnuaE2sE1GpEZNI0qez-kGz_Jd4">
+                            <small class="text-muted">احصل على التوكن من <a href="https://t.me/botfather" target="_blank">@BotFather</a></small>
+                        </div>
+
+                        <div class="mb-3">
+                            <label class="form-label">💬 Chat ID</label>
+                            <input type="text" name="telegram_chat_id" class="form-control"
+                                   value="{{ telegram_settings.chat_id or '' }}"
+                                   placeholder="1017610955">
+                            <small class="text-muted">احصل على المعرف من <a href="https://t.me/userinfobot" target="_blank">@userinfobot</a></small>
+                        </div>
+
+                        <div class="mb-3">
+                            <div class="form-check form-switch">
+                                <input class="form-check-input" type="checkbox" name="telegram_enabled"
+                                       id="telegram_enabled" {% if telegram_settings and telegram_settings.enabled %}checked{% endif %}>
+                                <label class="form-check-label" for="telegram_enabled">
+                                    ✅ تفعيل الإشعارات
+                                </label>
+                            </div>
+                        </div>
+
+                        <hr>
+
+                        <h6>📢 نوع الإشعارات المفعلة:</h6>
+
+                        <div class="form-check mb-2">
+                            <input class="form-check-input" type="checkbox" name="notify_new_subscriber"
+                                   id="notify_new_subscriber" {% if telegram_settings and telegram_settings.notify_new_subscriber %}checked{% endif %}>
+                            <label class="form-check-label" for="notify_new_subscriber">
+                                🆕 إشعار مشترك جديد
+                            </label>
+                        </div>
+
+                        <div class="form-check mb-2">
+                            <input class="form-check-input" type="checkbox" name="notify_subscriber_expired"
+                                   id="notify_subscriber_expired" {% if telegram_settings and telegram_settings.notify_subscriber_expired %}checked{% endif %}>
+                            <label class="form-check-label" for="notify_subscriber_expired">
+                                ⏰ إشعار انتهاء الاشتراك
+                            </label>
+                        </div>
+
+                        <div class="form-check mb-2">
+                            <input class="form-check-input" type="checkbox" name="notify_bulk_add"
+                                   id="notify_bulk_add" {% if telegram_settings and telegram_settings.notify_bulk_add %}checked{% endif %}>
+                            <label class="form-check-label" for="notify_bulk_add">
+                                📦 إشعار إضافة جماعية
+                            </label>
+                        </div>
+
+                        <div class="form-check">
+                            <input class="form-check-input" type="checkbox" name="notify_admin_action"
+                                   id="notify_admin_action" {% if telegram_settings and telegram_settings.notify_admin_action %}checked{% endif %}>
+                            <label class="form-check-label" for="notify_admin_action">
+                                ⚙️ إشعار العمليات الإدارية
+                            </label>
+                        </div>
+
+                        <div class="mt-4 d-flex gap-2">
+                            <button type="submit" class="btn btn-primary flex-grow-1">
+                                <i class="bi bi-save"></i> حفظ الإعدادات
+                            </button>
+                            <button type="button" class="btn btn-info" onclick="testTelegram()">
+                                <i class="bi bi-send"></i> اختبار
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+
+        <!-- قسم الإحصائيات -->
+        <div class="col-lg-6">
+            <div class="card shadow-sm">
+                <div class="card-header bg-info text-white">
+                    <h5 class="mb-0">📊 إحصائيات الإشعارات</h5>
+                </div>
+                <div class="card-body">
+                    <div class="row text-center">
+                        <div class="col-6 mb-3">
+                            <div>
+                                <h3 class="text-primary">{{ total_notifications }}</h3>
+                                <small class="text-muted">إجمالي الإشعارات</small>
+                            </div>
+                        </div>
+                        <div class="col-6 mb-3">
+                            <div>
+                                <h3 class="text-success">{{ new_subscribers }}</h3>
+                                <small class="text-muted">مشتركين جدد</small>
+                            </div>
+                        </div>
+                        <div class="col-6 mb-3">
+                            <div>
+                                <h3 class="text-warning">{{ expired_subscribers }}</h3>
+                                <small class="text-muted">اشتراكات منتهية</small>
+                            </div>
+                        </div>
+                        <div class="col-6 mb-3">
+                            <div>
+                                <h3 class="text-info">{{ bulk_adds }}</h3>
+                                <small class="text-muted">إضافات جماعية</small>
+                            </div>
+                        </div>
+                    </div>
+
+                    <hr>
+
+                    <h6>📌 آخر الرسائل:</h6>
+
+                    {% if telegram_logs %}
+                        <div class="list-group list-group-sm">
+                            {% for log in telegram_logs %}
+                            <div class="list-group-item">
+                                <div class="d-flex justify-content-between align-items-start">
+                                    <div>
+                                        <strong>{{ log.message_type }}</strong>
+                                        <br>
+                                        <small class="text-muted">{{ log.message[:60] }}...</small>
+                                    </div>
+                                    <span class="badge bg-{% if log.status == 'success' %}success{% else %}danger{% endif %}">
+                                        {{ log.status }}
+                                    </span>
+                                </div>
+                                <small class="text-muted">{{ log.created_at.strftime('%H:%M:%S') }}</small>
+                            </div>
+                            {% endfor %}
+                        </div>
+                    {% else %}
+                        <div class="alert alert-info">لا توجد رسائل حتى الآن</div>
+                    {% endif %}
+                </div>
+            </div>
         </div>
     </div>
-
-    {% if message %}
-    <div class="alert alert-success d-flex align-items-center mb-4" role="alert">
-        <i class="fa-solid fa-circle-check fs-5 me-2"></i>
-        <div>{{ message }}</div>
-    </div>
-    {% endif %}
-
-    {% if error %}
-    <div class="alert alert-danger d-flex align-items-center mb-4" role="alert">
-        <i class="fa-solid fa-triangle-exclamation fs-5 me-2"></i>
-        <div>{{ error }}</div>
-    </div>
-    {% endif %}
-
-    <div class="card card-custom p-4">
-        <form action="/admin_settings" method="POST">
-            <div class="mb-4">
-                <label class="form-label fw-bold"><i class="fa-solid fa-user text-info me-1"></i> اسم مستخدم الأدمن الحالي / الجديد</label>
-                <input type="text" name="username" class="form-control fs-5" value="{{ admin.username }}" required placeholder="أدخل اسم المستخدم الجديد">
-            </div>
-
-            <div class="mb-4">
-                <label class="form-label fw-bold"><i class="fa-solid fa-key text-warning me-1"></i> كلمة المرور الجديدة للمنصة</label>
-                <input type="password" name="password" class="form-control fs-5" value="{{ admin.password }}" required placeholder="أدخل كلمة المرور الجديدة">
-            </div>
-
-            <div class="d-flex gap-2 justify-content-end mt-4">
-                <a href="/dashboard" class="btn btn-outline-secondary px-4"><i class="fa-solid fa-arrow-right me-1"></i> إلغاء ورجوع</a>
-                <button type="submit" class="btn btn-info px-4 py-2 text-dark fw-bold">
-                    <i class="fa-solid fa-floppy-disk me-1"></i> حفظ التغيرات
-                </button>
-            </div>
-        </form>
-    </div>
 </div>
+
+<script>
+function testTelegram() {
+    const btn = event.target;
+    btn.disabled = true;
+    btn.innerHTML = '<i class="bi bi-hourglass-split"></i> جاري الاختبار...';
+
+    fetch('{{ url_for("test_telegram") }}', { method: 'POST' })
+        .then(r => r.json())
+        .then(data => {
+            if (data.success) {
+                alert('✅ تم إرسال رسالة الاختبار بنجاح!');
+            } else {
+                alert('❌ فشل الإرسال: ' + (data.error || 'خطأ غير معروف'));
+            }
+            btn.disabled = false;
+            btn.innerHTML = '<i class="bi bi-send"></i> اختبار';
+        })
+        .catch(err => {
+            alert('❌ حدث خطأ: ' + err);
+            btn.disabled = false;
+            btn.innerHTML = '<i class="bi bi-send"></i> اختبار';
+        });
+}
+</script>
 {% endblock %}
