@@ -1,48 +1,120 @@
-<!DOCTYPE html>
-<html dir="rtl" lang="ar">
-<head>
-    <title>إدارة الراوترات</title>
-</head>
-<body>
-    <h1>الراوترات</h1>
-    <a href="/add-router">+ إضافة راوتر</a>
-    
-    <table>
-        <tr>
-            <th>الاسم</th>
-            <th>IP</th>
-            <th>المستخدم</th>
-            <th>المنفذ</th>
-            <th>حالة</th>
-            <th>إجراءات</th>
-        </tr>
-        {% for router in routers %}
-        <tr>
-            <td>{{ router.name }}</td>
-            <td>{{ router.ip_address }}</td>
-            <td>{{ router.username }}</td>
-            <td>{{ router.port }}</td>
-            <td>{% if router.is_active %}🟢 نشط{% else %}🔴 معطل{% endif %}</td>
-            <td>
-                {% if router.is_master %}<span style="color: gold;">⭐ رئيسي</span>{% endif %}
-                <a href="/routers/set_master/{{ router.id }}">جعل رئيسي</a>
-                <a href="/routers/delete/{{ router.id }}">حذف</a>
-            </td>
-        </tr>
-        {% endfor %}
-    </table>
+{% extends "base.html" %}
+{% block content %}
+<div class="container py-4" dir="rtl">
+    <h2 class="mb-4 fw-bold text-primary">إدارة الراوترات</h2>
 
-    <h2>إضافة راوتر جديد</h2>
-    <form method="POST" action="/routers">
-        <input type="text" name="name" placeholder="اسم الراوتر" required>
-        <input type="text" name="ip_address" placeholder="عنوان IP" required>
-        <input type="text" name="username" placeholder="اسم المستخدم" required>
-        <input type="password" name="password" placeholder="كلمة المرور" required>
-        <input type="number" name="port" placeholder="المنفذ" value="22">
-        <label>
-            <input type="checkbox" name="is_master"> جعله رئيسياً
-        </label>
-        <button type="submit">إضافة</button>
-    </form>
-</body>
-</html>
+    <!-- رسائل التنبيه -->
+    {% with messages = get_flashed_messages(with_categories=true) %}
+        {% if messages %}
+            {% for category, message in messages %}
+                <div class="alert alert-{{ category }} alert-dismissible fade show" role="alert">
+                    {{ message }}
+                    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                </div>
+            {% endfor %}
+        {% endif %}
+    {% endwith %}
+
+    <!-- نموذج إضافة راوتر جديد -->
+    <div class="card shadow-sm mb-4 border-0">
+        <div class="card-header bg-dark text-white fw-bold">إضافة راوتر جديد</div>
+        <div class="card-body bg-light">
+            <form method="POST" action="{{ url_for('routers') }}">
+                <div class="row g-3">
+                    <div class="col-md-3">
+                        <label class="form-label fw-bold">اسم الراوتر</label>
+                        <input type="text" name="name" class="form-control" placeholder="مثال: ZENAR net" required>
+                    </div>
+                    <div class="col-md-3">
+                        <label class="form-label fw-bold">عنوان IP</label>
+                        <input type="text" name="ip_address" class="form-control" placeholder="192.145.x.x" required>
+                    </div>
+                    <div class="col-md-2">
+                        <label class="form-label fw-bold">اسم المستخدم</label>
+                        <input type="text" name="username" class="form-control" value="zinar" required>
+                    </div>
+                    <div class="col-md-2">
+                        <label class="form-label fw-bold">كلمة المرور</label>
+                        <input type="password" name="password" class="form-control" placeholder="••••••••" required>
+                    </div>
+                    <div class="col-md-2">
+                        <label class="form-label fw-bold">المنفذ (Port)</label>
+                        <input type="number" name="port" class="form-control" value="22" required>
+                    </div>
+                </div>
+                <div class="row mt-3 align-items-center">
+                    <div class="col-md-6">
+                        <div class="form-check">
+                            <input class="form-check-input" type="checkbox" name="is_master" id="is_master">
+                            <label class="form-check-label fw-bold" for="is_master">
+                                جعله الراوتر الرئيسي
+                            </label>
+                        </div>
+                    </div>
+                    <div class="col-md-6 text-md-end mt-2 mt-md-0">
+                        <button type="submit" class="btn btn-success px-4 fw-bold">
+                            <i class="fas fa-plus"></i> إضافة الراوتر
+                        </button>
+                    </div>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- جدول عرض الراوترات -->
+    <div class="card shadow-sm border-0">
+        <div class="card-body p-0">
+            <div class="table-responsive">
+                <table class="table table-hover align-middle mb-0 text-center">
+                    <thead class="table-dark">
+                        <tr>
+                            <th>الاسم</th>
+                            <th>IP</th>
+                            <th>المستخدم</th>
+                            <th>المنفذ</th>
+                            <th>الحالة</th>
+                            <th>الإجراءات</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for r in routers %}
+                        <tr>
+                            <td class="fw-bold">
+                                {{ r.name }}
+                                {% if r.is_master %}
+                                    <span class="badge bg-warning text-dark ms-1">رئيسي</span>
+                                {% endif %}
+                            </td>
+                            <td><code>{{ r.ip_address }}</code></td>
+                            <td>{{ r.username }}</td>
+                            <td>{{ r.port }}</td>
+                            <td>
+                                {% if r.is_active %}
+                                    <span class="badge bg-success">نشط</span>
+                                {% else %}
+                                    <span class="badge bg-secondary">متوقف</span>
+                                {% endif %}
+                            </td>
+                            <td>
+                                {% if not r.is_master %}
+                                    <a href="{{ url_for('set_master_router', router_id=r.id) }}" class="btn btn-sm btn-outline-warning" title="تعيين رئيسي">
+                                        تعيين رئيسي
+                                    </a>
+                                {% endif %}
+                                <a href="{{ url_for('delete_router', router_id=r.id) }}" class="btn btn-sm btn-outline-danger" onclick="return confirm('هل أنت متأكد من الحذف؟')" title="حذف">
+                                    حذف
+                                </a>
+                            </td>
+                        </tr>
+                        {% else %}
+                        <tr>
+                            <td colspan="6" class="text-muted py-4">لا توجد راوترات مضافة حالياً.</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
