@@ -647,7 +647,7 @@ def subscribers():
 
 @app.route('/add-subscriber', methods=['GET', 'POST'])
 @app.route('/subscribers/add', methods=['GET', 'POST'])
-db.session.add():
+def add_subscriber():
     if request.method == 'POST':
         name = request.form.get('name', '').strip()
         un = request.form.get('username', '').strip()
@@ -1020,6 +1020,26 @@ def packages():
 
     pkgs = Package.query.order_by(Package.created_at.desc()).all()
     return render_template('packages.html', packages=pkgs)
+
+
+@app.route('/packages/update/<int:pkg_id>', methods=['POST'])
+def update_package(pkg_id):
+    try:
+        pkg = Package.query.get_or_404(pkg_id)
+        pkg.name = request.form.get('name', '').strip() or pkg.name
+        pkg.speed = request.form.get('speed', '').strip() or pkg.speed
+        pkg.price = float(request.form.get('price', pkg.price))
+        pkg.duration = int(request.form.get('duration', pkg.duration))
+        pkg.duration_unit = request.form.get('duration_unit', 'days').strip()
+        pkg.user_type = request.form.get('user_type', 'pppoe').strip()
+        
+        db.session.commit()
+        log_event('تعديل باقة', pkg.name, f'السعر: {pkg.price}')
+        flash('✅ تم تحديث الباقة بنجاح', 'success')
+    except Exception as e:
+        db.session.rollback()
+        flash(f'❌ {str(e)}', 'danger')
+    return redirect(url_for('packages'))
 
 
 @app.route('/packages/delete/<int:pkg_id>')
