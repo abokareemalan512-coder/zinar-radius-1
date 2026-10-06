@@ -31,13 +31,13 @@ class Router(db.Model):
     username = db.Column(db.String(50), default='admin')
     password = db.Column(db.String(100), nullable=False)
     is_master = db.Column(db.Boolean, default=False)
-    is_active = db.Column(db.Boolean, default=False)  # يحدد حالة الاتصال (متصل/غير متصل)
+    is_active = db.Column(db.Boolean, default=False)
 
 class Subscriber(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     name = db.Column(db.String(100), nullable=False)
     phone = db.Column(db.String(50))
-    status = db.Column(db.String(20), default='active')  # active / expired
+    status = db.Column(db.String(20), default='active')
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     amount_paid = db.Column(db.Float, default=0.0)
 
@@ -49,11 +49,11 @@ class EventLog(db.Model):
     details = db.Column(db.String(255))
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
 
-# وظيفة فحص اتصال الراوتر عبر السوكت (VPN)
+# وظيفة فحص اتصال الراوتر بأمان تام
 def check_router_status(ip, port):
     try:
         sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        sock.settimeout(1.5)
+        sock.settimeout(1.0) # وقت انتظار قصير جداً لمنع تعليق الصفحة
         result = sock.connect_ex((str(ip), int(port)))
         sock.close()
         return result == 0
@@ -67,11 +67,17 @@ def check_router_status(ip, port):
 def dashboard():
     admin_name = session.get('admin_name', 'zinar')
     
-    # تحديث حالات كل الراوترات تلقائياً عند فتح لوحة التحكم
-    routers = Router.query.all()
-    for r in routers:
-        r.is_active = check_router_status(r.ip_address, r.port)
-    db.session.commit()
+    routers = []
+    try:
+        routers = Router.query.all()
+        for r in routers:
+            try:
+                r.is_active = check_router_status(r.ip_address, r.port)
+            except Exception:
+                r.is_active = False
+        db.session.commit()
+    except Exception as e:
+        db.session.rollback()
 
     routers_count = len(routers)
     routers_online = sum(1 for r in routers if r.is_active)
@@ -80,7 +86,6 @@ def dashboard():
     sub_count = Subscriber.query.count()
     active_subs = Subscriber.query.filter_by(status='active').count()
     
-    # حساب إيرادات اليوم والجدد اليوم
     today_start = datetime.utcnow().replace(hour=0, minute=0, second=0, microsecond=0)
     today_revenue = db.session.query(db.func.sum(Subscriber.amount_paid)).filter(Subscriber.created_at >= today_start).scalar() or 0
     new_users_today = Subscriber.query.filter(Subscriber.created_at >= today_start).count()
@@ -112,7 +117,6 @@ def routers():
         if is_master:
             Router.query.update({Router.is_master: False})
 
-        # فحص الاتصال مباشرة عند الإضافة
         is_active = check_router_status(ip_address, port)
 
         new_router = Router(
@@ -126,17 +130,19 @@ def routers():
         )
         db.session.add(new_router)
         
-        # تسجيل الحدث
         log = EventLog(admin_name=session.get('admin_name', 'zinar'), action='إضافة سيرفر', target=name, details=f'IP: {ip_address}')
         db.session.add(log)
-        
         db.session.commit()
+        
         flash('تم إضافة السيرفر بنجاح', 'success')
         return redirect(url_for('routers'))
 
     all_routers = Router.query.all()
     for r in all_routers:
-        r.is_active = check_router_status(r.ip_address, r.port)
+        try:
+            r.is_active = check_router_status(r.ip_address, r.port)
+        except:
+            r.is_active = False
     db.session.commit()
 
     return render_template('routers.html', routers=all_routers)
@@ -153,7 +159,6 @@ def update_router(router_id):
     if new_pass:
         router.password = new_pass
 
-    # فحص الاتصال بعد التعديل لضمان ظهور الحالة الصحيحة
     router.is_active = check_router_status(router.ip_address, router.port)
 
     log = EventLog(admin_name=session.get('admin_name', 'zinar'), action='تعديل سيرفر', target=router.name, details=f'New IP: {router.ip_address}')
@@ -256,7 +261,6 @@ def change_admin_credentials():
         flash('كلمة المرور الحالية غير صحيحة', 'danger')
     return redirect(url_for('dashboard'))
 
-# تهيئة قاعدة البيانات وإنشاء مستخدم افتراضي عند البدء
 with app.app_context():
     db.create_all()
     if not Admin.query.first():
