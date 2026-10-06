@@ -166,7 +166,6 @@ def update_router(router_id):
 @app.route('/routers/toggle/<int:router_id>')
 def toggle_router(router_id):
     router = Router.query.get_or_404(router_id)
-    # إعادة فحص الاتصال يدوياً أو عكس الحالة التشغيلية
     router.is_active = not router.is_active
     db.session.commit()
     return redirect(url_for('routers'))
@@ -179,7 +178,7 @@ def test_router(router_id):
     if router.is_active:
         flash(f'الاتصال بالسيرفر {router.name} ناجح (متصل 🟢)', 'success')
     else:
-        flash(فعل(`تعذر الاتصال بالسيرفر {router.name} عبر الـ IP {router.ip_address} (غير متصل 🔴)`), 'danger')
+        flash(f'تعذر الاتصال بالسيرفر {router.name} عبر الـ IP {router.ip_address} (غير متصل 🔴)', 'danger')
     return redirect(url_for('routers'))
 
 @app.route('/routers/master/<int:router_id>')
