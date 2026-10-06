@@ -41,7 +41,7 @@ class Router(db.Model):
     __tablename__ = 'routers'
     id = db.Column(db.Integer, primary_key=True)
     name = db.Column(db.String(100), nullable=False, unique=True)
-    ip_address = db.Column(db.String(50), nullable=False)  # مثال: 10.10.10.1
+    ip_address = db.Column(db.String(50), nullable=False)
     username = db.Column(db.String(50), nullable=False, default='admin')
     password = db.Column(db.String(150), nullable=False)
     port = db.Column(db.Integer, default=8728)
@@ -112,11 +112,10 @@ def log_event(action, target="", details="", admin_name=None):
     except Exception as e:
         logger.warning(f"⚠️ فشل تسجيل الحدث: {e}")
 
-# فحص اتصال الراوتر عبر السوكت (VPN) بأمان تام ودون تعليق
 def check_router_status(ip, port):
     try:
         sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        sock.settimeout(0.5)  # مهلة زمنية قصيرة لمنع أي تعليق للخادم
+        sock.settimeout(0.5)
         result = sock.connect_ex((str(ip), int(port or 8728)))
         sock.close()
         return result == 0
@@ -128,7 +127,7 @@ def _day_bounds():
     return start, start + timedelta(days=1)
 
 
-# ============ تهيئة قاعدة البيانات والتأكد من الأعمدة ============
+# ============ تهيئة قاعدة البيانات والأعمدة ============
 
 def init_database():
     with app.app_context():
@@ -149,6 +148,7 @@ def ensure_columns():
     with app.app_context():
         try:
             from sqlalchemy import text, inspect
+            db.create_all() # ضمان إنشاء جميع الجداول
             insp = inspect(db.engine)
             tables = insp.get_table_names()
             with db.engine.connect() as conn:
@@ -167,6 +167,21 @@ init_database()
 ensure_columns()
 
 
+# ============ معالج الأخطاء لكشف سبب 500 بوضوح ============
+@app.errorhandler(500)
+def internal_error(error):
+    db.session.rollback()
+    logger.error(f"❌ Server Error 500: {error}")
+    return f"""
+    <div style="direction: rtl; font-family: Tahoma; padding: 20px; background: #ffe6e6; border: 1px solid red; margin: 20px; border-radius: 8px;">
+        <h2 style="color: #d9534f;">⚠️ حدث خطأ برمجي (500 Internal Server Error)</h2>
+        <p><b>تفاصيل الخطأ:</b> {str(error)}</p>
+        <p>يرجى إرسال هذه الرسالة لنقوم بإصلاحها فوراً.</p>
+        <a href="/login" style="background: #0275d8; color: white; padding: 8px 15px; text-decoration: none; border-radius: 4px;">العودة لتسجيل الدخول</a>
+    </div>
+    """, 500
+
+
 # ============ حماية الجلسة (Auth Guard) ============
 
 @app.before_request
@@ -180,7 +195,7 @@ def check_admin_login():
         return redirect(url_for('login'))
 
 
-# ============ المسارات الأساسية (Routes) ============
+# ============ المسارات الأساسية ============
 
 @app.route('/')
 def index():
@@ -188,25 +203,29 @@ def index():
 
 @app.route('/login', methods=['GET', 'POST'])
 def login():
-    if request.method == 'POST':
-        u = request.form.get('username', '').strip()
-        p = request.form.get('password', '').strip()
-        if not u or not p:
-            flash('❌ الرجاء إدخال البيانات', 'danger')
-            return redirect(url_for('login'))
-        admin = AdminUser.query.filter_by(username=u).first()
-        if admin and check_password_hash(admin.password, p):
-            session['admin_id'] = admin.id
-            session['admin_name'] = admin.username
-            log_event('تسجيل دخول', 'لوحة التحكم', 'تسجيل دخول ناجح')
-            flash('✅ تم تسجيل الدخول', 'success')
-            return redirect(url_for('dashboard'))
-        flash('❌ بيانات غير صحيحة', 'danger')
-    return render_template('login.html')
+    try:
+        if request.method == 'POST':
+            u = request.form.get('username', '').strip()
+            p = request.form.get('password', '').strip()
+            if not u or not p:
+                flash('❌ الرجاء إدخال البيانات', 'danger')
+                return redirect(url_for('login'))
+            
+            admin = AdminUser.query.filter_by(username=u).first()
+            if admin and check_password_hash(admin.password, p):
+                session['admin_id'] = admin.id
+                session['admin_name'] = admin.username
+                log_event('تسجيل دخول', 'لوحة التحكم', 'تسجيل دخول ناجح')
+                flash('✅ تم تسجيل الدخول', 'success')
+                return redirect(url_for('dashboard'))
+            flash('❌ بيانات غير صحيحة', 'danger')
+        return render_template('login.html')
+    except Exception as e:
+        db.session.rollback()
+        return f"خطأ في صفحة تسجيل الدخول: {str(e)}", 500
 
 @app.route('/logout')
 def logout():
-    log_event('تسجيل خروج', 'لوحة التحكم', 'تسجيل خروج المدير')
     session.clear()
     flash('✅ تم تسجيل الخروج', 'success')
     return redirect(url_for('login'))
@@ -266,11 +285,10 @@ def dashboard():
         )
     except Exception as e:
         logger.error(f"❌ dashboard error: {e}")
-        flash(f'❌ {str(e)}', 'danger')
-        return render_template('dashboard.html', routers=[], routers_count=0, routers_online=0, has_master=False, sub_count=0, active_subs=0, today_revenue=0, new_users_today=0, events=[], admin_name='مدير')
+        return f"خطأ في لوحة التحكم: {str(e)}", 500
 
 
-# ============ إدارة الراوترات والسيرفرات (Routers) ============
+# ============ إدارة الراوترات (Routers) ============
 
 @app.route('/routers', methods=['GET', 'POST'])
 def routers():
@@ -291,15 +309,12 @@ def routers():
                 flash('❌ اسم السيرفر موجود مسبقاً', 'danger')
                 return redirect(url_for('routers'))
 
-            try: 
-                port = int(port)
-            except ValueError: 
-                port = 8728
+            try: port = int(port)
+            except ValueError: port = 8728
 
             if is_master:
                 Router.query.update({Router.is_master: False})
 
-            # فحص الاتصال بالـ VPN
             is_active = check_router_status(ip, port)
 
             new_router = Router(
@@ -309,14 +324,12 @@ def routers():
             db.session.add(new_router)
             db.session.commit()
             
-            log_event('إضافة سيرفر', name, f'IP: {ip}')
             flash(f'✅ تم إضافة السيرفر "{name}" بنجاح', 'success')
         except Exception as e:
             db.session.rollback()
             flash(f'❌ حدث خطأ: {str(e)}', 'danger')
         return redirect(url_for('routers'))
 
-    # جلب الراوترات وفحص حالتها بأمان تام
     all_routers = []
     try:
         all_routers = Router.query.all()
@@ -328,7 +341,6 @@ def routers():
         db.session.commit()
     except Exception as e:
         db.session.rollback()
-        logger.error(f"❌ routers get error: {e}")
 
     return render_template('routers.html', routers=all_routers)
 
@@ -340,11 +352,9 @@ def set_master_router(router_id):
         r = Router.query.get_or_404(router_id)
         r.is_master = True
         db.session.commit()
-        log_event('تعيين سيرفر رئيسي', r.name)
         flash(f'✅ تم تعيين {r.name} كـ سيرفر رئيسي', 'success')
     except Exception as e:
         db.session.rollback()
-        flash(f'❌ {str(e)}', 'danger')
     return redirect(url_for('routers'))
 
 @app.route('/routers/toggle/<int:router_id>')
@@ -353,10 +363,8 @@ def toggle_router(router_id):
         r = Router.query.get_or_404(router_id)
         r.is_active = not r.is_active
         db.session.commit()
-        flash('✅ تم تغيير حالة السيرفر', 'success')
     except Exception as e:
         db.session.rollback()
-        flash(f'❌ {str(e)}', 'danger')
     return redirect(url_for('routers'))
 
 @app.route('/routers/test/<int:router_id>')
@@ -366,60 +374,41 @@ def test_router(router_id):
         r.is_active = check_router_status(r.ip_address, r.port)
         db.session.commit()
         if r.is_active:
-            flash(f'🟢 الاتصال بالسيرفر {r.name} ({r.ip_address}) ناجح!', 'success')
+            flash(f'🟢 الاتصال بالسيرفر {r.name} ناجح!', 'success')
         else:
-            flash(f'🔴 تعذر الاتصال بالسيرفر {r.name} عبر الـ IP ({r.ip_address})', 'danger')
+            flash(f'🔴 تعذر الاتصال بالسيرفر {r.name}', 'danger')
     except Exception as e:
         db.session.rollback()
-        flash(f'❌ خطأ في اختبار الاتصال: {str(e)}', 'danger')
     return redirect(url_for('routers'))
 
 @app.route('/routers/update/<int:router_id>', methods=['POST'])
 def update_router(router_id):
     try:
         r = Router.query.get_or_404(router_id)
-        name = request.form.get('name', '').strip()
-        ip = request.form.get('ip_address', '').strip()
-        un = request.form.get('username', '').strip()
+        r.name = request.form.get('name', '').strip()
+        r.ip_address = request.form.get('ip_address', '').strip()
+        r.username = request.form.get('username', '').strip()
         pw = request.form.get('password', '').strip()
-        port = request.form.get('port', '8728').strip()
-
-        if not name or not ip:
-            flash('❌ الاسم و IP مطلوبان', 'danger')
-            return redirect(url_for('routers'))
-
-        r.name = name
-        r.ip_address = ip
-        r.username = un
-        if pw: 
-            r.password = pw
-        try: 
-            r.port = int(port)
-        except ValueError: 
-            r.port = 8728
+        if pw: r.password = pw
+        try: r.port = int(request.form.get('port', 8728))
+        except: r.port = 8728
 
         r.is_active = check_router_status(r.ip_address, r.port)
         db.session.commit()
-        
-        log_event('تعديل سيرفر', name, f'IP: {ip}')
-        flash('✅ تم تحديث بيانات السيرفر بنجاح', 'success')
+        flash('✅ تم التحديث بنجاح', 'success')
     except Exception as e:
         db.session.rollback()
-        flash(f'❌ {str(e)}', 'danger')
     return redirect(url_for('routers'))
 
 @app.route('/routers/delete/<int:router_id>')
 def delete_router(router_id):
     try:
         r = Router.query.get_or_404(router_id)
-        name = r.name
         db.session.delete(r)
         db.session.commit()
-        log_event('حذف سيرفر', name)
-        flash('✅ تم حذف السيرفر بنجاح', 'info')
+        flash('✅ تم الحذف', 'info')
     except Exception as e:
         db.session.rollback()
-        flash(f'❌ {str(e)}', 'danger')
     return redirect(url_for('routers'))
 
 @app.route('/router_users/<int:router_id>')
@@ -428,12 +417,12 @@ def router_users(router_id):
     return render_template('router_users.html', router=router, users=[])
 
 
-# ============ أقسام أخرى (Subscribers, Packages, Payments) ============
+# ============ أقسام أخرى ============
 
 @app.route('/subscribers')
 def subscribers():
     try:
-        subs = Subscriber.query.order_by(Subscriber.created_at.desc()).all()
+        subs = Subscriber.query.all()
     except:
         subs = []
     return render_template('subscribers.html', subscribers=subs)
@@ -452,7 +441,7 @@ def payments():
         pays = Payment.query.all()
     except:
         pays = []
-    return render_template('payments.html', payments=pays)
+    return render_template('payments.html', pays=pays)
 
 
 if __name__ == '__main__':
