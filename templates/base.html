@@ -93,7 +93,16 @@
                 خروج
             </a>
         </aside>
-
+<li class="nav-item">
+    <a class="nav-link" href="{{ url_for('admin_settings') }}">
+        <i class="bi bi-telegram"></i> إعدادات التلجرام
+        {% if telegram_settings and telegram_settings.enabled %}
+            <span class="badge bg-success ms-2">✅</span>
+        {% endif %}
+    </a>
+</li>
+    
+        
         <main class="main">
             {% with messages = get_flashed_messages(with_categories=true) %}
                 {% for category, message in messages %}
