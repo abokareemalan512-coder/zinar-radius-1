@@ -65,34 +65,39 @@
     </style>
 </head>
 <body>
-    <div class="layout">
-        <aside class="sidebar">
-            <div class="brand">
-                <div class="brand-icon">⚡</div>
-                <div>
+<div class="layout">
+    <aside class="sidebar">
+        <div class="brand">
+            <div class="brand-logo">
+                <span class="brand-icon">⚡</span>
+                <div class="brand-text">
                     <h4>ZINAR</h4>
+                    <small>نظام إدارة المشتركين</small>
                 </div>
             </div>
-
-            <a href="{{ url_for('dashboard') }}" class="nav-item {% if request.endpoint == 'dashboard' %}active{% endif %}">
-                لوحة التحكم
-            </a>
-            <a href="{{ url_for('subscribers') }}" class="nav-item {% if request.endpoint in ['subscribers','add_subscriber'] %}active{% endif %}">
-                المشتركين
-            </a>
-            <a href="{{ url_for('packages') }}" class="nav-item {% if request.endpoint == 'packages' %}active{% endif %}">
-                الباقات
-            </a>
-            <a href="{{ url_for('payments') }}" class="nav-item {% if request.endpoint == 'payments' %}active{% endif %}">
-                الدفعات
-            </a>
-            <a href="{{ url_for('admin_settings') }}" class="nav-item {% if request.endpoint == 'admin_settings' %}active{% endif %}">
-                إعدادات النظام
-            </a>
-            <a href="{{ url_for('logout') }}" class="nav-item">
-                خروج
-            </a>
-        </aside>
+        </div>
+        <a href="{{ url_for('dashboard') }}" class="nav-item {% if request.endpoint == 'dashboard' %}active{% endif %}">
+            <i class="bi bi-speedometer2"></i> لوحة التحكم
+        </a>
+        <a href="{{ url_for('subscribers') }}" class="nav-item {% if request.endpoint in ['subscribers','add_subscriber'] %}active{% endif %}">
+            <i class="bi bi-people"></i> المشتركين
+        </a>
+        <a href="{{ url_for('packages') }}" class="nav-item {% if request.endpoint == 'packages' %}active{% endif %}">
+            <i class="bi bi-box-seam"></i> الباقات
+        </a>
+        <a href="{{ url_for('routers') }}" class="nav-item {% if request.endpoint == 'routers' %}active{% endif %}">
+            <i class="bi bi-router"></i> الراوترات
+        </a>
+        <a href="{{ url_for('payments') }}" class="nav-item {% if request.endpoint == 'payments' %}active{% endif %}">
+            <i class="bi bi-cash-coin"></i> الدفعات
+        </a>
+        <a href="{{ url_for('logout') }}" class="nav-item">
+            <i class="bi bi-box-arrow-right"></i> خروج
+        </a>
+        <a href="{{ url_for('add_subscriber') }}" class="btn-add">
+            <i class="bi bi-person-plus"></i> إضافة مشترك
+        </a>
+    </aside>
 <li class="nav-item">
     <a class="nav-link" href="{{ url_for('admin_settings') }}">
         <i class="bi bi-telegram"></i> إعدادات التلجرام
