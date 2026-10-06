@@ -10,7 +10,7 @@
             <h5 class="text-accent mb-3">
                 <i class="bi bi-plus-circle"></i> إضافة باقة جديدة
             </h5>
-            <form method="POST" action="{{ url_for('add_package') }}">
+            <form method="POST" action="{{ url_for('packages') }}">
                 <div class="mb-3">
                     <label class="form-label">اسم الباقة</label>
                     <input type="text" name="name" class="form-control"
@@ -102,7 +102,8 @@
                             <td>
                                 <div class="d-flex gap-1">
                                     <button class="btn btn-sm btn-primary"
-                                            onclick='openPackageModal({{ pkg.id }}, "{{ pkg.name|e }}", "{{ pkg.speed|e }}", {{ pkg.price }}, {{ pkg.duration }}, "{{ pkg.duration_unit or "days" }}", "{{ pkg.user_type or "pppoe" }}")'>
+                                            type="button"
+                                            onclick="openPackageModal({{ pkg.id }}, '{{ pkg.name|replace('\'', '\\\'')|e }}', '{{ pkg.speed|replace('\'', '\\\'')|e }}', {{ pkg.price }}, {{ pkg.duration }}, '{{ pkg.duration_unit or 'days' }}', '{{ pkg.user_type or 'pppoe' }}')">
                                         <i class="bi bi-pencil"></i>
                                     </button>
                                     <a href="{{ url_for('delete_package', pkg_id=pkg.id) }}"
@@ -127,6 +128,7 @@
     </div>
 </div>
 
+<!-- Modal for editing package -->
 <div class="modal fade" id="editPackageModal" tabindex="-1">
     <div class="modal-dialog modal-dialog-centered">
         <div class="modal-content">
@@ -192,18 +194,26 @@
 
 <script>
 function openPackageModal(id, name, speed, price, duration, unit, utype) {
+    // تعيين الـ action URL
     document.getElementById('editPackageForm').action = '/packages/update/' + id;
+    
+    // ملء البيانات
     document.getElementById('pkg_name').value = name;
     document.getElementById('pkg_speed').value = speed;
     document.getElementById('pkg_price').value = price;
     document.getElementById('pkg_duration').value = duration;
     document.getElementById('pkg_user_type').value = utype || 'pppoe';
+    
+    // تعيين الـ radio button للوحدة
     if (unit === 'months') {
         document.getElementById('um_edit').checked = true;
     } else {
         document.getElementById('ud_edit').checked = true;
     }
-    new bootstrap.Modal(document.getElementById('editPackageModal')).show();
+    
+    // فتح المودال
+    const modal = new bootstrap.Modal(document.getElementById('editPackageModal'));
+    modal.show();
 }
 </script>
 {% endblock %}
