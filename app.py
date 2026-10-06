@@ -902,71 +902,25 @@ def delete_expired_subscribers():
                 seen.add(s.id); unique.append(s)
 
         if not unique:
-            flash('ℹ️ لا يوجد مشتركين منتهين', 'info')
+            flash('ℹ️ لايوجد مشتركين منتهيين للحذف', 'info')
             return redirect(url_for('subscribers'))
 
-        deleted = 0
+        count = 0
         for sub in unique:
             try:
                 kick_subscriber(sub)
             except Exception:
                 pass
-            if radius_sync: radius_sync.delete_user(sub.username)
-            db.session.delete(sub); deleted += 1
+            if radius_sync:
+                radius_sync.delete_user(sub.username)
+            db.session.delete(sub)
+            count += 1
         db.session.commit()
-        log_event('حذف المنتهين', f'{deleted} مشترك')
-        flash(f'🗑 تم حذف {deleted} مشترك منتهي', 'success')
+        log_event('حذف المنتهيين', f'{count} مشترك')
+        flash(f'🗑 تم حذف {count} مشترك منتهي بنجاح', 'success')
     except Exception as e:
         db.session.rollback()
         flash(f'❌ {str(e)}', 'danger')
-    return redirect(url_for('subscribers'))
-
-
-@app.route('/subscribers/export/<format>')
-def export_subscribers(format):
-    ft = request.args.get('type', '').strip()
-    ids = request.args.get('ids', '').strip()
-
-    if ids:
-        try:
-            idl = [int(x) for x in ids.split(',') if x.strip().isdigit()]
-            subs = Subscriber.query.filter(Subscriber.id.in_(idl)).order_by(Subscriber.created_at.desc()).all()
-        except Exception: subs = []
-    else:
-        q = Subscriber.query
-        if ft in ('pppoe', 'hotspot'):
-            q = q.filter_by(user_type=ft)
-        subs = q.order_by(Subscriber.created_at.desc()).all()
-
-    ts = datetime.now().strftime("%Y%m%d_%H%M%S")
-
-    if format == 'csv':
-        out = io.StringIO(); out.write('\ufeff')
-        w = csv.writer(out)
-        w.writerow(['#', 'الاسم', 'المستخدم', 'كلمة المرور', 'الباقة', 'النوع', 'الحالة', 'تاريخ الانتهاء'])
-        for i, s in enumerate(subs, 1):
-            w.writerow([
-                i,
-                s.name or '',
-                s.username,
-                s.password,
-                s.package or '',
-                s.user_type or 'pppoe',
-                s.status or 'active',
-                s.expires_at.strftime('%Y-%m-%d %H:%M') if s.expires_at else 'غير محدد'
-            ])
-        
-        mem = io.BytesIO()
-        mem.write(out.getvalue().encode('utf-8'))
-        mem.seek(0)
-        
-        return send_file(
-            mem,
-            mimetype='text/csv',
-            as_attachment=True,
-            download_name=f'subscribers_{ts}.csv'
-        )
-
     return redirect(url_for('subscribers'))
 
 
@@ -979,44 +933,48 @@ def packages():
         speed = request.form.get('speed', '').strip()
         price = request.form.get('price', '0').strip()
         duration = request.form.get('duration', '30').strip()
-        unit = request.form.get('duration_unit', 'days').strip()
-        ut = request.form.get('user_type', 'pppoe').strip()
+        duration_unit = request.form.get('duration_unit', 'days').strip()
+        user_type = request.form.get('user_type', 'pppoe').strip()
 
         if not name:
             flash('❌ اسم الباقة مطلوب', 'danger')
             return redirect(url_for('packages'))
 
         if Package.query.filter_by(name=name).first():
-            flash('❌ اسم الباقة موجود بالفعل', 'danger')
+            flash('❌ اسم الباقة موجود مسبقاً', 'danger')
             return redirect(url_for('packages'))
 
+        try: price = float(price)
+        except ValueError: price = 0.0
+
+        try: duration = int(duration)
+        except ValueError: duration = 30
+
         try:
-            p_val = float(price) if price else 0
-            d_val = int(duration) if duration else 30
             db.session.add(Package(
-                name=name, speed=speed, price=p_val,
-                duration=d_val, duration_unit=unit, user_type=ut
+                name=name, speed=speed, price=price,
+                duration=duration, duration_unit=duration_unit, user_type=user_type
             ))
             db.session.commit()
-            log_event('إضافة باقة', name, f'السعر: {p_val}')
-            flash(f'✅ الباقة "{name}" أُضيفت بنجاح', 'success')
+            log_event('إضافة باقة', name)
+            flash(f'✅ تم إضافة الباقة "{name}" بنجاح', 'success')
         except Exception as e:
             db.session.rollback()
             flash(f'❌ {str(e)}', 'danger')
         return redirect(url_for('packages'))
 
-    pkgs = Package.query.order_by(Package.created_at.desc()).all()
-    return render_template('packages.html', packages=pkgs)
+    all_packages = Package.query.order_by(Package.name).all()
+    return render_template('packages.html', packages=all_packages)
 
 
 @app.route('/packages/delete/<int:pkg_id>')
 def delete_package(pkg_id):
     try:
         pkg = Package.query.get_or_404(pkg_id)
-        pkg_name = pkg.name
+        name = pkg.name
         db.session.delete(pkg)
         db.session.commit()
-        log_event('حذف باقة', pkg_name)
+        log_event('حذف باقة', name)
         flash('✅ تم حذف الباقة بنجاح', 'success')
     except Exception as e:
         db.session.rollback()
@@ -1028,12 +986,13 @@ def delete_package(pkg_id):
 
 @app.route('/payments')
 def payments():
-    pay_list = Payment.query.order_by(Payment.created_at.desc()).all()
-    return render_template('payments.html', payments=pay_list)
+    all_payments = Payment.query.order_by(Payment.created_at.desc()).all()
+    subscribers_map = {s.id: s for s in Subscriber.query.all()}
+    return render_template('payments.html', payments=all_payments, subscribers=subscribers_map)
 
 
-# ============ Main ============
+# ============ Main Runner ============
 
 if __name__ == '__main__':
     port = int(os.environ.get('PORT', 5000))
-    app.run(host='0.0.0.0', port=port, debug=True)
+    app.run(host='0.0.0.0', port=port, debug=False)
