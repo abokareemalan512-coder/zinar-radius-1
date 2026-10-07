@@ -40,7 +40,11 @@ app.config['MAX_CONTENT_LENGTH'] = 5 * 1024 * 1024
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
+# ✅ تحديد التوقيت المحلي (توقيت سوريا كافتراضي)
 LOCAL_TZ = ZoneInfo("Asia/Damascus")
+
+# ✅ مفتاح API لاستيراد المشتركين (غيّره لأي قيمة سرية تريدها)
+IMPORT_API_KEY = os.environ.get('IMPORT_API_KEY', 'zinar-import-key-2026')
 
 # ============ Database Config ============
 
@@ -56,6 +60,7 @@ else:
 app.config['SQLALCHEMY_DATABASE_URI'] = database_url
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 
+# إعدادات محسنة لمنع انقطاع الاتصال (SSL SYSCALL error)
 app.config['SQLALCHEMY_ENGINE_OPTIONS'] = {
     'pool_pre_ping': True,
     'pool_recycle': 180,
@@ -70,10 +75,12 @@ logger.info(f"📊 DB: ...@{_masked}")
 
 db = SQLAlchemy(app)
 
+# ✅ إغلاق الجلسة تلقائياً بعد كل طلب لمنع تسرب الاتصالات
 @app.teardown_appcontext
 def shutdown_session(exception=None):
     db.session.remove()
 
+# ✅ فلتر جينجا لتحويل التوقيت من UTC إلى المحلي تلقائياً
 @app.template_filter('localtime')
 def localtime_filter(dt, format='%Y-%m-%d %H:%M:%S'):
     if dt is None:
@@ -102,6 +109,7 @@ class Router(db.Model):
     is_active = db.Column(db.Boolean, default=True)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
 
+
 class AdminUser(db.Model):
     __tablename__ = 'admin_users'
     id = db.Column(db.Integer, primary_key=True)
@@ -109,6 +117,7 @@ class AdminUser(db.Model):
     password = db.Column(db.String(255), nullable=False)
     email = db.Column(db.String(100))
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
+
 
 class Subscriber(db.Model):
     __tablename__ = 'subscribers'
@@ -124,6 +133,7 @@ class Subscriber(db.Model):
     expires_at = db.Column(db.DateTime)
     first_used_at = db.Column(db.DateTime)
 
+
 class Payment(db.Model):
     __tablename__ = 'payments'
     id = db.Column(db.Integer, primary_key=True)
@@ -131,6 +141,7 @@ class Payment(db.Model):
     amount = db.Column(db.Float, default=0)
     status = db.Column(db.String(20), default='pending')
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
+
 
 class Package(db.Model):
     __tablename__ = 'packages'
@@ -143,6 +154,7 @@ class Package(db.Model):
     user_type = db.Column(db.String(20), default='pppoe')
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
 
+
 class SystemEvent(db.Model):
     __tablename__ = 'system_events'
     id = db.Column(db.Integer, primary_key=True)
@@ -151,6 +163,7 @@ class SystemEvent(db.Model):
     target = db.Column(db.String(100))
     details = db.Column(db.String(255))
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
+
 
 class TelegramSetting(db.Model):
     __tablename__ = 'telegram_settings'
@@ -164,6 +177,7 @@ class TelegramSetting(db.Model):
     notify_admin_action = db.Column(db.Boolean, default=False)
     notify_router_status = db.Column(db.Boolean, default=True)
 
+
 class TelegramLog(db.Model):
     __tablename__ = 'telegram_logs'
     id = db.Column(db.Integer, primary_key=True)
@@ -171,6 +185,7 @@ class TelegramLog(db.Model):
     status = db.Column(db.String(20))
     message = db.Column(db.Text)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
+
 
 # ============ Helpers ============
 
@@ -191,6 +206,7 @@ def log_event(action, target="", details="", admin_name=None):
         db.session.rollback()
         logger.warning(f"⚠️ فشل تسجيل الحدث: {e}")
 
+
 def add_months(source_date, months):
     month = source_date.month - 1 + months
     year = source_date.year + month // 12
@@ -198,6 +214,7 @@ def add_months(source_date, months):
     last_day = calendar.monthrange(year, month)[1]
     day = min(source_date.day, last_day)
     return source_date.replace(year=year, month=month, day=day)
+
 
 def calculate_expiry(pkg, start_date=None):
     if start_date is None:
@@ -208,16 +225,19 @@ def calculate_expiry(pkg, start_date=None):
         return add_months(start_date, pkg.duration)
     return start_date + timedelta(days=pkg.duration)
 
+
 def package_to_profile(name):
     if not name:
         return 'default'
     return name.strip().replace(' ', '_')
+
 
 def _day_bounds(day=None):
     if day is None:
         day = datetime.utcnow()
     start = day.replace(hour=0, minute=0, second=0, microsecond=0)
     return start, start + timedelta(days=1)
+
 
 # ============ Telegram Helper ============
 
@@ -227,6 +247,7 @@ def get_telegram_settings():
     except Exception:
         return None
 
+
 def log_telegram(message, message_type='info', status='success'):
     try:
         log = TelegramLog(message_type=message_type, status=status, message=message[:2000])
@@ -235,6 +256,7 @@ def log_telegram(message, message_type='info', status='success'):
     except Exception as e:
         db.session.rollback()
         logger.warning(f"⚠️ فشل تسجيل log تليجرام: {e}")
+
 
 def send_telegram_message(message, message_type='info', force=False):
     if not requests:
@@ -277,6 +299,7 @@ def send_telegram_message(message, message_type='info', force=False):
         logger.warning(f"⚠️ فشل إرسال رسالة تلجرام: {e}")
         return False, str(e)
 
+
 @app.route('/api/telegram/webhook', methods=['POST'])
 def telegram_webhook():
     try:
@@ -316,6 +339,7 @@ def telegram_webhook():
         logger.error(f"Webhook Error: {e}")
         return jsonify({'ok': False}), 500
 
+
 def notify_new_subscriber(username):
     settings = get_telegram_settings()
     if not settings or not settings.enabled or not settings.notify_new_subscriber:
@@ -324,6 +348,7 @@ def notify_new_subscriber(username):
         return False
     msg = f"*🆕 مشترك جديد*\n👤 المستخدم: `{username}`\n🕒 الوقت: {get_local_time_str()}"
     return send_telegram_message(msg, message_type='new_subscriber')[0]
+
 
 def notify_expired_subscriber(username):
     settings = get_telegram_settings()
@@ -334,6 +359,7 @@ def notify_expired_subscriber(username):
     msg = f"*⏰ اشتراك منتهي*\n👤 المستخدم: `{username}`\n⚠️ تم إنهاء الاشتراك"
     return send_telegram_message(msg, message_type='expired_subscriber')[0]
 
+
 def notify_bulk_add(created, failed, package_name):
     settings = get_telegram_settings()
     if not settings or not settings.enabled or not settings.notify_bulk_add:
@@ -343,6 +369,7 @@ def notify_bulk_add(created, failed, package_name):
     msg = f"*📦 إضافة جماعية*\n📦 الباقة: `{package_name or 'غير محددة'}`\n✅ تم إنشاء: `{created}`\n❌ فشل: `{failed}`"
     return send_telegram_message(msg, message_type='bulk_add')[0]
 
+
 def notify_admin_action(action_text):
     settings = get_telegram_settings()
     if not settings or not settings.enabled or not settings.notify_admin_action:
@@ -351,6 +378,7 @@ def notify_admin_action(action_text):
         return False
     msg = f"*⚙️ إجراء إداري*\n{action_text}"
     return send_telegram_message(msg, message_type='admin_action')[0]
+
 
 def notify_router_status_change(router_name, ip_address, is_up):
     settings = get_telegram_settings()
@@ -364,6 +392,7 @@ def notify_router_status_change(router_name, ip_address, is_up):
     msg = f"{status_symbol} {router_name} `{ip_address}` {status_text}"
     return send_telegram_message(msg, message_type='router_status')[0]
 
+
 # ============ Background Router Monitor ============
 
 def is_private_ip(ip):
@@ -372,9 +401,11 @@ def is_private_ip(ip):
     except ValueError:
         return False
 
+
 def check_router_connection(ip, port=22, timeout=3):
     if is_private_ip(ip):
         return 'private'
+
     s = None
     try:
         s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -387,6 +418,7 @@ def check_router_connection(ip, port=22, timeout=3):
         if s:
             s.close()
 
+
 def background_router_monitor():
     time.sleep(15)
     while True:
@@ -396,11 +428,13 @@ def background_router_monitor():
                 for r in routers:
                     try:
                         current_state = check_router_connection(r.ip_address, r.port or 22)
+                        
                         if current_state == 'private':
                             if not r.is_active:
                                 r.is_active = True
                                 db.session.commit()
                             continue
+
                         if r.is_active != current_state:
                             r.is_active = current_state
                             db.session.commit()
@@ -417,11 +451,13 @@ def background_router_monitor():
                 pass
         time.sleep(60)
 
+
 # ============ Kick via SSH ============
 
 def kick_user_via_ssh(router, username, user_type='pppoe'):
     if not router:
         return False, "no router"
+
     try:
         ssh = paramiko.SSHClient()
         ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
@@ -434,28 +470,34 @@ def kick_user_via_ssh(router, username, user_type='pppoe'):
             allow_agent=False,
             look_for_keys=False,
         )
+
         if user_type == 'hotspot':
             cmd = f'/ip hotspot active remove [find user="{username}"]'
         else:
             cmd = f'/ppp active remove [find name="{username}"]'
+
         stdin, stdout, stderr = ssh.exec_command(cmd)
         stdout.read()
         ssh.close()
+
         logger.info(f"👢 KICK: {username} on {router.name}")
         return True, "kicked"
     except Exception as e:
         logger.warning(f"⚠️ KICK فشل {username}: {e}")
         return False, str(e)
 
+
 def kick_subscriber(sub):
     if os.environ.get("RENDER") == "true":
         return
     if not sub:
         return
+
     if sub.router_id:
         r = Router.query.get(sub.router_id)
         if r:
             kick_user_via_ssh(r, sub.username, sub.user_type or 'pppoe')
+
     other_routers = Router.query.filter(
         Router.is_active == True,
         Router.id != (sub.router_id or 0)
@@ -465,6 +507,7 @@ def kick_subscriber(sub):
             kick_user_via_ssh(r, sub.username, sub.user_type or 'pppoe')
         except Exception:
             pass
+
 
 # ============ Init DB ============
 
@@ -479,6 +522,7 @@ def init_database():
                     email='admin@zinar.com'
                 ))
                 db.session.commit()
+            
             if not TelegramSetting.query.first():
                 db.session.add(TelegramSetting(
                     enabled=False,
@@ -489,11 +533,13 @@ def init_database():
                     notify_router_status=True
                 ))
                 db.session.commit()
+            
             logger.info("✅ تم تهيئة قاعدة البيانات")
         except Exception as e:
             db.session.rollback()
             if "already exists" not in str(e).lower():
                 logger.error(f"❌ خطأ تهيئة قاعدة البيانات: {e}")
+
 
 def ensure_columns():
     with app.app_context():
@@ -506,10 +552,12 @@ def ensure_columns():
                     cols = [c['name'] for c in insp.get_columns('routers')]
                     if 'is_active' not in cols:
                         conn.execute(text("ALTER TABLE routers ADD COLUMN is_active BOOLEAN DEFAULT TRUE"))
+
                 if 'telegram_settings' in tables:
                     cols = [c['name'] for c in insp.get_columns('telegram_settings')]
                     if 'notify_router_status' not in cols:
                         conn.execute(text("ALTER TABLE telegram_settings ADD COLUMN notify_router_status BOOLEAN DEFAULT TRUE"))
+
                 if 'subscribers' in tables:
                     cols = [c['name'] for c in insp.get_columns('subscribers')]
                     for col, sql in [
@@ -519,6 +567,7 @@ def ensure_columns():
                     ]:
                         if col not in cols:
                             conn.execute(text(sql))
+
                 if 'packages' in tables:
                     cols = [c['name'] for c in insp.get_columns('packages')]
                     for col, sql in [
@@ -527,16 +576,19 @@ def ensure_columns():
                     ]:
                         if col not in cols:
                             conn.execute(text(sql))
+
                 conn.commit()
             logger.info("✅ فحص الأعمدة اكتمل")
         except Exception as e:
             logger.warning(f"⚠️ ensure_columns: {e}")
+
 
 init_database()
 ensure_columns()
 
 monitor_thread = threading.Thread(target=background_router_monitor, daemon=True)
 monitor_thread.start()
+
 
 # ============ API للميكروتيك ============
 
@@ -597,17 +649,18 @@ def api_auth():
         'name': sub.name or sub.username
     })
 
+
 @app.route('/api/log', methods=['POST'])
 def api_log():
     data = request.form.to_dict() if request.form else (request.get_json(silent=True) or {})
     logger.info(f"📡 Mikrotik: {data}")
     return jsonify({'ok': True})
 
-# ✅ مسار استقبال تنبيهات الراوترات (معدل لاستقبال GET و POST وإرسال تليجرام)
+
+# ✅ مسار استقبال تنبيهات الراوترات من الميكروتيك
 @app.route('/api/router_notify', methods=['POST', 'GET'])
 def api_router_notify():
     try:
-        # قراءة البيانات من JSON أو Form أو GET
         data = {}
         if request.is_json:
             data = request.get_json()
@@ -620,7 +673,6 @@ def api_router_notify():
         status = data.get('status', 'unknown').lower()
         ip_address = data.get('ip', '')
         
-        # ترجمة الحالة
         if status in ('working', 'up', 'online'):
             status_ar = 'يعمل'
             status_icon = '🟢'
@@ -633,13 +685,11 @@ def api_router_notify():
 
         message = f"{status_icon} الراوتر {router_name} ({ip_address}) {status_ar}"
 
-        # حفظ في قاعدة البيانات
         log = TelegramLog(message_type='router_alert', status='success', message=message)
         db.session.add(log)
         log_event('تنبيه راوتر', router_name, message, admin_name='الميكروتيك')
         db.session.commit()
         
-        # ✅ إرسال التنبيه إلى التلجرام أيضاً
         try:
             send_telegram_message(message, message_type='router_alert')
         except Exception as tg_err:
@@ -651,6 +701,93 @@ def api_router_notify():
         db.session.rollback()
         logger.error(f"❌ Error in router_notify: {e}")
         return jsonify({'ok': False, 'error': str(e)}), 500
+
+
+# ✅✅✅ مسار استيراد المشتركين من الميكروتيك (جديد)
+@app.route('/api/import_subscribers', methods=['POST'])
+def api_import_subscribers():
+    try:
+        # ✅ التحقق من مفتاح API للأمان
+        api_key = request.headers.get('X-API-Key') or request.args.get('api_key')
+        if api_key != IMPORT_API_KEY:
+            logger.warning(f"⚠️ محاولة استيراد فاشلة (مفتاح خاطئ) من {request.remote_addr}")
+            return jsonify({'ok': False, 'error': 'Unauthorized: Invalid API Key'}), 401
+
+        data = request.get_json()
+        if not data or not isinstance(data, list):
+            return jsonify({'ok': False, 'error': 'Invalid data format. Expected a JSON array.'}), 400
+
+        imported = 0
+        updated = 0
+        skipped = 0
+
+        for item in data:
+            username = str(item.get('username', '')).strip()
+            password = str(item.get('password', '')).strip()
+            package = str(item.get('package', '')).strip()
+            user_type = str(item.get('user_type', 'pppoe')).strip()
+            status = str(item.get('status', 'active')).strip()
+            name = str(item.get('name', username)).strip()
+
+            # تخطي إذا كان اسم المستخدم أو كلمة المرور فارغة
+            if not username or not password:
+                skipped += 1
+                continue
+
+            # التحقق من صحة user_type
+            if user_type not in ('pppoe', 'hotspot'):
+                user_type = 'pppoe'
+
+            # التحقق من صحة status
+            if status not in ('active', 'paused', 'expired'):
+                status = 'active'
+
+            sub = Subscriber.query.filter_by(username=username).first()
+            if sub:
+                # تحديث بيانات المشترك الموجود
+                sub.password = password
+                sub.package = package
+                sub.user_type = user_type
+                sub.status = status
+                sub.name = name
+                updated += 1
+            else:
+                # إضافة مشترك جديد
+                db.session.add(Subscriber(
+                    name=name,
+                    username=username,
+                    password=password,
+                    package=package,
+                    user_type=user_type,
+                    status=status,
+                    expires_at=None  # سيتم حسابه عند أول دخول
+                ))
+                imported += 1
+
+        db.session.commit()
+        
+        log_event(
+            'استيراد مشتركين من الميكروتيك',
+            f'{imported + updated} مشترك',
+            f'جديد: {imported} | محدّث: {updated} | متجاهل: {skipped}',
+            admin_name='النظام (API)'
+        )
+        
+        logger.info(f"✅ Import: {imported} new, {updated} updated, {skipped} skipped.")
+        
+        return jsonify({
+            'ok': True,
+            'imported': imported,
+            'updated': updated,
+            'skipped': skipped,
+            'total': len(data),
+            'message': f'تم بنجاح: {imported} مشترك جديد، {updated} محدّث، {skipped} متجاهل.'
+        })
+    except Exception as e:
+        db.session.rollback()
+        logger.error(f"❌ Import Error: {e}")
+        return jsonify({'ok': False, 'error': str(e)}), 500
+
 
 # ============ API for Live Updates (AJAX) ============
 
@@ -699,6 +836,7 @@ def api_dashboard_data():
         db.session.rollback()
         return jsonify({'error': str(e)}), 500
 
+
 @app.route('/api/telegram_data')
 def api_telegram_data():
     try:
@@ -721,11 +859,13 @@ def api_telegram_data():
         db.session.rollback()
         return jsonify({'error': str(e)}), 500
 
+
 # ============ Auth Guard ============
 
 @app.route('/mobile')
 def mobile_view():
     return render_template('mobile.html')
+
 
 @app.before_request
 def check_admin_login():
@@ -739,18 +879,20 @@ def check_admin_login():
     public = (
         'login', 'logout', 'mobile', 'mobile_view',
         'sync.get_subscribers', 'sync.mark_first_use',
-        'api_auth', 'api_log', 'api_router_notify'
+        'api_auth', 'api_log', 'api_router_notify', 'api_import_subscribers'
     )
     if request.endpoint in public:
         return
     if not session.get('admin_id'):
         return redirect(url_for('login'))
 
+
 # ============ Routes ============
 
 @app.route('/')
 def index():
     return redirect(url_for('dashboard'))
+
 
 @app.route('/login', methods=['GET', 'POST'])
 def login():
@@ -770,12 +912,14 @@ def login():
         flash('❌ بيانات غير صحيحة', 'danger')
     return render_template('login.html')
 
+
 @app.route('/logout')
 def logout():
     log_event('تسجيل خروج', 'لوحة التحكم', 'تسجيل خروج المدير')
     session.clear()
     flash('✅ تم تسجيل الخروج', 'success')
     return redirect(url_for('login'))
+
 
 @app.route('/dashboard')
 def dashboard():
@@ -829,6 +973,7 @@ def dashboard():
         flash(f'❌ {str(e)}', 'danger')
         return render_template('error.html', error=str(e)), 500
 
+
 @app.route('/admin/change-credentials', methods=['POST'])
 def change_admin_credentials():
     admin_id = session.get('admin_id')
@@ -839,20 +984,24 @@ def change_admin_credentials():
     if not admin:
         flash('❌ المستخدم غير موجود', 'danger')
         return redirect(url_for('login'))
+
     try:
         nu = request.form.get('new_username', '').strip()
         cp = request.form.get('current_password', '').strip()
         np = request.form.get('new_password', '').strip()
         cf = request.form.get('confirm_password', '').strip()
+
         if not cp or not check_password_hash(admin.password, cp):
             flash('❌ كلمة المرور الحالية غير صحيحة', 'danger')
             return redirect(url_for('dashboard'))
+
         if nu and nu != admin.username:
             if AdminUser.query.filter_by(username=nu).first():
                 flash('❌ اسم المستخدم موجود', 'danger')
                 return redirect(url_for('dashboard'))
             admin.username = nu
             session['admin_name'] = nu
+
         if np:
             if np != cf:
                 flash('❌ كلمتا المرور غير متطابقتين', 'danger')
@@ -861,6 +1010,7 @@ def change_admin_credentials():
                 flash('❌ 6 أحرف على الأقل', 'danger')
                 return redirect(url_for('dashboard'))
             admin.password = generate_password_hash(np)
+
         db.session.commit()
         log_event('تعديل بيانات الحساب', 'المدير', f'تحديث بيانات المدير {admin.username}')
         flash('✅ تم التحديث بنجاح', 'success')
@@ -868,6 +1018,7 @@ def change_admin_credentials():
         db.session.rollback()
         flash(f'❌ {str(e)}', 'danger')
     return redirect(url_for('dashboard'))
+
 
 @app.route('/routers', methods=['GET', 'POST'])
 def routers():
@@ -878,22 +1029,30 @@ def routers():
         pw = request.form.get('password', '').strip()
         port = request.form.get('port', '22').strip()
         is_master = request.form.get('is_master') == 'on'
+
         if not name or not ip:
             flash('❌ الاسم و IP مطلوبان', 'danger')
             return redirect(url_for('routers'))
         if Router.query.filter_by(name=name).first():
             flash('❌ الاسم موجود', 'danger')
             return redirect(url_for('routers'))
+
         try:
             port = int(port)
         except ValueError:
             port = 22
+
         try:
             if is_master:
                 Router.query.update({Router.is_master: False}, synchronize_session=False)
             db.session.add(Router(
-                name=name, ip_address=ip, username=un, password=pw,
-                port=port, is_master=is_master, is_active=True
+                name=name,
+                ip_address=ip,
+                username=un,
+                password=pw,
+                port=port,
+                is_master=is_master,
+                is_active=True
             ))
             db.session.commit()
             log_event('إضافة راوتر', name, f'IP: {ip}')
@@ -906,7 +1065,9 @@ def routers():
             db.session.rollback()
             flash(f'❌ {str(e)}', 'danger')
         return redirect(url_for('routers'))
+
     return render_template('routers.html', routers=Router.query.all())
+
 
 @app.route('/routers/set_master/<int:router_id>')
 def set_master_router(router_id):
@@ -926,6 +1087,7 @@ def set_master_router(router_id):
         flash(f'❌ {str(e)}', 'danger')
     return redirect(url_for('routers'))
 
+
 @app.route('/routers/update/<int:router_id>', methods=['POST'])
 def update_router(router_id):
     try:
@@ -935,12 +1097,15 @@ def update_router(router_id):
         un = request.form.get('username', '').strip()
         pw = request.form.get('password', '').strip()
         port = request.form.get('port', '22').strip()
+
         if not name or not ip:
             flash('❌ الاسم و IP مطلوبان', 'danger')
             return redirect(url_for('routers'))
+
         if Router.query.filter(Router.name == name, Router.id != router_id).first():
             flash('❌ الاسم موجود', 'danger')
             return redirect(url_for('routers'))
+
         r.name = name
         r.ip_address = ip
         r.username = un
@@ -950,6 +1115,7 @@ def update_router(router_id):
             r.port = int(port)
         except ValueError:
             r.port = 22
+
         db.session.commit()
         log_event('تعديل راوتر', name, f'IP: {ip}')
         try:
@@ -961,6 +1127,7 @@ def update_router(router_id):
         db.session.rollback()
         flash(f'❌ {str(e)}', 'danger')
     return redirect(url_for('routers'))
+
 
 @app.route('/routers/delete/<int:router_id>')
 def delete_router(router_id):
@@ -980,11 +1147,13 @@ def delete_router(router_id):
         flash(f'❌ {str(e)}', 'danger')
     return redirect(url_for('routers'))
 
+
 @app.route('/subscribers')
 def subscribers():
     search = request.args.get('q', '').strip()
     ft = request.args.get('type', '').strip()
     now = datetime.utcnow()
+
     try:
         expired = Subscriber.query.filter(
             Subscriber.expires_at.isnot(None),
@@ -999,6 +1168,7 @@ def subscribers():
                 pass
         if expired:
             db.session.commit()
+
         q = Subscriber.query
         if search:
             q = q.filter(db.or_(
@@ -1007,11 +1177,13 @@ def subscribers():
             ))
         if ft in ('pppoe', 'hotspot'):
             q = q.filter_by(user_type=ft)
+
         subs = q.order_by(Subscriber.created_at.desc()).all()
     except Exception as e:
         db.session.rollback()
         logger.error(f"❌ error subscribers: {e}")
         subs = []
+
     return render_template(
         'subscribers.html',
         subscribers=subs,
@@ -1022,6 +1194,7 @@ def subscribers():
         filter_type=ft
     )
 
+
 @app.route('/add-subscriber', methods=['GET', 'POST'])
 @app.route('/subscribers/add', methods=['GET', 'POST'])
 def add_subscriber():
@@ -1031,6 +1204,7 @@ def add_subscriber():
         pw = request.form.get('password', '').strip()
         pkg = request.form.get('package', '').strip()
         ut = request.form.get('user_type', 'pppoe').strip()
+
         if ut not in ('pppoe', 'hotspot'):
             ut = 'pppoe'
         if not un or not pw:
@@ -1039,32 +1213,43 @@ def add_subscriber():
         if Subscriber.query.filter_by(username=un).first():
             flash(f'❌ "{un}" موجود مسبقاً', 'danger')
             return redirect(url_for('add_subscriber'))
+
         try:
             db.session.add(Subscriber(
-                name=name or un, username=un, password=pw, package=pkg,
-                user_type=ut, expires_at=None, status='active'
+                name=name or un,
+                username=un,
+                password=pw,
+                package=pkg,
+                user_type=ut,
+                expires_at=None,
+                status='active'
             ))
             db.session.commit()
+
             if radius_sync:
                 try:
                     radius_sync.sync_user(un, pw)
                 except Exception:
                     pass
+
             log_event('إضافة مشترك', un, f'الباقة: {pkg}')
             try:
                 notify_new_subscriber(un)
             except Exception:
                 pass
+
             flash(f'✅ المشترك "{un}" أُضيف بنجاح', 'success')
             return redirect(url_for('subscribers'))
         except Exception as e:
             db.session.rollback()
             flash(f'❌ {e}', 'danger')
+
     return render_template(
         'add_subscriber.html',
         packages=Package.query.order_by(Package.name).all(),
         routers=Router.query.order_by(Router.name).all()
     )
+
 
 @app.route('/subscribers/bulk-add', methods=['GET', 'POST'])
 def bulk_add():
@@ -1077,35 +1262,42 @@ def bulk_add():
         pm = request.form.get('password_mode', 'random')
         fp = request.form.get('fixed_password', '').strip()
         pl = request.form.get('password_length', '6').strip()
+
         if ut not in ('pppoe', 'hotspot'):
             ut = 'pppoe'
         if cm not in ('numbers', 'letters', 'mixed'):
             cm = 'numbers'
         if pm not in ('random', 'same_as_username', 'fixed'):
             pm = 'random'
+
         try:
             pl = int(pl)
             if pl < 4 or pl > 20:
                 pl = 6
         except ValueError:
             pl = 6
+
         try:
             rl = int(request.form.get('random_length', '6'))
             if rl < 4 or rl > 20:
                 rl = 6
         except ValueError:
             rl = 6
+
         try:
             cnt = int(cnt)
         except ValueError:
             flash('❌ عدد غير صحيح', 'danger')
             return redirect(url_for('bulk_add'))
+
         if cnt < 1 or cnt > 500:
             flash('❌ بين 1 و 500', 'danger')
             return redirect(url_for('bulk_add'))
+
         L = 'abcdefghijkmnpqrstuvwxyz'
         N = '23456789'
         M = L + N
+
         usernames = []
         if cm == 'numbers':
             for _ in range(cnt):
@@ -1116,6 +1308,7 @@ def bulk_add():
         else:
             for _ in range(cnt):
                 usernames.append(f"{prefix}{''.join(random.choices(M, k=rl))}")
+
         created = failed = 0
         for un in usernames:
             if pm == 'same_as_username':
@@ -1126,22 +1319,30 @@ def bulk_add():
                 pw = ''.join(random.choices(N, k=pl))
             else:
                 pw = un
+
             if Subscriber.query.filter_by(username=un).first():
                 failed += 1
                 continue
             try:
                 db.session.add(Subscriber(
-                    name=un, username=un, password=pw, package=pkg,
-                    user_type=ut, expires_at=None, status='active'
+                    name=un,
+                    username=un,
+                    password=pw,
+                    package=pkg,
+                    user_type=ut,
+                    expires_at=None,
+                    status='active'
                 ))
                 created += 1
             except Exception:
                 db.session.rollback()
                 failed += 1
+
         try:
             db.session.commit()
         except Exception:
             db.session.rollback()
+
         if radius_sync:
             for un in usernames:
                 sub = Subscriber.query.filter_by(username=un).first()
@@ -1150,21 +1351,25 @@ def bulk_add():
                         radius_sync.sync_user(sub.username, sub.password)
                     except Exception:
                         pass
+
         log_event('إضافة جملة', f'{created} مشترك', f'الباقة: {pkg}')
         try:
             notify_bulk_add(created, failed, pkg)
         except Exception:
             pass
+
         flash(
             f'✅ تم إيجاد {created} مشترك' + (f' — فشل {failed}' if failed else ''),
             'success' if not failed else 'warning'
         )
         return redirect(url_for('subscribers'))
+
     return render_template(
         'bulk_add.html',
         packages=Package.query.order_by(Package.name).all(),
         routers=Router.query.order_by(Router.name).all()
     )
+
 
 @app.route('/subscribers/toggle/<int:sub_id>')
 def toggle_subscriber(sub_id):
@@ -1199,6 +1404,7 @@ def toggle_subscriber(sub_id):
         flash(f'❌ {str(e)}', 'danger')
     return redirect(url_for('subscribers'))
 
+
 @app.route('/subscribers/reset/<int:sub_id>')
 def reset_subscriber(sub_id):
     try:
@@ -1215,6 +1421,7 @@ def reset_subscriber(sub_id):
         flash(f'❌ {str(e)}', 'danger')
     return redirect(url_for('subscribers'))
 
+
 @app.route('/subscribers/extend/<int:sub_id>')
 def extend_subscriber(sub_id):
     try:
@@ -1230,6 +1437,7 @@ def extend_subscriber(sub_id):
         db.session.rollback()
         flash(f'❌ {str(e)}', 'danger')
     return redirect(url_for('subscribers'))
+
 
 @app.route('/subscribers/update/<int:sub_id>', methods=['POST'])
 def update_subscriber(sub_id):
@@ -1256,6 +1464,7 @@ def update_subscriber(sub_id):
         flash(f'❌ {str(e)}', 'danger')
     return redirect(url_for('subscribers'))
 
+
 @app.route('/subscribers/delete/<int:sub_id>')
 def delete_subscriber(sub_id):
     try:
@@ -1276,6 +1485,7 @@ def delete_subscriber(sub_id):
         flash(f'❌ {str(e)}', 'danger')
     return redirect(url_for('subscribers'))
 
+
 @app.route('/subscribers/bulk-delete', methods=['POST'])
 def bulk_delete_subscribers():
     try:
@@ -1283,6 +1493,7 @@ def bulk_delete_subscribers():
         if not ids:
             flash('❌ لم تحدد أي مشترك', 'warning')
             return redirect(url_for('subscribers'))
+
         ids_list = [int(x) for x in ids.split(',') if x.strip().isdigit()]
         subs = Subscriber.query.filter(Subscriber.id.in_(ids_list)).all()
         deleted = 0
@@ -1308,6 +1519,7 @@ def bulk_delete_subscribers():
         flash(f'❌ {str(e)}', 'danger')
     return redirect(url_for('subscribers'))
 
+
 @app.route('/subscribers/delete-expired', methods=['POST'])
 def delete_expired_subscribers():
     try:
@@ -1323,13 +1535,16 @@ def delete_expired_subscribers():
         all_expired = list(expired_subs) + list(extra)
         seen = set()
         unique = []
+
         for s in all_expired:
             if s.id not in seen:
                 seen.add(s.id)
                 unique.append(s)
+
         if not unique:
             flash('ℹ️ لا يوجد مشتركين منتهين', 'info')
             return redirect(url_for('subscribers'))
+
         deleted = 0
         for sub in unique:
             try:
@@ -1343,6 +1558,7 @@ def delete_expired_subscribers():
                     pass
             db.session.delete(sub)
             deleted += 1
+
         db.session.commit()
         log_event('حذف المنتهين', f'{deleted} مشترك')
         flash(f'🗑 تم حذف {deleted} مشترك منتهي', 'success')
@@ -1351,10 +1567,12 @@ def delete_expired_subscribers():
         flash(f'❌ {str(e)}', 'danger')
     return redirect(url_for('subscribers'))
 
+
 @app.route('/subscribers/export/<format>')
 def export_subscribers(format):
     ft = request.args.get('type', '').strip()
     ids = request.args.get('ids', '').strip()
+
     if ids:
         try:
             idl = [int(x) for x in ids.split(',') if x.strip().isdigit()]
@@ -1366,7 +1584,9 @@ def export_subscribers(format):
         if ft in ('pppoe', 'hotspot'):
             q = q.filter_by(user_type=ft)
         subs = q.order_by(Subscriber.created_at.desc()).all()
+
     ts = datetime.now().strftime("%Y%m%d_%H%M%S")
+
     if format == 'csv':
         out = io.StringIO()
         out.write('\ufeff')
@@ -1374,19 +1594,29 @@ def export_subscribers(format):
         w.writerow(['#', 'الاسم', 'المستخدم', 'كلمة المرور', 'الباقة', 'النوع', 'الحالة', 'تاريخ الانتهاء'])
         for i, s in enumerate(subs, 1):
             w.writerow([
-                i, s.name or '', s.username, s.password,
-                s.package or '', s.user_type or 'pppoe',
+                i,
+                s.name or '',
+                s.username,
+                s.password,
+                s.package or '',
+                s.user_type or 'pppoe',
                 s.status or 'active',
                 s.expires_at.strftime('%Y-%m-%d %H:%M') if s.expires_at else 'غير محدد'
             ])
+
         mem = io.BytesIO()
         mem.write(out.getvalue().encode('utf-8'))
         mem.seek(0)
+
         return send_file(
-            mem, mimetype='text/csv', as_attachment=True,
+            mem,
+            mimetype='text/csv',
+            as_attachment=True,
             download_name=f'subscribers_{ts}.csv'
         )
+
     return redirect(url_for('subscribers'))
+
 
 @app.route('/packages', methods=['GET', 'POST'])
 def packages():
@@ -1397,18 +1627,25 @@ def packages():
         duration = request.form.get('duration', '30').strip()
         unit = request.form.get('duration_unit', 'days').strip()
         ut = request.form.get('user_type', 'pppoe').strip()
+
         if not name:
             flash('❌ اسم الباقة مطلوب', 'danger')
             return redirect(url_for('packages'))
+
         if Package.query.filter_by(name=name).first():
             flash('❌ اسم الباقة موجود بالفعل', 'danger')
             return redirect(url_for('packages'))
+
         try:
             p_val = float(price) if price else 0
             d_val = int(duration) if duration else 30
             db.session.add(Package(
-                name=name, speed=speed, price=p_val,
-                duration=d_val, duration_unit=unit, user_type=ut
+                name=name,
+                speed=speed,
+                price=p_val,
+                duration=d_val,
+                duration_unit=unit,
+                user_type=ut
             ))
             db.session.commit()
             log_event('إضافة باقة', name, f'السعر: {p_val}')
@@ -1417,8 +1654,10 @@ def packages():
             db.session.rollback()
             flash(f'❌ {str(e)}', 'danger')
         return redirect(url_for('packages'))
+
     pkgs = Package.query.order_by(Package.created_at.desc()).all()
     return render_template('packages.html', packages=pkgs)
+
 
 @app.route('/packages/update/<int:pkg_id>', methods=['POST'])
 def update_package(pkg_id):
@@ -1430,6 +1669,7 @@ def update_package(pkg_id):
         pkg.duration = int(request.form.get('duration', pkg.duration))
         pkg.duration_unit = request.form.get('duration_unit', 'days').strip()
         pkg.user_type = request.form.get('user_type', 'pppoe').strip()
+
         db.session.commit()
         log_event('تعديل باقة', pkg.name, f'السعر: {pkg.price}')
         flash('✅ تم تحديث الباقة بنجاح', 'success')
@@ -1437,6 +1677,7 @@ def update_package(pkg_id):
         db.session.rollback()
         flash(f'❌ {str(e)}', 'danger')
     return redirect(url_for('packages'))
+
 
 @app.route('/packages/delete/<int:pkg_id>')
 def delete_package(pkg_id):
@@ -1451,6 +1692,7 @@ def delete_package(pkg_id):
         db.session.rollback()
         flash(f'❌ {str(e)}', 'danger')
     return redirect(url_for('packages'))
+
 
 @app.route('/admin-settings', methods=['GET'])
 def admin_settings():
@@ -1469,6 +1711,7 @@ def admin_settings():
     new_subscribers = TelegramLog.query.filter_by(message_type='new_subscriber').count()
     expired_subscribers = TelegramLog.query.filter_by(message_type='expired_subscriber').count()
     bulk_adds = TelegramLog.query.filter_by(message_type='bulk_add').count()
+
     return render_template(
         'admin_settings.html',
         telegram_settings=settings,
@@ -1479,11 +1722,13 @@ def admin_settings():
         bulk_adds=bulk_adds
     )
 
+
 @app.route('/admin-settings/save', methods=['POST'])
 def save_telegram_settings():
     settings = TelegramSetting.query.first()
     if not settings:
         settings = TelegramSetting()
+
     settings.token = request.form.get('telegram_token', '').strip()
     settings.chat_id = request.form.get('telegram_chat_id', '').strip()
     settings.enabled = 'telegram_enabled' in request.form
@@ -1492,29 +1737,36 @@ def save_telegram_settings():
     settings.notify_bulk_add = 'notify_bulk_add' in request.form
     settings.notify_admin_action = 'notify_admin_action' in request.form
     settings.notify_router_status = 'notify_router_status' in request.form
+
     db.session.add(settings)
     db.session.commit()
+
     flash('✅ تم حفظ إعدادات التلجرام بنجاح', 'success')
     return redirect(url_for('admin_settings'))
+
 
 @app.route('/admin-settings/test', methods=['POST'])
 def test_telegram():
     settings = TelegramSetting.query.first()
     if not settings or not settings.token or not settings.chat_id:
         return jsonify({'success': False, 'error': 'الإعدادات غير مكتملة'})
+
     ok, msg = send_telegram_message(
         "✅ *اختبار الإشعار*\nتم إرسال رسالة اختبار بنجاح من النظام",
         message_type='test',
         force=True
     )
+
     if ok:
         return jsonify({'success': True})
     return jsonify({'success': False, 'error': msg})
+
 
 @app.route('/payments')
 def payments():
     pay_list = Payment.query.order_by(Payment.created_at.desc()).all()
     return render_template('payments.html', payments=pay_list)
+
 
 # ============ Main ============
 
