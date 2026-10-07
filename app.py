@@ -52,16 +52,29 @@ else:
 app.config['SQLALCHEMY_DATABASE_URI'] = database_url
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 
-# تفعيل إعادة الاتصال التلقائي ومنع مشاكل الـ EOF
+# إعدادات محسنة لمنع انقطاع الاتصال (SSL SYSCALL error)
+# pool_pre_ping: يتحقق من صحة الاتصال قبل استخدامه
+# pool_recycle: يعيد تدوير الاتصالات كل 3 دقائق لتجنب إغلاقها من قبل الخادم
+# pool_size و max_overflow: لضبط حجم التجمع
+# connect_args: لفرض SSL في PostgreSQL
 app.config['SQLALCHEMY_ENGINE_OPTIONS'] = {
     'pool_pre_ping': True,
-    'pool_recycle': 300,
+    'pool_recycle': 180,
+    'pool_size': 5,
+    'max_overflow': 10,
+    'pool_timeout': 30,
+    'connect_args': {"sslmode": "require"} if 'postgresql' in database_url else {}
 }
 
 _masked = database_url.split('@')[-1] if '@' in database_url else database_url
 logger.info(f"📊 DB: ...@{_masked}")
 
 db = SQLAlchemy(app)
+
+# ✅ إغلاق الجلسة تلقائياً بعد كل طلب لمنع تسرب الاتصالات
+@app.teardown_appcontext
+def shutdown_session(exception=None):
+    db.session.remove()
 
 try:
     from api_sync import sync_bp
@@ -351,23 +364,26 @@ def notify_router_status_change(router_name, ip_address, is_up):
     if not settings.token or not settings.chat_id:
         return False
     
-    status_icon = "يعمل" if is_up else "متوقف"
-    status_symbol = "🟢" if is_up else "❌"
-    msg = f"{status_symbol} {router_name} `{ip_address}` {status_icon}"
+    status_symbol = "🟢" if is_up else "🔴"
+    status_text = "يعمل" if is_up else "متوقف"
+    msg = f"{status_symbol} {router_name} `{ip_address}` {status_text}"
     return send_telegram_message(msg, message_type='router_status')[0]
 
 
 # ============ Background Router Monitor ============
 
 def check_router_connection(ip, port=22, timeout=3):
+    s = None
     try:
-        socket.setdefaulttimeout(timeout)
         s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        s.settimeout(timeout)
         s.connect((ip, int(port)))
-        s.close()
         return True
     except Exception:
         return False
+    finally:
+        if s:
+            s.close()
 
 
 def background_router_monitor():
@@ -377,15 +393,15 @@ def background_router_monitor():
             with app.app_context():
                 routers = Router.query.all()
                 for r in routers:
-                    current_state = check_router_connection(r.ip_address, r.port or 22)
-                    if r.is_active != current_state:
-                        r.is_active = current_state
-                        try:
+                    try:
+                        current_state = check_router_connection(r.ip_address, r.port or 22)
+                        if r.is_active != current_state:
+                            r.is_active = current_state
                             db.session.commit()
                             notify_router_status_change(r.name, r.ip_address, current_state)
-                        except Exception as db_err:
-                            db.session.rollback()
-                            logger.warning(f"⚠️ خطأ قاعدة بيانات أثناء تحديث حالة الراوتر {r.name}: {db_err}")
+                    except Exception as db_err:
+                        db.session.rollback()
+                        logger.warning(f"⚠️ خطأ قاعدة بيانات أثناء تحديث حالة الراوتر {r.name}: {db_err}")
         except Exception as e:
             logger.warning(f"⚠️ خطأ في مراقبة الراوترات بالخلفية: {e}")
         finally:
@@ -482,7 +498,9 @@ def init_database():
             logger.info("✅ تم تهيئة قاعدة البيانات")
         except Exception as e:
             db.session.rollback()
-            logger.error(f"❌ خطأ تهيئة قاعدة البيانات: {e}")
+            # تجاهل خطأ التكرار في حالة تشغيل أكثر من عامل (Worker)
+            if "already exists" not in str(e).lower():
+                logger.error(f"❌ خطأ تهيئة قاعدة البيانات: {e}")
 
 
 def ensure_columns():
@@ -1185,6 +1203,9 @@ def update_subscriber(sub_id):
         pkg = request.form.get('package', '').strip()
         if pkg:
             sub.package = pkg
+        ut = request.form.get('user_type', '').strip()
+        if ut in ('pppoe', 'hotspot'):
+            sub.user_type = ut
         db.session.commit()
         log_event('تعديل مشترك', sub.username)
         flash('✅ تم التحديث في قاعدة البيانات', 'success')
