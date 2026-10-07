@@ -5,9 +5,9 @@
 <div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
     <h5 class="mb-0">🏠 لوحة التحكم الرئيسية</h5>
     <div class="d-flex align-items-center gap-3">
-        <!-- ✅ عرض التوقيت المحلي مع التاريخ -->
+        <!-- ✅ عرض التوقيت المحلي مع التاريخ (تمت إضافة ID لتحديثه عبر JS) -->
         <div class="badge bg-dark border border-secondary text-light p-2" style="font-size: 0.8rem;">
-            <i class="bi bi-calendar-event text-accent"></i> {{ current_time }}
+            <i class="bi bi-calendar-event text-accent"></i> <span id="live-clock">{{ current_time }}</span>
         </div>
         
         <button type="button" class="user-badge" data-bs-toggle="modal" data-bs-target="#changeCredModal">
@@ -211,7 +211,7 @@
     </div>
 </div>
 
-<!-- ✅ سجل الأحداث الحديثة (تم إصلاحه ليعرض events بدلاً من subscribers) -->
+<!-- سجل الأحداث الحديثة -->
 <div class="card border-0">
     <div class="card-header bg-dark bg-opacity-50 py-2">
         <h6 class="mb-0 fw-bold">
@@ -485,4 +485,35 @@
     border-radius: 4px;
 }
 </style>
+
+<!-- ✅ كود JavaScript لتحديث التوقيت كل ثانية -->
+<script>
+    function updateLiveClock() {
+        const now = new Date();
+        
+        // استخراج مكونات التاريخ والوقت
+        const year = now.getFullYear();
+        const month = String(now.getMonth() + 1).padStart(2, '0'); // الشهر يبدأ من 0
+        const day = String(now.getDate()).padStart(2, '0');
+        
+        const hours = String(now.getHours()).padStart(2, '0');
+        const minutes = String(now.getMinutes()).padStart(2, '0');
+        const seconds = String(now.getSeconds()).padStart(2, '0');
+        
+        // التنسيق المطلوب: HH:MM:SS YYYY-MM-DD
+        const formattedTime = `${hours}:${minutes}:${seconds} ${year}-${month}-${day}`;
+        
+        // تحديث العنصر في الصفحة
+        const clockElement = document.getElementById('live-clock');
+        if (clockElement) {
+            clockElement.textContent = formattedTime;
+        }
+    }
+    
+    // تشغيل الدالة فوراً عند تحميل الصفحة
+    updateLiveClock();
+    
+    // تحديث التوقيت كل 1000 مللي ثانية (ثانية واحدة)
+    setInterval(updateLiveClock, 1000);
+</script>
 {% endblock %}
