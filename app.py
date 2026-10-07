@@ -36,13 +36,12 @@ except ImportError:
 
 app = Flask(__name__)
 app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', 'zinar-secret-key-2024')
-app.config['MAX_CONTENT_LENGTH'] = 20 * 1024 * 1024  # 20MB
+app.config['MAX_CONTENT_LENGTH'] = 20 * 1024 * 1024
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 LOCAL_TZ = ZoneInfo("Asia/Damascus")
-
 IMPORT_API_KEY = os.environ.get('IMPORT_API_KEY', 'zinar-import-key-2026')
 
 # ============ Database Config ============
@@ -237,11 +236,53 @@ def _day_bounds(day=None):
     return start, start + timedelta(days=1)
 
 
-# ============ MikroTik Parser (يدعم print و export) ============
+# ============ ✅ فك ترميز MikroTik (تحويل \XX إلى عربي) ============
+
+def decode_mikrotik_escapes(text):
+    """
+    تحويل رموز MikroTik مثل \E3\CD\E3\CF إلى نص عربي مقروء.
+    MikroTik يشفر البايتات غير ASCII إلى \XX حيث XX هو hex.
+    """
+    if not text or '\\' not in text:
+        return text
+
+    result = []
+    i = 0
+    n = len(text)
+
+    while i < n:
+        # هل نبدأ بـ \XX ?
+        if text[i] == '\\' and i + 2 < n and all(c in '0123456789ABCDEFabcdef' for c in text[i+1:i+3]):
+            # جمع كل البايتات المتتالية
+            byte_seq = []
+            while i + 2 < n and text[i] == '\\' and all(c in '0123456789ABCDEFabcdef' for c in text[i+1:i+3]):
+                byte_seq.append(int(text[i+1:i+3], 16))
+                i += 3
+
+            # محاولة فك الترميز
+            try:
+                decoded = bytes(byte_seq).decode('utf-8')
+                # إذا كان الفك ناجح لكن النتيجة غير معقولة، ارجع للـ hex
+                result.append(decoded)
+            except UnicodeDecodeError:
+                try:
+                    decoded = bytes(byte_seq).decode('windows-1256')
+                    result.append(decoded)
+                except UnicodeDecodeError:
+                    # فشل كل شيء، احتفظ بالرموز الأصلية
+                    result.append(''.join(f'\\{b:02X}' for b in byte_seq))
+        else:
+            result.append(text[i])
+            i += 1
+
+    return ''.join(result)
+
+
+# ============ MikroTik Parser ============
 
 def _extract_kv(text, params):
-    """استخراج key=value - يتوقف عند on-up/on-down لتجنب محتوى معقد"""
-    # قطع النص عند on-up أو on-down (لا نحتاجهما)
+    """استخراج key=value مع فك الترميز العربي"""
+    # قطع النص عند on-up/on-down لتجنب محتوى معقد
     for stop in [' on-up=', ' on-down=', 'on-up=', 'on-down=']:
         idx = text.find(stop)
         if idx != -1:
@@ -252,12 +293,12 @@ def _extract_kv(text, params):
     for match in re.finditer(pattern, text):
         key = match.group(1).lower()
         value = match.group(2) if match.group(2) is not None else match.group(3)
-        if key not in params:  # احتفظ بأول قيمة فقط
-            params[key] = value
+        if key not in params:
+            # ✅ فك الترميز العربي
+            params[key] = decode_mikrotik_escapes(value)
 
 
 def _parse_print_format(lines, debug_info, packages, subscribers):
-    """تحليل صيغة terminal print (مثل /ppp profile print و /ppp secret print)"""
     current_section = None
     current_entry = None
     current_disabled = False
@@ -313,7 +354,6 @@ def _parse_print_format(lines, debug_info, packages, subscribers):
         if not stripped or stripped.startswith('#'):
             continue
 
-        # كشف القسم
         if stripped.startswith('/'):
             finalize()
             lower = stripped.lower()
@@ -333,20 +373,15 @@ def _parse_print_format(lines, debug_info, packages, subscribers):
         if not current_section:
             continue
 
-        # هل السطر بداية إدخال جديد؟ (يبدأ برقم)
         m = re.match(r'^\s*(\d+)\s+(.*)$', line)
         if m:
             finalize()
             content = m.group(2)
-
-            # كشف علامة X (معطل) أو * (افتراضي)
             current_disabled = content.startswith('X ')
             content = re.sub(r'^[X\*]\s+', '', content).strip()
-
             current_entry = {}
             _extract_kv(content, current_entry)
         else:
-            # استمرارية لإدخال حالي
             if current_entry is not None:
                 _extract_kv(stripped, current_entry)
 
@@ -354,10 +389,9 @@ def _parse_print_format(lines, debug_info, packages, subscribers):
 
 
 def _parse_export_format(lines, debug_info, packages, subscribers):
-    """تحليل صيغة .rsc export"""
     current_section = None
 
-    # دمج أسطر المتابعة (line continuation)
+    # دمج أسطر المتابعة
     merged = []
     buffer = ''
     for line in lines:
@@ -377,7 +411,6 @@ def _parse_export_format(lines, debug_info, packages, subscribers):
         if not stripped or stripped.startswith('#'):
             continue
 
-        # كشف القسم
         if stripped.startswith('/'):
             lower = stripped.lower()
             if 'ppp/profile' in lower or 'ppp profile' in lower:
@@ -436,10 +469,6 @@ def _parse_export_format(lines, debug_info, packages, subscribers):
 
 
 def parse_mikrotik_rsc(content):
-    """
-    تحليل ملف MikroTik (سواء من /export أو من terminal print)
-    يعيد: (packages, subscribers, debug_info)
-    """
     packages = []
     subscribers = []
     debug_info = {
@@ -451,7 +480,6 @@ def parse_mikrotik_rsc(content):
         'format': 'unknown',
     }
 
-    # تنظيف
     if content.startswith('\ufeff'):
         content = content[1:]
     content = content.replace('\r\n', '\n').replace('\r', '\n')
@@ -460,7 +488,6 @@ def parse_mikrotik_rsc(content):
     debug_info['lines_read'] = len(lines)
     debug_info['preview'] = '\n'.join(lines[:20])
 
-    # كشف الصيغة: print أم export
     is_print = False
     for line in lines[:80]:
         s = line.strip()
@@ -502,7 +529,6 @@ def log_telegram(message, message_type='info', status='success'):
 
 def send_telegram_message(message, message_type='info', force=False):
     if not requests:
-        logger.warning("⚠️ مكتبة requests غير مثبتة")
         return False, 'requests library not installed'
 
     settings = get_telegram_settings()
@@ -538,7 +564,6 @@ def send_telegram_message(message, message_type='info', force=False):
             return False, result.get("description", "Unknown Telegram error")
     except Exception as e:
         log_telegram(str(e), message_type=message_type, status='failed')
-        logger.warning(f"⚠️ فشل إرسال رسالة تلجرام: {e}")
         return False, str(e)
 
 
@@ -578,7 +603,6 @@ def telegram_webhook():
         return jsonify({'ok': True})
     except Exception as e:
         db.session.rollback()
-        logger.error(f"Webhook Error: {e}")
         return jsonify({'ok': False}), 500
 
 
@@ -936,11 +960,9 @@ def api_router_notify():
         except Exception as tg_err:
             logger.warning(f"Telegram send failed: {tg_err}")
 
-        logger.info(f"📡 Router Notify: {message}")
         return jsonify({'ok': True, 'message': 'Notification received', 'data': data})
     except Exception as e:
         db.session.rollback()
-        logger.error(f"❌ Error in router_notify: {e}")
         return jsonify({'ok': False, 'error': str(e)}), 500
 
 
@@ -949,12 +971,11 @@ def api_import_subscribers():
     try:
         api_key = request.headers.get('X-API-Key') or request.args.get('api_key')
         if api_key != IMPORT_API_KEY:
-            logger.warning(f"⚠️ محاولة استيراد فاشلة (مفتاح خاطئ) من {request.remote_addr}")
             return jsonify({'ok': False, 'error': 'Unauthorized: Invalid API Key'}), 401
 
         data = request.get_json()
         if not data or not isinstance(data, list):
-            return jsonify({'ok': False, 'error': 'Invalid data format. Expected a JSON array.'}), 400
+            return jsonify({'ok': False, 'error': 'Invalid data format.'}), 400
 
         imported = 0
         updated = 0
@@ -994,13 +1015,8 @@ def api_import_subscribers():
                 imported += 1
 
         db.session.commit()
-        log_event(
-            'استيراد مشتركين (API)',
-            f'{imported + updated} مشترك',
-            f'جديد: {imported} | محدّث: {updated} | متجاهل: {skipped}',
-            admin_name='النظام (API)'
-        )
-        logger.info(f"✅ Import: {imported} new, {updated} updated, {skipped} skipped.")
+        log_event('استيراد مشتركين (API)', f'{imported + updated} مشترك',
+                  f'جديد: {imported} | محدّث: {updated} | متجاهل: {skipped}', admin_name='النظام (API)')
         return jsonify({
             'ok': True, 'imported': imported, 'updated': updated,
             'skipped': skipped, 'total': len(data),
@@ -1008,7 +1024,6 @@ def api_import_subscribers():
         })
     except Exception as e:
         db.session.rollback()
-        logger.error(f"❌ Import Error: {e}")
         return jsonify({'ok': False, 'error': str(e)}), 500
 
 
@@ -1017,12 +1032,11 @@ def api_import_packages():
     try:
         api_key = request.headers.get('X-API-Key') or request.args.get('api_key')
         if api_key != IMPORT_API_KEY:
-            logger.warning(f"⚠️ محاولة استيراد باقات فاشلة (مفتاح خاطئ) من {request.remote_addr}")
             return jsonify({'ok': False, 'error': 'Unauthorized: Invalid API Key'}), 401
 
         data = request.get_json()
         if not data or not isinstance(data, list):
-            return jsonify({'ok': False, 'error': 'Invalid data format. Expected a JSON array.'}), 400
+            return jsonify({'ok': False, 'error': 'Invalid data format.'}), 400
 
         imported = 0
         updated = 0
@@ -1072,13 +1086,8 @@ def api_import_packages():
                 imported += 1
 
         db.session.commit()
-        log_event(
-            'استيراد باقات (API)',
-            f'{imported + updated} باقة',
-            f'جديدة: {imported} | محدّثة: {updated} | متجاهلة: {skipped}',
-            admin_name='النظام (API)'
-        )
-        logger.info(f"✅ Packages Import: {imported} new, {updated} updated, {skipped} skipped.")
+        log_event('استيراد باقات (API)', f'{imported + updated} باقة',
+                  f'جديدة: {imported} | محدّثة: {updated} | متجاهلة: {skipped}', admin_name='النظام (API)')
         return jsonify({
             'ok': True, 'imported': imported, 'updated': updated,
             'skipped': skipped, 'total': len(data),
@@ -1086,7 +1095,6 @@ def api_import_packages():
         })
     except Exception as e:
         db.session.rollback()
-        logger.error(f"❌ Packages Import Error: {e}")
         return jsonify({'ok': False, 'error': str(e)}), 500
 
 
@@ -1240,7 +1248,6 @@ def import_backup():
                 flash('❌ يجب أن يكون الملف بصيغة .rsc أو .txt', 'danger')
                 return redirect(url_for('import_backup'))
 
-            # قراءة الملف
             raw_bytes = file.read()
             try:
                 content = raw_bytes.decode('utf-8')
@@ -1250,15 +1257,12 @@ def import_backup():
                 except UnicodeDecodeError:
                     content = raw_bytes.decode('utf-8', errors='ignore')
 
-            # كشف ملف .backup الثنائي
             if content[:5] == 'PK\x03\x04' or raw_bytes[:4] == b'\x00\x00\x00\x00':
-                flash('❌ هذا ملف Backup ثنائي وليس RSC! استخدم أمر /export file=name', 'danger')
+                flash('❌ هذا ملف Backup ثنائي وليس RSC! استخدم /export file=name', 'danger')
                 return redirect(url_for('import_backup'))
 
-            # تحليل الملف
             packages, subscribers, debug_info = parse_mikrotik_rsc(content)
 
-            # عرض معلومات التشخيص إذا لم يتم العثور على شيء
             if not packages and not subscribers:
                 preview = debug_info['preview'].replace('\n', '<br>').replace('<', '&lt;').replace('>', '&gt;')[:800]
                 sections = ', '.join(debug_info['sections_found']) or 'لا يوجد'
@@ -1274,7 +1278,6 @@ def import_backup():
                 flash(error_msg, 'warning')
                 return redirect(url_for('import_backup'))
 
-            # استيراد الباقات
             pkg_imported = 0
             pkg_updated = 0
             for p in packages:
@@ -1286,7 +1289,6 @@ def import_backup():
                     db.session.add(Package(**p))
                     pkg_imported += 1
 
-            # استيراد المشتركين
             sub_imported = 0
             sub_updated = 0
             for s in subscribers:
@@ -1465,13 +1467,8 @@ def routers():
             if is_master:
                 Router.query.update({Router.is_master: False}, synchronize_session=False)
             db.session.add(Router(
-                name=name,
-                ip_address=ip,
-                username=un,
-                password=pw,
-                port=port,
-                is_master=is_master,
-                is_active=True
+                name=name, ip_address=ip, username=un, password=pw,
+                port=port, is_master=is_master, is_active=True
             ))
             db.session.commit()
             log_event('إضافة راوتر', name, f'IP: {ip}')
@@ -1635,13 +1632,8 @@ def add_subscriber():
 
         try:
             db.session.add(Subscriber(
-                name=name or un,
-                username=un,
-                password=pw,
-                package=pkg,
-                user_type=ut,
-                expires_at=None,
-                status='active'
+                name=name or un, username=un, password=pw, package=pkg,
+                user_type=ut, expires_at=None, status='active'
             ))
             db.session.commit()
 
@@ -1744,13 +1736,8 @@ def bulk_add():
                 continue
             try:
                 db.session.add(Subscriber(
-                    name=un,
-                    username=un,
-                    password=pw,
-                    package=pkg,
-                    user_type=ut,
-                    expires_at=None,
-                    status='active'
+                    name=un, username=un, password=pw, package=pkg,
+                    user_type=ut, expires_at=None, status='active'
                 ))
                 created += 1
             except Exception:
@@ -2053,12 +2040,8 @@ def packages():
             p_val = float(price) if price else 0
             d_val = int(duration) if duration else 30
             db.session.add(Package(
-                name=name,
-                speed=speed,
-                price=p_val,
-                duration=d_val,
-                duration_unit=unit,
-                user_type=ut
+                name=name, speed=speed, price=p_val,
+                duration=d_val, duration_unit=unit, user_type=ut
             ))
             db.session.commit()
             log_event('إضافة باقة', name, f'السعر: {p_val}')
@@ -2112,12 +2095,8 @@ def admin_settings():
     settings = TelegramSetting.query.first()
     if not settings:
         settings = TelegramSetting(
-            enabled=False,
-            notify_new_subscriber=True,
-            notify_subscriber_expired=True,
-            notify_bulk_add=True,
-            notify_admin_action=False,
-            notify_router_status=True
+            enabled=False, notify_new_subscriber=True, notify_subscriber_expired=True,
+            notify_bulk_add=True, notify_admin_action=False, notify_router_status=True
         )
     logs = TelegramLog.query.order_by(TelegramLog.created_at.desc()).limit(10).all()
     total_notifications = TelegramLog.query.count()
