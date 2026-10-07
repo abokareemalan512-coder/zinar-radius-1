@@ -312,6 +312,11 @@ def telegram_webhook():
             text = msg.get('text', '')
             chat_title = msg.get('chat', {}).get('title', '')
             user_info = msg.get('from', {})
+            
+            # ✅ تجاهل الرسائل التي يرسلها البوت نفسه لتجنب التكرار
+            if user_info.get('is_bot', False):
+                return jsonify({'ok': True})
+            
             user_name = user_info.get('username') or user_info.get('first_name', 'مستخدم')
             
             # ✅ حفظ الرسالة الواردة في قاعدة البيانات لتظهر في الموقع
@@ -653,6 +658,52 @@ def api_log():
     return jsonify({'ok': True})
 
 
+# ✅ مسار استقبال تنبيهات الراوترات من الميكروتيك (مع ترجمة الحالة)
+@app.route('/api/router_notify', methods=['POST', 'GET'])
+def api_router_notify():
+    try:
+        # استقبال البيانات من الميكروتيك (JSON أو Form أو Query Params)
+        data = request.get_json(silent=True) or request.form.to_dict() or request.args.to_dict()
+        
+        router_name = data.get('name', 'راوتر غير معروف')
+        status = data.get('status', 'unknown').lower()
+        ip_address = data.get('ip', '')
+        
+        # ✅ ترجمة الحالة من الإنجليزية إلى العربية
+        if status in ('working', 'up', 'online'):
+            status_ar = 'يعمل'
+            status_icon = '🟢'
+        elif status in ('stopped', 'down', 'offline'):
+            status_ar = 'متوقف'
+            status_icon = '🔴'
+        else:
+            status_ar = status
+            status_icon = '⚪'
+
+        # تكوين الرسالة النهائية بالعربية
+        message = f"{status_icon} الراوتر {router_name} ({ip_address}) {status_ar}"
+
+        # حفظ التنبيه في قاعدة البيانات (سيظهر في سجل الأحداث وفي صفحة التلجرام)
+        log = TelegramLog(
+            message_type='router_alert',
+            status='success',
+            message=message
+        )
+        db.session.add(log)
+        
+        # تسجيل الحدث في سجل الأحداث العام
+        log_event('تنبيه راوتر', router_name, message, admin_name='الميكروتيك')
+        
+        db.session.commit()
+        logger.info(f"📡 Router Notify: {message}")
+        
+        return jsonify({'ok': True, 'message': 'Notification received'})
+    except Exception as e:
+        db.session.rollback()
+        logger.error(f"❌ Error in router_notify: {e}")
+        return jsonify({'ok': False, 'error': str(e)}), 500
+
+
 # ============ API for Live Updates (AJAX) ============
 
 @app.route('/api/dashboard_data')
@@ -742,7 +793,7 @@ def check_admin_login():
     public = (
         'login', 'logout', 'mobile', 'mobile_view',
         'sync.get_subscribers', 'sync.mark_first_use',
-        'api_auth', 'api_log'
+        'api_auth', 'api_log', 'api_router_notify'
     )
     if request.endpoint in public:
         return
