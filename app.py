@@ -6,6 +6,9 @@ import string
 import logging
 import traceback
 import calendar
+import socket
+import time
+import threading
 from datetime import datetime, timedelta
 
 from flask import (
@@ -21,7 +24,6 @@ try:
 except ImportError:
     requests = None
 
-# محاولة استيراد radius_sync مع حماية في حال عدم وجود الموديول
 try:
     import radius_sync
 except ImportError:
@@ -141,6 +143,7 @@ class TelegramSetting(db.Model):
     notify_subscriber_expired = db.Column(db.Boolean, default=True)
     notify_bulk_add = db.Column(db.Boolean, default=True)
     notify_admin_action = db.Column(db.Boolean, default=False)
+    notify_router_status = db.Column(db.Boolean, default=True)
 
 
 class TelegramLog(db.Model):
@@ -257,7 +260,6 @@ def send_telegram_message(message, message_type='info', force=False):
         return False, str(e)
 
 
-# مسار استقبال الرسائل (الصندوق الوارد - Inbox Webhook)
 @app.route('/api/telegram/webhook', methods=['POST'])
 def telegram_webhook():
     try:
@@ -272,7 +274,6 @@ def telegram_webhook():
             user_info = msg.get('from', {})
             user_name = user_info.get('username') or user_info.get('first_name', 'مستخدم')
             
-            # تخزين الرسالة الواردة في السجلات بنوع 'incoming'
             log = TelegramLog(
                 message_type='incoming',
                 status='success',
@@ -281,7 +282,6 @@ def telegram_webhook():
             db.session.add(log)
             db.session.commit()
             
-            # رد تلقائي اختياري عند إرسال /start
             if text.strip() == '/start':
                 send_telegram_message(
                     f"أهلاً بك يا {user_name} 👋\nتم استلام رسالتك وربط حسابك بنجاح مع النظام.",
@@ -333,6 +333,52 @@ def notify_admin_action(action_text):
         return False
     msg = f"*⚙️ إجراء إداري*\n{action_text}"
     return send_telegram_message(msg, message_type='admin_action')[0]
+
+
+def notify_router_status_change(router_name, ip_address, is_up):
+    settings = get_telegram_settings()
+    if not settings or not settings.enabled or not settings.notify_router_status:
+        return False
+    if not settings.token or not settings.chat_id:
+        return False
+    
+    status_icon = "يعمل" if is_up else "متوقف"
+    status_symbol = "🟢" if is_up else "❌"
+    msg = f"{status_symbol} {router_name} `{ip_address}` {status_icon}"
+    return send_telegram_message(msg, message_type='router_status')[0]
+
+
+# ============ Background Router Monitor ============
+
+def check_router_connection(ip, port=22, timeout=3):
+    try:
+        socket.setdefaulttimeout(timeout)
+        s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        s.connect((ip, int(port)))
+        s.close()
+        return True
+    except Exception:
+        return False
+
+
+def background_router_monitor():
+    time.sleep(15) # انتظار قليلاً حتى يتم بدء التطبيق وتجهيز قاعدة البيانات
+    while True:
+        try:
+            with app.app_context():
+                routers = Router.query.all()
+                for r in routers:
+                    current_state = check_router_connection(r.ip_address, r.port or 22)
+                    if r.is_active != current_state:
+                        r.is_active = current_state
+                        db.session.commit()
+                        try:
+                            notify_router_status_change(r.name, r.ip_address, current_state)
+                        except Exception as e:
+                            logger.warning(f"⚠️ فشل إرسال إشعار الراوتر: {e}")
+        except Exception as e:
+            logger.warning(f"⚠️ خطأ في مراقبة الراوترات بالخلفية: {e}")
+        time.sleep(60)  # فحص كل دقيقة
 
 
 # ============ Kick via SSH ============
@@ -412,7 +458,8 @@ def init_database():
                     notify_new_subscriber=True,
                     notify_subscriber_expired=True,
                     notify_bulk_add=True,
-                    notify_admin_action=False
+                    notify_admin_action=False,
+                    notify_router_status=True
                 ))
                 db.session.commit()
             
@@ -432,6 +479,11 @@ def ensure_columns():
                     cols = [c['name'] for c in insp.get_columns('routers')]
                     if 'is_active' not in cols:
                         conn.execute(text("ALTER TABLE routers ADD COLUMN is_active BOOLEAN DEFAULT TRUE"))
+
+                if 'telegram_settings' in tables:
+                    cols = [c['name'] for c in insp.get_columns('telegram_settings')]
+                    if 'notify_router_status' not in cols:
+                        conn.execute(text("ALTER TABLE telegram_settings ADD COLUMN notify_router_status BOOLEAN DEFAULT TRUE"))
 
                 if 'subscribers' in tables:
                     cols = [c['name'] for c in insp.get_columns('subscribers')]
@@ -460,6 +512,10 @@ def ensure_columns():
 
 init_database()
 ensure_columns()
+
+# تشغيل خيط المراقبة بالخلفية
+monitor_thread = threading.Thread(target=background_router_monitor, daemon=True)
+monitor_thread.start()
 
 
 # ============ API للميكروتيك ============
@@ -589,8 +645,6 @@ def logout():
     return redirect(url_for('login'))
 
 
-# ============ Dashboard ============
-
 @app.route('/dashboard')
 def dashboard():
     try:
@@ -633,8 +687,6 @@ def dashboard():
         flash(f'❌ {str(e)}', 'danger')
         return render_template('error.html', error=str(e)), 500
 
-
-# ============ Admin Profile ============
 
 @app.route('/admin/change-credentials', methods=['POST'])
 def change_admin_credentials():
@@ -681,8 +733,6 @@ def change_admin_credentials():
         flash(f'❌ {str(e)}', 'danger')
     return redirect(url_for('dashboard'))
 
-
-# ============ Routers ============
 
 @app.route('/routers', methods=['GET', 'POST'])
 def routers():
@@ -811,8 +861,6 @@ def delete_router(router_id):
         flash(f'❌ {str(e)}', 'danger')
     return redirect(url_for('routers'))
 
-
-# ============ Subscribers ============
 
 @app.route('/subscribers')
 def subscribers():
@@ -1276,8 +1324,6 @@ def export_subscribers(format):
     return redirect(url_for('subscribers'))
 
 
-# ============ Packages ============
-
 @app.route('/packages', methods=['GET', 'POST'])
 def packages():
     if request.method == 'POST':
@@ -1354,8 +1400,6 @@ def delete_package(pkg_id):
     return redirect(url_for('packages'))
 
 
-# ============ Telegram Admin Settings ============
-
 @app.route('/admin-settings', methods=['GET'])
 def admin_settings():
     settings = TelegramSetting.query.first()
@@ -1365,7 +1409,8 @@ def admin_settings():
             notify_new_subscriber=True,
             notify_subscriber_expired=True,
             notify_bulk_add=True,
-            notify_admin_action=False
+            notify_admin_action=False,
+            notify_router_status=True
         )
     logs = TelegramLog.query.order_by(TelegramLog.created_at.desc()).limit(10).all()
     total_notifications = TelegramLog.query.count()
@@ -1397,6 +1442,7 @@ def save_telegram_settings():
     settings.notify_subscriber_expired = 'notify_subscriber_expired' in request.form
     settings.notify_bulk_add = 'notify_bulk_add' in request.form
     settings.notify_admin_action = 'notify_admin_action' in request.form
+    settings.notify_router_status = 'notify_router_status' in request.form
 
     db.session.add(settings)
     db.session.commit()
@@ -1421,8 +1467,6 @@ def test_telegram():
         return jsonify({'success': True})
     return jsonify({'success': False, 'error': msg})
 
-
-# ============ Payments ============
 
 @app.route('/payments')
 def payments():
