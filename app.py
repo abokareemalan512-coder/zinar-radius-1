@@ -52,7 +52,7 @@ else:
 app.config['SQLALCHEMY_DATABASE_URI'] = database_url
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 
-# [تصحيح جذرى]: إضافة خيارات الاتصال لمنع مشاكل انقطاع الاتصال (EOF detected) وإعادة الربط التلقائي
+# تفعيل إعادة الاتصال التلقائي ومنع مشاكل الـ EOF
 app.config['SQLALCHEMY_ENGINE_OPTIONS'] = {
     'pool_pre_ping': True,
     'pool_recycle': 300,
@@ -388,6 +388,12 @@ def background_router_monitor():
                             logger.warning(f"⚠️ خطأ قاعدة بيانات أثناء تحديث حالة الراوتر {r.name}: {db_err}")
         except Exception as e:
             logger.warning(f"⚠️ خطأ في مراقبة الراوترات بالخلفية: {e}")
+        finally:
+            # تنظيف الجلسة نهائياً لمنع تلف الـ Connection في الدورة القادمة
+            try:
+                db.session.remove()
+            except Exception:
+                pass
         time.sleep(60)  # فحص كل دقيقة
 
 
