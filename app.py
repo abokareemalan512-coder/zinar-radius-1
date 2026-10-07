@@ -36,7 +36,7 @@ except ImportError:
 
 app = Flask(__name__)
 app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', 'zinar-secret-key-2024')
-app.config['MAX_CONTENT_LENGTH'] = 20 * 1024 * 1024  # ✅ رفعنا الحجم إلى 20MB لدعم ملفات .rsc
+app.config['MAX_CONTENT_LENGTH'] = 20 * 1024 * 1024  # 20MB لدعم ملفات .rsc
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -237,49 +237,78 @@ def _day_bounds(day=None):
     return start, start + timedelta(days=1)
 
 
-# ============ MikroTik .rsc Parser ============
+# ============ MikroTik .rsc Parser (نسخة محسّنة) ============
 
 def parse_mikrotik_rsc(content):
     """
-    تحليل ملف MikroTik Export (.rsc) واستخراج:
-    - الباقات (PPP Profiles)
-    - المشتركين (PPP Secrets)
+    تحليل ملف MikroTik Export (.rsc) واستخراج الباقات والمشتركين.
+    يعيد: (packages, subscribers, debug_info)
     """
     packages = []
     subscribers = []
+    debug_info = {
+        'lines_read': 0,
+        'sections_found': [],
+        'profile_lines': 0,
+        'secret_lines': 0,
+        'preview': '',
+        'errors': []
+    }
 
-    # دمج الأسطر المتابعة (line continuation) باستخدام \
+    # إزالة BOM إذا وجد
+    if content.startswith('\ufeff'):
+        content = content[1:]
+
+    # توحيد نهايات الأسطر
+    content = content.replace('\r\n', '\n').replace('\r', '\n')
+
+    # دمج أسطر المتابعة (line continuation)
     content = re.sub(r'\\\s*\n', ' ', content)
+
+    lines = content.split('\n')
+    debug_info['lines_read'] = len(lines)
+    debug_info['preview'] = '\n'.join(lines[:15])
 
     current_section = None
 
-    for line in content.split('\n'):
-        line = line.strip()
-        if not line or line.startswith('#'):
+    for line_num, raw_line in enumerate(lines, 1):
+        line = raw_line.strip()
+        if not line:
+            continue
+
+        if line.startswith('#'):
             continue
 
         # كشف بداية القسم
         if line.startswith('/'):
-            lower = line.lower()
-            if 'ppp profile' in lower:
+            lower = line.lower().strip()
+
+            if 'ppp/profile' in lower or 'ppp profile' in lower:
                 current_section = 'profile'
-            elif 'ppp secret' in lower:
+                debug_info['sections_found'].append(f'L{line_num}: profile')
+            elif 'ppp/secret' in lower or 'ppp secret' in lower:
                 current_section = 'secret'
-            else:
+                debug_info['sections_found'].append(f'L{line_num}: secret')
+            elif any(k in lower for k in [
+                '/interface', '/ip ', '/system', '/user', '/tool',
+                '/queue', '/routing', '/ipv6', '/snmp', '/radius',
+                '/log', '/certificate', '/file'
+            ]):
                 current_section = None
             continue
 
-        # تحليل أوامر add
-        if line.startswith('add ') and current_section:
+        # معالجة أوامر add/set
+        if current_section and (line.startswith('add ') or line.startswith('set ')):
             params = {}
-            # Regex لاستخراج key="value" أو key=value
-            pattern = r'([\w-]+)=(?:"([^"]*)"|([^\s]+))'
+            pattern = r'([\w\-]+)\s*=\s*(?:"([^"]*)"|(\S+))'
+
             for match in re.finditer(pattern, line):
                 key = match.group(1).lower()
                 value = match.group(2) if match.group(2) is not None else match.group(3)
                 params[key] = value
 
             if current_section == 'profile':
+                debug_info['profile_lines'] += 1
                 name = params.get('name', '').strip()
                 if name and name not in ('default', 'default-encryption'):
                     rate_limit = params.get('rate-limit', '').strip()
@@ -293,6 +322,7 @@ def parse_mikrotik_rsc(content):
                     })
 
             elif current_section == 'secret':
+                debug_info['secret_lines'] += 1
                 username = params.get('name', '').strip()
                 if not username:
                     continue
@@ -300,19 +330,21 @@ def parse_mikrotik_rsc(content):
                 profile = params.get('profile', '').strip()
                 comment = params.get('comment', '').strip()
                 disabled = params.get('disabled', 'no').strip().lower()
+                service = params.get('service', 'pppoe').strip().lower()
 
-                status = 'paused' if disabled in ('yes', 'true') else 'active'
+                status = 'paused' if disabled in ('yes', 'true', '1') else 'active'
+                user_type = 'hotspot' if 'hotspot' in service else 'pppoe'
 
                 subscribers.append({
                     'username': username,
                     'password': password,
                     'package': profile,
                     'name': comment if comment else username,
-                    'user_type': 'pppoe',
+                    'user_type': user_type,
                     'status': status
                 })
 
-    return packages, subscribers
+    return packages, subscribers, debug_info
 
 
 # ============ Telegram Helper ============
@@ -1057,7 +1089,7 @@ def logout():
     return redirect(url_for('login'))
 
 
-# ✅✅✅ مسار استيراد النسخة الاحتياطية من الميكروتيك (جديد)
+# ✅✅✅ مسار استيراد النسخة الاحتياطية (نسخة محسّنة برسائل تشخيص)
 @app.route('/import-backup', methods=['GET', 'POST'])
 def import_backup():
     if request.method == 'POST':
@@ -1072,17 +1104,40 @@ def import_backup():
                 return redirect(url_for('import_backup'))
 
             if not file.filename.lower().endswith(('.rsc', '.txt')):
-                flash('❌ يجب أن يكون الملف بصيغة .rsc (من أمر /export)', 'danger')
+                flash('❌ يجب أن يكون الملف بصيغة .rsc (من أمر /export) أو .txt', 'danger')
                 return redirect(url_for('import_backup'))
 
             # قراءة الملف
-            content = file.read().decode('utf-8', errors='ignore')
+            raw_bytes = file.read()
+            try:
+                content = raw_bytes.decode('utf-8')
+            except UnicodeDecodeError:
+                try:
+                    content = raw_bytes.decode('windows-1256')
+                except UnicodeDecodeError:
+                    content = raw_bytes.decode('utf-8', errors='ignore')
+
+            # كشف ملف .backup الثنائي
+            if content[:5] == 'PK\x03\x04' or raw_bytes[:4] == b'\x00\x00\x00\x00':
+                flash('❌ هذا ملف Backup ثنائي وليس RSC! استخدم أمر /export file=name وليس /system backup', 'danger')
+                return redirect(url_for('import_backup'))
 
             # تحليل الملف
-            packages, subscribers = parse_mikrotik_rsc(content)
+            packages, subscribers, debug_info = parse_mikrotik_rsc(content)
 
+            # عرض معلومات التشخيص إذا لم يتم العثور على شيء
             if not packages and not subscribers:
-                flash('⚠️ لم يتم العثور على باقات أو مشتركين في الملف. تأكد أنك استخدمت /export file=name', 'warning')
+                preview = debug_info['preview'].replace('\n', '<br>').replace('<', '&lt;').replace('>', '&gt;')[:800]
+                sections = ', '.join(debug_info['sections_found']) or 'لا يوجد'
+                error_msg = (
+                    f'⚠️ لم يتم العثور على بيانات!<br>'
+                    f'📄 عدد الأسطر: {debug_info["lines_read"]}<br>'
+                    f'🔍 الأقسام المكتشفة: {sections}<br>'
+                    f'📊 أسطر Profiles: {debug_info["profile_lines"]} | أسطر Secrets: {debug_info["secret_lines"]}<br>'
+                    f'<br><strong>معاينة أول أسطر الملف:</strong><br>'
+                    f'<code style="display:block; max-height:200px; overflow:auto; background:#000; padding:10px; margin-top:5px; text-align:left; direction:ltr; color:#0f0; font-size:11px;">{preview}</code>'
+                )
+                flash(error_msg, 'warning')
                 return redirect(url_for('import_backup'))
 
             # استيراد الباقات
@@ -1141,6 +1196,7 @@ def import_backup():
         except Exception as e:
             db.session.rollback()
             logger.error(f"❌ Backup import error: {e}")
+            logger.error(traceback.format_exc())
             flash(f'❌ خطأ في الاستيراد: {str(e)}', 'danger')
             return redirect(url_for('import_backup'))
 
