@@ -52,6 +52,12 @@ else:
 app.config['SQLALCHEMY_DATABASE_URI'] = database_url
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 
+# [تصحيح جذرى]: إضافة خيارات الاتصال لمنع مشاكل انقطاع الاتصال (EOF detected) وإعادة الربط التلقائي
+app.config['SQLALCHEMY_ENGINE_OPTIONS'] = {
+    'pool_pre_ping': True,
+    'pool_recycle': 300,
+}
+
 _masked = database_url.split('@')[-1] if '@' in database_url else database_url
 logger.info(f"📊 DB: ...@{_masked}")
 
@@ -165,6 +171,7 @@ def log_event(action, target="", details="", admin_name=None):
         db.session.add(evt)
         db.session.commit()
     except Exception as e:
+        db.session.rollback()
         logger.warning(f"⚠️ فشل تسجيل الحدث: {e}")
 
 
@@ -215,6 +222,7 @@ def log_telegram(message, message_type='info', status='success'):
         db.session.add(log)
         db.session.commit()
     except Exception as e:
+        db.session.rollback()
         logger.warning(f"⚠️ فشل تسجيل log تليجرام: {e}")
 
 
@@ -291,6 +299,7 @@ def telegram_webhook():
                 
         return jsonify({'ok': True})
     except Exception as e:
+        db.session.rollback()
         print(f"Webhook Error: {e}")
         return jsonify({'ok': False}), 500
 
@@ -362,7 +371,7 @@ def check_router_connection(ip, port=22, timeout=3):
 
 
 def background_router_monitor():
-    time.sleep(15) # انتظار قليلاً حتى يتم بدء التطبيق وتجهيز قاعدة البيانات
+    time.sleep(15)  # انتظار قليلاً حتى يتم بدء التطبيق وتجهيز قاعدة البيانات
     while True:
         try:
             with app.app_context():
@@ -371,11 +380,12 @@ def background_router_monitor():
                     current_state = check_router_connection(r.ip_address, r.port or 22)
                     if r.is_active != current_state:
                         r.is_active = current_state
-                        db.session.commit()
                         try:
+                            db.session.commit()
                             notify_router_status_change(r.name, r.ip_address, current_state)
-                        except Exception as e:
-                            logger.warning(f"⚠️ فشل إرسال إشعار الراوتر: {e}")
+                        except Exception as db_err:
+                            db.session.rollback()
+                            logger.warning(f"⚠️ خطأ قاعدة بيانات أثناء تحديث حالة الراوتر {r.name}: {db_err}")
         except Exception as e:
             logger.warning(f"⚠️ خطأ في مراقبة الراوترات بالخلفية: {e}")
         time.sleep(60)  # فحص كل دقيقة
@@ -465,6 +475,7 @@ def init_database():
             
             logger.info("✅ تم تهيئة قاعدة البيانات")
         except Exception as e:
+            db.session.rollback()
             logger.error(f"❌ خطأ تهيئة قاعدة البيانات: {e}")
 
 
@@ -683,6 +694,7 @@ def dashboard():
             admin_name=session.get('admin_name', 'مدير'),
         )
     except Exception as e:
+        db.session.rollback()
         logger.error(f"❌ dashboard error: {e}")
         flash(f'❌ {str(e)}', 'danger')
         return render_template('error.html', error=str(e)), 500
@@ -894,6 +906,7 @@ def subscribers():
 
         subs = q.order_by(Subscriber.created_at.desc()).all()
     except Exception as e:
+        db.session.rollback()
         logger.error(f"❌ error subscribers: {e}")
         subs = []
 
@@ -1048,9 +1061,13 @@ def bulk_add():
                 ))
                 created += 1
             except Exception:
+                db.session.rollback()
                 failed += 1
 
-        db.session.commit()
+        try:
+            db.session.commit()
+        except Exception:
+            db.session.rollback()
 
         if radius_sync:
             for un in usernames:
