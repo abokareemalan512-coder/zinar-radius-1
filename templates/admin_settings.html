@@ -28,7 +28,7 @@
                         <input type="text" name="telegram_chat_id" class="form-control border-secondary" 
                                style="background:rgba(0,0,0,0.3);color:#fff; font-size: 0.85rem;" 
                                value="{{ telegram_settings.chat_id or '' }}" placeholder="أدخل Chat ID هنا">
-                        <small class="text-muted" style="font-size: 0.7rem;">احصل على Chat ID من @userinfobot</small>
+                        <small class="text-muted" style="font-size: 0.7rem;">احصل على Chat ID من @userinfobot (يبدأ بـ -100 للمجموعات)</small>
                     </div>
 
                     <div class="form-check form-switch mb-3">
@@ -124,14 +124,14 @@
                         <div class="list-group-item bg-transparent text-light border-secondary px-0 py-2">
                             <div class="d-flex justify-content-between align-items-center mb-1">
                                 <span class="badge {% if log.status == 'success' %}bg-success{% else %}bg-danger{% endif %} bg-opacity-75" style="font-size: 0.7rem;">
-                                    {{ log.status }}
+                                    {{ log.message_type }}
                                 </span>
                                 <small class="text-muted" style="font-size: 0.7rem;">
                                     {{ log.created_at | localtime('%Y-%m-%d %H:%M:%S') }}
                                 </small>
                             </div>
                             <div class="small text-truncate" style="max-width: 100%; font-size: 0.8rem;">
-                                <span class="text-accent">{{ log.message_type }}:</span> {{ log.message }}
+                                {{ log.message }}
                             </div>
                         </div>
                         {% endfor %}
@@ -159,7 +159,7 @@ function testTelegram() {
     .catch(error => alert('❌ حدث خطأ في الاتصال بالسيرفر'));
 }
 
-// ✅ دالة التحديث التلقائي (هذا هو الكود المفقود الذي كان يسبب المشكلة)
+// ✅ دالة التحديث التلقائي (AJAX)
 function fetchTelegramData() {
     console.log("🔄 جاري تحديث بيانات التلجرام...");
     
@@ -192,11 +192,11 @@ function fetchTelegramData() {
                         html += `
                             <div class="list-group-item bg-transparent text-light border-secondary px-0 py-2">
                                 <div class="d-flex justify-content-between align-items-center mb-1">
-                                    <span class="badge ${badgeClass} bg-opacity-75" style="font-size: 0.7rem;">${log.status}</span>
+                                    <span class="badge ${badgeClass} bg-opacity-75" style="font-size: 0.7rem;">${log.type}</span>
                                     <small class="text-muted" style="font-size: 0.7rem;">${log.time}</small>
                                 </div>
                                 <div class="small text-truncate" style="max-width: 100%; font-size: 0.8rem;">
-                                    <span class="text-accent">${log.type}:</span> ${log.message}
+                                    ${log.message}
                                 </div>
                             </div>
                         `;
@@ -210,7 +210,7 @@ function fetchTelegramData() {
         .catch(error => console.error('❌ خطأ في جلب البيانات:', error));
 }
 
-// تشغيل التحديث التلقائي كل 5 ثوانٍ (5000 مللي ثانية)
+// تشغيل التحديث التلقائي كل 5 ثوانٍ
 setInterval(fetchTelegramData, 5000);
 
 // تشغيل التحديث فوراً عند فتح الصفحة
