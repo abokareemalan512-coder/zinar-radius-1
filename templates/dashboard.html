@@ -2,16 +2,23 @@
 {% block title %}لوحة التحكم{% endblock %}
 
 {% block content %}
-<div class="d-flex justify-content-between align-items-center mb-3">
+<div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
     <h5 class="mb-0">🏠 لوحة التحكم الرئيسية</h5>
-    <button type="button" class="user-badge" data-bs-toggle="modal" data-bs-target="#changeCredModal">
-        <div class="user-avatar">{{ (admin_name or 'A')[0]|upper }}</div>
-        <div class="user-info">
-            <span class="user-greeting">مرحباً</span>
-            <span class="user-name">{{ admin_name }}</span>
+    <div class="d-flex align-items-center gap-3">
+        <!-- ✅ عرض التوقيت المحلي مع التاريخ -->
+        <div class="badge bg-dark border border-secondary text-light p-2" style="font-size: 0.8rem;">
+            <i class="bi bi-calendar-event text-accent"></i> {{ current_time }}
         </div>
-        <i class="bi bi-gear text-accent ms-2"></i>
-    </button>
+        
+        <button type="button" class="user-badge" data-bs-toggle="modal" data-bs-target="#changeCredModal">
+            <div class="user-avatar">{{ (admin_name or 'A')[0]|upper }}</div>
+            <div class="user-info">
+                <span class="user-greeting">مرحباً</span>
+                <span class="user-name">{{ admin_name }}</span>
+            </div>
+            <i class="bi bi-gear text-accent ms-2"></i>
+        </button>
+    </div>
 </div>
 
 <!-- الإحصائيات الرئيسية -->
@@ -83,33 +90,57 @@
         </div>
     </div>
 
-    <!-- أيقونة Telegram صغيرة -->
-<div class="col-md-3">
-    <div class="card shadow-sm border-0" style="background: rgba(18, 35, 58, 0.9); border: 1px solid rgba(255,255,255,0.08);">
-        <div class="card-body text-center py-3">
-            <div class="d-flex justify-content-center align-items-center mb-3">
-                <div class="rounded-circle d-flex align-items-center justify-content-center"
-                     style="width: 40px; height: 40px; background: linear-gradient(135deg, #2a7ae2, #32a8ff);">
-                    <i class="bi bi-telegram text-white" style="font-size: 1.2rem;"></i>
+    <!-- ✅ بطاقة إشعارات التلجرام المحدثة -->
+    <div class="col-md-3">
+        <div class="card shadow-sm border-0 h-100" style="background: rgba(18, 35, 58, 0.9); border: 1px solid rgba(255,255,255,0.08);">
+            <div class="card-body p-2 d-flex flex-column">
+                <div class="d-flex justify-content-between align-items-center mb-2 px-2 pt-2">
+                    <div class="d-flex align-items-center gap-2">
+                        <div class="rounded-circle d-flex align-items-center justify-content-center" style="width: 30px; height: 30px; background: linear-gradient(135deg, #2a7ae2, #32a8ff);">
+                            <i class="bi bi-telegram text-white" style="font-size: 1rem;"></i>
+                        </div>
+                        <h6 class="text-white mb-0" style="font-size: 0.85rem;">تيلجرام</h6>
+                    </div>
+                    {% if telegram_status and telegram_status.enabled %}
+                        <span class="badge bg-success px-2 py-1" style="font-size: 0.65rem;">مفعل</span>
+                    {% else %}
+                        <span class="badge bg-danger px-2 py-1" style="font-size: 0.65rem;">معطل</span>
+                    {% endif %}
                 </div>
-            </div>
-
-            <h6 class="text-white mb-2" style="font-size: 0.9rem;">تيلجرام</h6>
-
-            {% if telegram_settings and telegram_settings.enabled %}
-                <span class="badge bg-success px-2 py-1" style="font-size: 0.75rem;">✅ مفعل</span>
-            {% else %}
-                <span class="badge bg-danger px-2 py-1" style="font-size: 0.75rem;">❌ معطل</span>
-            {% endif %}
-
-            <div class="mt-2">
-                <a href="{{ url_for('admin_settings') }}" class="btn btn-sm btn-primary w-100" style="font-size: 0.75rem; padding: 0.4rem;">
-                    <i class="bi bi-gear" style="font-size: 0.8rem;"></i> إعدادات
-                </a>
+                
+                <!-- قائمة آخر الإشعارات -->
+                <div class="list-group list-group-flush flex-grow-1" style="overflow-y: auto; max-height: 150px; background: transparent;">
+                    {% if recent_telegram_logs %}
+                        {% for log in recent_telegram_logs %}
+                        <div class="list-group-item bg-transparent text-light border-secondary px-2 py-1 d-flex justify-content-between align-items-center" style="font-size: 0.7rem;">
+                            <div>
+                                <span class="text-muted d-block" style="font-size: 0.6rem;">
+                                    {{ log.created_at_local.strftime('%m-%d %H:%M') if log.created_at_local else '' }}
+                                </span>
+                                <span class="text-truncate d-inline-block" style="max-width: 100px;">
+                                    {{ log.message_type }}
+                                </span>
+                            </div>
+                            {% if log.status == 'success' %}
+                                <i class="bi bi-check-circle-fill text-success"></i>
+                            {% else %}
+                                <i class="bi bi-x-circle-fill text-danger"></i>
+                            {% endif %}
+                        </div>
+                        {% endfor %}
+                    {% else %}
+                        <div class="text-center text-muted small py-3">لا توجد إشعارات حديثة</div>
+                    {% endif %}
+                </div>
+                
+                <div class="mt-2 px-2 pb-2">
+                    <a href="{{ url_for('admin_settings') }}" class="btn btn-sm btn-primary w-100" style="font-size: 0.75rem; padding: 0.3rem;">
+                        <i class="bi bi-gear" style="font-size: 0.8rem;"></i> الإعدادات
+                    </a>
+                </div>
             </div>
         </div>
     </div>
-</div>
  
     <div class="col-md-6">
         <div class="card action-card border-0 p-3">
@@ -180,7 +211,7 @@
     </div>
 </div>
 
-<!-- سجل الأحداث الحديثة -->
+<!-- ✅ سجل الأحداث الحديثة (تم إصلاحه ليعرض events بدلاً من subscribers) -->
 <div class="card border-0">
     <div class="card-header bg-dark bg-opacity-50 py-2">
         <h6 class="mb-0 fw-bold">
@@ -200,22 +231,16 @@
                     </tr>
                 </thead>
                 <tbody>
-                    {% if subscribers %}
-                        {% for s in subscribers[:15] %}
+                    {% if events %}
+                        {% for e in events[:15] %}
                         <tr style="font-size:11px">
-                            <td><i class="bi bi-clock"></i> {{ s.created_at.strftime('%H:%M') if s.created_at else '-' }}</td>
-                            <td><span class="text-accent">{{ admin_name }}</span></td>
+                            <td><i class="bi bi-clock"></i> {{ e.created_at.strftime('%H:%M') if e.created_at else '-' }}</td>
+                            <td><span class="text-accent">{{ e.admin_name or 'النظام' }}</span></td>
                             <td>
-                                {% if s.status == 'active' %}
-                                    <span class="badge bg-success bg-opacity-75">➕ إضافة</span>
-                                {% elif s.status == 'paused' %}
-                                    <span class="badge bg-warning bg-opacity-75">⏸️ إيقاف</span>
-                                {% elif s.status == 'expired' %}
-                                    <span class="badge bg-danger bg-opacity-75">⏰ انتهى</span>
-                                {% endif %}
+                                <span class="badge bg-info bg-opacity-75">{{ e.action }}</span>
                             </td>
-                            <td>{{ s.username }}</td>
-                            <td class="text-muted">{{ s.package or '-' }}</td>
+                            <td>{{ e.target or '-' }}</td>
+                            <td class="text-muted">{{ e.details or '-' }}</td>
                         </tr>
                         {% endfor %}
                     {% else %}
@@ -446,6 +471,18 @@
 .event-log td {
     vertical-align: middle;
     padding: 14px !important;
+}
+
+/* Custom Scrollbar for Telegram list */
+.list-group::-webkit-scrollbar {
+    width: 4px;
+}
+.list-group::-webkit-scrollbar-track {
+    background: transparent;
+}
+.list-group::-webkit-scrollbar-thumb {
+    background: rgba(255,255,255,0.2);
+    border-radius: 4px;
 }
 </style>
 {% endblock %}
