@@ -77,6 +77,15 @@ db = SQLAlchemy(app)
 def shutdown_session(exception=None):
     db.session.remove()
 
+# ✅ فلتر جينجا لتحويل التوقيت من UTC إلى المحلي تلقائياً
+@app.template_filter('localtime')
+def localtime_filter(dt, format='%Y-%m-%d %H:%M:%S'):
+    if dt is None:
+        return "-"
+    if dt.tzinfo is None:
+        dt = dt.replace(tzinfo=ZoneInfo("UTC"))
+    return dt.astimezone(LOCAL_TZ).strftime(format)
+
 try:
     from api_sync import sync_bp
     app.register_blueprint(sync_bp)
@@ -176,7 +185,6 @@ class TelegramLog(db.Model):
 
     @property
     def created_at_local(self):
-        """تحويل وقت الإنشاء إلى التوقيت المحلي للعرض"""
         if self.created_at:
             utc_time = self.created_at.replace(tzinfo=ZoneInfo("UTC"))
             return utc_time.astimezone(LOCAL_TZ)
@@ -388,14 +396,12 @@ def notify_router_status_change(router_name, ip_address, is_up):
 # ============ Background Router Monitor ============
 
 def is_private_ip(ip):
-    """التحقق مما إذا كان العنوان خاصاً (VPN)"""
     try:
         return ipaddress.ip_address(ip).is_private
     except ValueError:
         return False
 
 def check_router_connection(ip, port=22, timeout=3):
-    # ✅ إذا كان العنوان خاص (VPN)، نعتبره غير قابل للفحص من الخارج
     if is_private_ip(ip):
         return 'private'
 
@@ -422,7 +428,6 @@ def background_router_monitor():
                     try:
                         current_state = check_router_connection(r.ip_address, r.port or 22)
                         
-                        # ✅ إذا كان العنوان خاص، نضع الحالة True لتجنب اللون الأحمر
                         if current_state == 'private':
                             if not r.is_active:
                                 r.is_active = True
@@ -733,9 +738,8 @@ def dashboard():
             Subscriber.created_at < end
         ).count()
 
-        events_list = SystemEvent.query.order_by(SystemEvent.created_at.desc()).limit(20).all()
+        events_list = SystemEvent.query.order_by(SystemEvent.created_at.desc()).limit(15).all()
 
-        # ✅ إضافة بيانات التوقيت وإشعارات التلجرام للصفحة الرئيسية
         current_time = get_local_time_str()
         telegram_status = TelegramSetting.query.first()
         recent_telegram_logs = TelegramLog.query.order_by(TelegramLog.created_at.desc()).limit(5).all()
@@ -752,9 +756,9 @@ def dashboard():
             has_master=master is not None,
             events=events_list,
             admin_name=session.get('admin_name', 'مدير'),
-            current_time=current_time,                   # ✅ تمرير التوقيت للقالب
-            telegram_status=telegram_status,             # ✅ تمرير حالة التلجرام
-            recent_telegram_logs=recent_telegram_logs    # ✅ تمرير آخر الإشعارات
+            current_time=current_time,
+            telegram_status=telegram_status,
+            recent_telegram_logs=recent_telegram_logs
         )
     except Exception as e:
         db.session.rollback()
