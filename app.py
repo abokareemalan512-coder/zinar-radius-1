@@ -11,7 +11,7 @@ import time
 import threading
 import ipaddress
 from datetime import datetime, timedelta
-from zoneinfo import ZoneInfo  # ✅ مكتبة التوقيت المحلي
+from zoneinfo import ZoneInfo
 
 from flask import (
     Flask, render_template, request, redirect, url_for,
@@ -40,10 +40,9 @@ app.config['MAX_CONTENT_LENGTH'] = 5 * 1024 * 1024
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-# ✅ تحديد التوقيت المحلي (توقيت سوريا كافتراضي)
 LOCAL_TZ = ZoneInfo("Asia/Damascus")
 
-# ✅ مفتاح API لاستيراد المشتركين (غيّره لأي قيمة سرية تريدها)
+# ✅ مفتاح API لاستيراد البيانات (غيّره لأي قيمة سرية)
 IMPORT_API_KEY = os.environ.get('IMPORT_API_KEY', 'zinar-import-key-2026')
 
 # ============ Database Config ============
@@ -60,7 +59,6 @@ else:
 app.config['SQLALCHEMY_DATABASE_URI'] = database_url
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 
-# إعدادات محسنة لمنع انقطاع الاتصال (SSL SYSCALL error)
 app.config['SQLALCHEMY_ENGINE_OPTIONS'] = {
     'pool_pre_ping': True,
     'pool_recycle': 180,
@@ -75,12 +73,10 @@ logger.info(f"📊 DB: ...@{_masked}")
 
 db = SQLAlchemy(app)
 
-# ✅ إغلاق الجلسة تلقائياً بعد كل طلب لمنع تسرب الاتصالات
 @app.teardown_appcontext
 def shutdown_session(exception=None):
     db.session.remove()
 
-# ✅ فلتر جينجا لتحويل التوقيت من UTC إلى المحلي تلقائياً
 @app.template_filter('localtime')
 def localtime_filter(dt, format='%Y-%m-%d %H:%M:%S'):
     if dt is None:
@@ -657,7 +653,6 @@ def api_log():
     return jsonify({'ok': True})
 
 
-# ✅ مسار استقبال تنبيهات الراوترات من الميكروتيك
 @app.route('/api/router_notify', methods=['POST', 'GET'])
 def api_router_notify():
     try:
@@ -703,11 +698,10 @@ def api_router_notify():
         return jsonify({'ok': False, 'error': str(e)}), 500
 
 
-# ✅✅✅ مسار استيراد المشتركين من الميكروتيك (جديد)
+# ✅ مسار استيراد المشتركين من الميكروتيك
 @app.route('/api/import_subscribers', methods=['POST'])
 def api_import_subscribers():
     try:
-        # ✅ التحقق من مفتاح API للأمان
         api_key = request.headers.get('X-API-Key') or request.args.get('api_key')
         if api_key != IMPORT_API_KEY:
             logger.warning(f"⚠️ محاولة استيراد فاشلة (مفتاح خاطئ) من {request.remote_addr}")
@@ -729,22 +723,17 @@ def api_import_subscribers():
             status = str(item.get('status', 'active')).strip()
             name = str(item.get('name', username)).strip()
 
-            # تخطي إذا كان اسم المستخدم أو كلمة المرور فارغة
             if not username or not password:
                 skipped += 1
                 continue
 
-            # التحقق من صحة user_type
             if user_type not in ('pppoe', 'hotspot'):
                 user_type = 'pppoe'
-
-            # التحقق من صحة status
             if status not in ('active', 'paused', 'expired'):
                 status = 'active'
 
             sub = Subscriber.query.filter_by(username=username).first()
             if sub:
-                # تحديث بيانات المشترك الموجود
                 sub.password = password
                 sub.package = package
                 sub.user_type = user_type
@@ -752,7 +741,6 @@ def api_import_subscribers():
                 sub.name = name
                 updated += 1
             else:
-                # إضافة مشترك جديد
                 db.session.add(Subscriber(
                     name=name,
                     username=username,
@@ -760,32 +748,114 @@ def api_import_subscribers():
                     package=package,
                     user_type=user_type,
                     status=status,
-                    expires_at=None  # سيتم حسابه عند أول دخول
+                    expires_at=None
                 ))
                 imported += 1
 
         db.session.commit()
-        
         log_event(
             'استيراد مشتركين من الميكروتيك',
             f'{imported + updated} مشترك',
             f'جديد: {imported} | محدّث: {updated} | متجاهل: {skipped}',
             admin_name='النظام (API)'
         )
-        
         logger.info(f"✅ Import: {imported} new, {updated} updated, {skipped} skipped.")
-        
         return jsonify({
-            'ok': True,
-            'imported': imported,
-            'updated': updated,
-            'skipped': skipped,
-            'total': len(data),
+            'ok': True, 'imported': imported, 'updated': updated,
+            'skipped': skipped, 'total': len(data),
             'message': f'تم بنجاح: {imported} مشترك جديد، {updated} محدّث، {skipped} متجاهل.'
         })
     except Exception as e:
         db.session.rollback()
         logger.error(f"❌ Import Error: {e}")
+        return jsonify({'ok': False, 'error': str(e)}), 500
+
+
+# ✅✅✅ مسار استيراد الباقات (Profiles) من الميكروتيك (جديد)
+@app.route('/api/import_packages', methods=['POST'])
+def api_import_packages():
+    try:
+        # التحقق من مفتاح API
+        api_key = request.headers.get('X-API-Key') or request.args.get('api_key')
+        if api_key != IMPORT_API_KEY:
+            logger.warning(f"⚠️ محاولة استيراد باقات فاشلة (مفتاح خاطئ) من {request.remote_addr}")
+            return jsonify({'ok': False, 'error': 'Unauthorized: Invalid API Key'}), 401
+
+        data = request.get_json()
+        if not data or not isinstance(data, list):
+            return jsonify({'ok': False, 'error': 'Invalid data format. Expected a JSON array.'}), 400
+
+        imported = 0
+        updated = 0
+        skipped = 0
+
+        for item in data:
+            name = str(item.get('name', '')).strip()
+            speed = str(item.get('speed', '')).strip()
+            price = item.get('price', 0)
+            duration = item.get('duration', 30)
+            duration_unit = str(item.get('duration_unit', 'days')).strip()
+            user_type = str(item.get('user_type', 'pppoe')).strip()
+
+            if not name:
+                skipped += 1
+                continue
+
+            # التحقق من صحة القيم
+            try:
+                price = float(price) if price else 0
+            except (ValueError, TypeError):
+                price = 0
+
+            try:
+                duration = int(duration) if duration else 30
+            except (ValueError, TypeError):
+                duration = 30
+
+            if duration_unit not in ('days', 'months'):
+                duration_unit = 'days'
+
+            if user_type not in ('pppoe', 'hotspot'):
+                user_type = 'pppoe'
+
+            # التحقق من وجود الباقة
+            pkg = Package.query.filter_by(name=name).first()
+            if pkg:
+                # تحديث الباقة الموجودة
+                pkg.speed = speed or pkg.speed
+                pkg.price = price
+                pkg.duration = duration
+                pkg.duration_unit = duration_unit
+                pkg.user_type = user_type
+                updated += 1
+            else:
+                # إضافة باقة جديدة
+                db.session.add(Package(
+                    name=name,
+                    speed=speed,
+                    price=price,
+                    duration=duration,
+                    duration_unit=duration_unit,
+                    user_type=user_type
+                ))
+                imported += 1
+
+        db.session.commit()
+        log_event(
+            'استيراد باقات من الميكروتيك',
+            f'{imported + updated} باقة',
+            f'جديدة: {imported} | محدّثة: {updated} | متجاهلة: {skipped}',
+            admin_name='النظام (API)'
+        )
+        logger.info(f"✅ Packages Import: {imported} new, {updated} updated, {skipped} skipped.")
+        return jsonify({
+            'ok': True, 'imported': imported, 'updated': updated,
+            'skipped': skipped, 'total': len(data),
+            'message': f'تم بنجاح: {imported} باقة جديدة، {updated} محدّثة، {skipped} متجاهلة.'
+        })
+    except Exception as e:
+        db.session.rollback()
+        logger.error(f"❌ Packages Import Error: {e}")
         return jsonify({'ok': False, 'error': str(e)}), 500
 
 
@@ -879,7 +949,8 @@ def check_admin_login():
     public = (
         'login', 'logout', 'mobile', 'mobile_view',
         'sync.get_subscribers', 'sync.mark_first_use',
-        'api_auth', 'api_log', 'api_router_notify', 'api_import_subscribers'
+        'api_auth', 'api_log', 'api_router_notify',
+        'api_import_subscribers', 'api_import_packages'
     )
     if request.endpoint in public:
         return
@@ -1594,12 +1665,8 @@ def export_subscribers(format):
         w.writerow(['#', 'الاسم', 'المستخدم', 'كلمة المرور', 'الباقة', 'النوع', 'الحالة', 'تاريخ الانتهاء'])
         for i, s in enumerate(subs, 1):
             w.writerow([
-                i,
-                s.name or '',
-                s.username,
-                s.password,
-                s.package or '',
-                s.user_type or 'pppoe',
+                i, s.name or '', s.username, s.password,
+                s.package or '', s.user_type or 'pppoe',
                 s.status or 'active',
                 s.expires_at.strftime('%Y-%m-%d %H:%M') if s.expires_at else 'غير محدد'
             ])
@@ -1609,9 +1676,7 @@ def export_subscribers(format):
         mem.seek(0)
 
         return send_file(
-            mem,
-            mimetype='text/csv',
-            as_attachment=True,
+            mem, mimetype='text/csv', as_attachment=True,
             download_name=f'subscribers_{ts}.csv'
         )
 
