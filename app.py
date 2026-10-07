@@ -9,8 +9,9 @@ import calendar
 import socket
 import time
 import threading
+import ipaddress
 from datetime import datetime, timedelta
-from zoneinfo import ZoneInfo  # ✅ إضافة مكتبة التوقيت
+from zoneinfo import ZoneInfo  # ✅ مكتبة التوقيت المحلي
 
 from flask import (
     Flask, render_template, request, redirect, url_for,
@@ -40,7 +41,6 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 # ✅ تحديد التوقيت المحلي (توقيت سوريا كافتراضي)
-# يمكنك تغيير "Asia/Damascus" إلى "Asia/Riyadh" أو "Africa/Cairo" حسب بلدك
 LOCAL_TZ = ZoneInfo("Asia/Damascus")
 
 # ============ Database Config ============
@@ -178,7 +178,6 @@ class TelegramLog(db.Model):
     def created_at_local(self):
         """تحويل وقت الإنشاء إلى التوقيت المحلي للعرض"""
         if self.created_at:
-            # نفترض أن الوقت المخزن هو UTC، نحوله إلى التوقيت المحلي
             utc_time = self.created_at.replace(tzinfo=ZoneInfo("UTC"))
             return utc_time.astimezone(LOCAL_TZ)
         return None
@@ -187,11 +186,9 @@ class TelegramLog(db.Model):
 # ============ Helpers ============
 
 def get_local_time():
-    """الحصول على الوقت الحالي بالتوقيت المحلي"""
     return datetime.now(LOCAL_TZ)
 
 def get_local_time_str():
-    """الحصول على الوقت الحالي بالتوقيت المحلي كـ String"""
     return get_local_time().strftime('%Y-%m-%d %H:%M:%S')
 
 def log_event(action, target="", details="", admin_name=None):
@@ -341,7 +338,6 @@ def notify_new_subscriber(username):
         return False
     if not settings.token or not settings.chat_id:
         return False
-    # ✅ استخدام التوقيت المحلي بدلاً من UTC
     msg = f"*🆕 مشترك جديد*\n👤 المستخدم: `{username}`\n🕒 الوقت: {get_local_time_str()}"
     return send_telegram_message(msg, message_type='new_subscriber')[0]
 
@@ -391,7 +387,18 @@ def notify_router_status_change(router_name, ip_address, is_up):
 
 # ============ Background Router Monitor ============
 
+def is_private_ip(ip):
+    """التحقق مما إذا كان العنوان خاصاً (VPN)"""
+    try:
+        return ipaddress.ip_address(ip).is_private
+    except ValueError:
+        return False
+
 def check_router_connection(ip, port=22, timeout=3):
+    # ✅ إذا كان العنوان خاص (VPN)، نعتبره غير قابل للفحص من الخارج
+    if is_private_ip(ip):
+        return 'private'
+
     s = None
     try:
         s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -414,6 +421,14 @@ def background_router_monitor():
                 for r in routers:
                     try:
                         current_state = check_router_connection(r.ip_address, r.port or 22)
+                        
+                        # ✅ إذا كان العنوان خاص، نضع الحالة True لتجنب اللون الأحمر
+                        if current_state == 'private':
+                            if not r.is_active:
+                                r.is_active = True
+                                db.session.commit()
+                            continue
+
                         if r.is_active != current_state:
                             r.is_active = current_state
                             db.session.commit()
@@ -720,6 +735,11 @@ def dashboard():
 
         events_list = SystemEvent.query.order_by(SystemEvent.created_at.desc()).limit(20).all()
 
+        # ✅ إضافة بيانات التوقيت وإشعارات التلجرام للصفحة الرئيسية
+        current_time = get_local_time_str()
+        telegram_status = TelegramSetting.query.first()
+        recent_telegram_logs = TelegramLog.query.order_by(TelegramLog.created_at.desc()).limit(5).all()
+
         return render_template(
             'dashboard.html',
             routers_count=routers_count,
@@ -732,6 +752,9 @@ def dashboard():
             has_master=master is not None,
             events=events_list,
             admin_name=session.get('admin_name', 'مدير'),
+            current_time=current_time,                   # ✅ تمرير التوقيت للقالب
+            telegram_status=telegram_status,             # ✅ تمرير حالة التلجرام
+            recent_telegram_logs=recent_telegram_logs    # ✅ تمرير آخر الإشعارات
         )
     except Exception as e:
         db.session.rollback()
@@ -1472,7 +1495,6 @@ def admin_settings():
             notify_admin_action=False,
             notify_router_status=True
         )
-    # ✅ جلب السجلات مع تحويل التوقيت المحلي للعرض
     logs = TelegramLog.query.order_by(TelegramLog.created_at.desc()).limit(10).all()
     total_notifications = TelegramLog.query.count()
     new_subscribers = TelegramLog.query.filter_by(message_type='new_subscriber').count()
