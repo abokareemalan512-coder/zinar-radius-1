@@ -117,6 +117,7 @@
                 <hr class="border-secondary">
                 
                 <h6 class="text-white mb-3 fw-bold"><i class="bi bi-clock-history"></i> آخر الرسائل:</h6>
+                <!-- ✅ هذا العنصر هو المسؤول عن تحديث القائمة تلقائياً -->
                 <div class="list-group list-group-flush" id="telegram-logs-container" style="max-height: 250px; overflow-y: auto;">
                     {% if telegram_logs %}
                         {% for log in telegram_logs %}
@@ -158,9 +159,9 @@ function testTelegram() {
     .catch(error => alert('❌ حدث خطأ في الاتصال بالسيرفر'));
 }
 
-// ✅ دالة التحديث التلقائي (AJAX)
+// ✅ دالة التحديث التلقائي (هذا هو الكود المفقود الذي كان يسبب المشكلة)
 function fetchTelegramData() {
-    console.log("🔄 جاري تحديث بيانات التلجرام..."); // رسالة للمطور في الـ Console
+    console.log("🔄 جاري تحديث بيانات التلجرام...");
     
     fetch('/api/telegram_data')
         .then(response => {
@@ -168,12 +169,9 @@ function fetchTelegramData() {
             return response.json();
         })
         .then(data => {
-            if (data.error) {
-                console.error("خطأ من السيرفر:", data.error);
-                return;
-            }
+            if (data.error) return;
 
-            // 1. تحديث الأرقام
+            // تحديث الأرقام
             const totalEl = document.getElementById('stat-total-notifications');
             const newEl = document.getElementById('stat-new-subscribers');
             const expEl = document.getElementById('stat-expired-subscribers');
@@ -184,7 +182,7 @@ function fetchTelegramData() {
             if (expEl) expEl.textContent = data.expired_subscribers;
             if (bulkEl) bulkEl.textContent = data.bulk_adds;
 
-            // 2. تحديث قائمة السجلات
+            // تحديث قائمة السجلات
             const container = document.getElementById('telegram-logs-container');
             if (container && data.logs) {
                 let html = '';
@@ -208,8 +206,6 @@ function fetchTelegramData() {
                 }
                 container.innerHTML = html;
             }
-            
-            console.log("✅ تم تحديث البيانات بنجاح");
         })
         .catch(error => console.error('❌ خطأ في جلب البيانات:', error));
 }
