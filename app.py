@@ -131,99 +131,25 @@ class SystemEvent(db.Model):
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
 
 
-import requests
-from flask import request, jsonify
-
-# 1. دالة إرسال الرسائل (صندوق المرسل - Outbox)
-def send_telegram_message(text, message_type='test', force=False):
-    try:
-        settings = TelegramSetting.query.first()
-        if not settings or (not settings.enabled and not force):
-            return False, "التليجرام معطل"
-        
-        token = settings.token
-        chat_id = settings.chat_id
-        
-        if not token or not chat_id:
-            return False, "التوكن أو معرف المحادثة غير موجود"
-            
-        url = f"https://api.telegram.org/bot{token}/sendMessage"
-        payload = {
-            'chat_id': chat_id,
-            'text': text,
-            'parse_mode': 'Markdown'
-        }
-        
-        response = requests.post(url, json=payload, timeout=10)
-        res_data = response.json()
-        
-        if res_data.get('ok'):
-            # تسجيل الرسالة المرسلة بنجاح
-            log = TelegramLog(
-                message_type=message_type,
-                status='success',
-                message=text
-            )
-            db.session.add(log)
-            db.session.commit()
-            return True, "تم الإرسال بنجاح"
-        else:
-            error_desc = res_data.get('description', 'خطأ غير معروف')
-            log = TelegramLog(
-                message_type=message_type,
-                status='failed',
-                message=f"فشل الإرسال: {error_desc}"
-            )
-            db.session.add(log)
-            db.session.commit()
-            return False, error_desc
-    except Exception as e:
-        log = TelegramLog(
-            message_type=message_type,
-            status='failed',
-            message=f"خطأ الاتصال: {str(e)}"
-        )
-        db.session.add(log)
-        db.session.commit()
-        return False, str(e)
+class TelegramSetting(db.Model):
+    __tablename__ = 'telegram_settings'
+    id = db.Column(db.Integer, primary_key=True)
+    token = db.Column(db.String(255))
+    chat_id = db.Column(db.String(100))
+    enabled = db.Column(db.Boolean, default=False)
+    notify_new_subscriber = db.Column(db.Boolean, default=True)
+    notify_subscriber_expired = db.Column(db.Boolean, default=True)
+    notify_bulk_add = db.Column(db.Boolean, default=True)
+    notify_admin_action = db.Column(db.Boolean, default=False)
 
 
-# 2. مسار استقبال الرسائل (الصندوق الوارد - Inbox Webhook)
-@app.route('/api/telegram/webhook', methods=['POST'])
-def telegram_webhook():
-    try:
-        data = request.get_json(silent=True)
-        if not data:
-            return jsonify({'ok': True})
-        
-        msg = data.get('message')
-        if msg:
-            chat_id = msg.get('chat', {}).get('id')
-            text = msg.get('text', '')
-            user_info = msg.get('from', {})
-            user_name = user_info.get('username') or user_info.get('first_name', 'مستخدم')
-            
-            # تخزين الرسالة الواردة في السجلات بنوع 'incoming'
-            log = TelegramLog(
-                message_type='incoming',
-                status='success',
-                message=f"📥 من: {user_name} (ID: {chat_id})\n💬 النص: {text}"
-            )
-            db.session.add(log)
-            db.session.commit()
-            
-            # رد تلقائي اختياري عند إرسال /start
-            if text.strip() == '/start':
-                send_telegram_message(
-                    f"أهلاً بك يا {user_name} 👋\nتم استلام رسالتك وربط حسابك بنجاح مع النظام.",
-                    message_type='reply',
-                    force=True
-                )
-                
-        return jsonify({'ok': True})
-    except Exception as e:
-        print(f"Webhook Error: {e}")
-        return jsonify({'ok': False}), 500
+class TelegramLog(db.Model):
+    __tablename__ = 'telegram_logs'
+    id = db.Column(db.Integer, primary_key=True)
+    message_type = db.Column(db.String(50))
+    status = db.Column(db.String(20))
+    message = db.Column(db.Text)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
 
 
 # ============ Helpers ============
@@ -329,6 +255,44 @@ def send_telegram_message(message, message_type='info', force=False):
         log_telegram(str(e), message_type=message_type, status='failed')
         logger.warning(f"⚠️ فشل إرسال رسالة تلجرام: {e}")
         return False, str(e)
+
+
+# مسار استقبال الرسائل (الصندوق الوارد - Inbox Webhook)
+@app.route('/api/telegram/webhook', methods=['POST'])
+def telegram_webhook():
+    try:
+        data = request.get_json(silent=True)
+        if not data:
+            return jsonify({'ok': True})
+        
+        msg = data.get('message')
+        if msg:
+            chat_id = msg.get('chat', {}).get('id')
+            text = msg.get('text', '')
+            user_info = msg.get('from', {})
+            user_name = user_info.get('username') or user_info.get('first_name', 'مستخدم')
+            
+            # تخزين الرسالة الواردة في السجلات بنوع 'incoming'
+            log = TelegramLog(
+                message_type='incoming',
+                status='success',
+                message=f"📥 من: {user_name} (ID: {chat_id})\n💬 النص: {text}"
+            )
+            db.session.add(log)
+            db.session.commit()
+            
+            # رد تلقائي اختياري عند إرسال /start
+            if text.strip() == '/start':
+                send_telegram_message(
+                    f"أهلاً بك يا {user_name} 👋\nتم استلام رسالتك وربط حسابك بنجاح مع النظام.",
+                    message_type='reply',
+                    force=True
+                )
+                
+        return jsonify({'ok': True})
+    except Exception as e:
+        print(f"Webhook Error: {e}")
+        return jsonify({'ok': False}), 500
 
 
 def notify_new_subscriber(username):
@@ -442,7 +406,6 @@ def init_database():
                 ))
                 db.session.commit()
             
-            # تأكد من وجود إعدادات التلجرام الافتراضية
             if not TelegramSetting.query.first():
                 db.session.add(TelegramSetting(
                     enabled=False,
