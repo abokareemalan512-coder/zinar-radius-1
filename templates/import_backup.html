@@ -1,0 +1,98 @@
+{% extends "base.html" %}
+{% block title %}استيراد من الميكروتيك{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-3">
+    <h5 class="mb-0 fw-bold text-white">📥 استيراد من نسخة الميكروتيك الاحتياطية</h5>
+</div>
+
+<div class="row g-3 justify-content-center">
+    <div class="col-md-9">
+
+        <!-- صندوق التعليمات -->
+        <div class="alert" style="background: rgba(13, 202, 240, 0.15); border: 1px solid rgba(13, 202, 240, 0.4); color: #b8e6f0;">
+            <h6 class="fw-bold mb-2"><i class="bi bi-info-circle-fill"></i> كيف تحصل على ملف النسخة الاحتياطية؟</h6>
+            <ol class="mb-0" style="font-size: 0.9rem; line-height: 1.8;">
+                <li>افتح <strong>WinBox</strong> واتصل بالميكروتيك</li>
+                <li>اذهب إلى <strong>New Terminal</strong></li>
+                <li>اكتب الأمر التالي:
+                    <code style="background: rgba(0,0,0,0.4); padding: 3px 8px; border-radius: 5px; color: #00e676; font-size: 0.95rem;">/export file=zinar_backup</code>
+                </li>
+                <li>سيتم حفظ الملف في <strong>Files</strong> باسم <code>zinar_backup.rsc</code></li>
+                <li>حمّل الملف إلى جهازك ثم ارفعه هنا ⬇️</li>
+            </ol>
+        </div>
+
+        <!-- بطاقة الرفع -->
+        <div class="card border-0 shadow-sm" style="background: rgba(18, 35, 58, 0.95); border: 1px solid rgba(0, 230, 118, 0.2) !important;">
+            <div class="card-header bg-primary text-white py-3" style="background: linear-gradient(90deg, #0d6efd, #0b5ed7) !important;">
+                <h6 class="mb-0 fw-bold"><i class="bi bi-cloud-upload-fill"></i> رفع الملف</h6>
+            </div>
+            <div class="card-body p-4">
+
+                <div class="row text-center mb-4">
+                    <div class="col-6">
+                        <h3 class="text-info fw-bold mb-0">{{ total_packages }}</h3>
+                        <small class="text-muted">باقات حالية في الموقع</small>
+                    </div>
+                    <div class="col-6">
+                        <h3 class="text-success fw-bold mb-0">{{ total_subscribers }}</h3>
+                        <small class="text-muted">مشتركين حاليين في الموقع</small>
+                    </div>
+                </div>
+
+                <hr class="border-secondary">
+
+                <form method="POST" enctype="multipart/form-data" id="uploadForm">
+                    <div class="mb-3">
+                        <label class="form-label fw-bold text-light">📁 اختر ملف النسخة الاحتياطية (.rsc)</label>
+                        <input type="file" name="backup_file" id="fileInput"
+                               class="form-control" accept=".rsc,.txt" required
+                               style="background: rgba(0,0,0,0.3); color: #fff; border: 2px dashed rgba(0, 230, 118, 0.4); padding: 15px;">
+                        <small class="text-muted">الملف يجب أن يكون بصيغة .rsc (من أمر /export) أو .txt</small>
+                    </div>
+
+                    <div id="filePreview" class="alert d-none" style="background: rgba(0,0,0,0.3); border: 1px solid rgba(0, 230, 118, 0.3); color: #00e676;">
+                        <i class="bi bi-file-earmark-check-fill"></i>
+                        <span id="fileName" class="fw-bold"></span>
+                        <span id="fileSize" class="text-muted ms-2"></span>
+                    </div>
+
+                    <button type="submit" class="btn btn-success w-100 py-3 fw-bold" id="submitBtn">
+                        <i class="bi bi-upload"></i> بدء الاستيراد إلى الموقع
+                    </button>
+                </form>
+
+                <div class="alert mt-3" style="background: rgba(255, 193, 7, 0.15); border: 1px solid rgba(255, 193, 7, 0.4); color: #ffd966; font-size: 0.85rem;">
+                    <i class="bi bi-exclamation-triangle-fill"></i>
+                    <strong>ملاحظات مهمة:</strong>
+                    <ul class="mb-0 mt-1" style="padding-right: 20px;">
+                        <li>إذا كان المشترك موجوداً مسبقاً، سيتم <strong>تحديث بياناته</strong></li>
+                        <li>الباقات الجديدة ستُضاف بسعر 0 ومدة 30 يوم — يمكنك تعديلها لاحقاً من صفحة الباقات</li>
+                        <li>الباقات الافتراضية (default, default-encryption) سيتم تجاهلها تلقائياً</li>
+                        <li>الحسابات المعطلة (Disabled) سيتم استيرادها بحالة "موقوف"</li>
+                    </ul>
+                </div>
+
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+document.getElementById('fileInput').addEventListener('change', function(e) {
+    const file = e.target.files[0];
+    if (file) {
+        document.getElementById('filePreview').classList.remove('d-none');
+        document.getElementById('fileName').textContent = file.name;
+        document.getElementById('fileSize').textContent = '(' + (file.size / 1024).toFixed(1) + ' KB)';
+    }
+});
+
+document.getElementById('uploadForm').addEventListener('submit', function() {
+    const btn = document.getElementById('submitBtn');
+    btn.disabled = true;
+    btn.innerHTML = '<span class="spinner-border spinner-border-sm"></span> جاري الاستيراد... قد يستغرق دقيقة';
+});
+</script>
+{% endblock %}
