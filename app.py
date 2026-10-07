@@ -1,4 +1,5 @@
 import os
+import re
 import io
 import csv
 import random
@@ -35,14 +36,13 @@ except ImportError:
 
 app = Flask(__name__)
 app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', 'zinar-secret-key-2024')
-app.config['MAX_CONTENT_LENGTH'] = 5 * 1024 * 1024
+app.config['MAX_CONTENT_LENGTH'] = 20 * 1024 * 1024  # ✅ رفعنا الحجم إلى 20MB لدعم ملفات .rsc
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 LOCAL_TZ = ZoneInfo("Asia/Damascus")
 
-# ✅ مفتاح API لاستيراد البيانات (غيّره لأي قيمة سرية)
 IMPORT_API_KEY = os.environ.get('IMPORT_API_KEY', 'zinar-import-key-2026')
 
 # ============ Database Config ============
@@ -188,8 +188,10 @@ class TelegramLog(db.Model):
 def get_local_time():
     return datetime.now(LOCAL_TZ)
 
+
 def get_local_time_str():
     return get_local_time().strftime('%Y-%m-%d %H:%M:%S')
+
 
 def log_event(action, target="", details="", admin_name=None):
     try:
@@ -233,6 +235,84 @@ def _day_bounds(day=None):
         day = datetime.utcnow()
     start = day.replace(hour=0, minute=0, second=0, microsecond=0)
     return start, start + timedelta(days=1)
+
+
+# ============ MikroTik .rsc Parser ============
+
+def parse_mikrotik_rsc(content):
+    """
+    تحليل ملف MikroTik Export (.rsc) واستخراج:
+    - الباقات (PPP Profiles)
+    - المشتركين (PPP Secrets)
+    """
+    packages = []
+    subscribers = []
+
+    # دمج الأسطر المتابعة (line continuation) باستخدام \
+    content = re.sub(r'\\\s*\n', ' ', content)
+
+    current_section = None
+
+    for line in content.split('\n'):
+        line = line.strip()
+        if not line or line.startswith('#'):
+            continue
+
+        # كشف بداية القسم
+        if line.startswith('/'):
+            lower = line.lower()
+            if 'ppp profile' in lower:
+                current_section = 'profile'
+            elif 'ppp secret' in lower:
+                current_section = 'secret'
+            else:
+                current_section = None
+            continue
+
+        # تحليل أوامر add
+        if line.startswith('add ') and current_section:
+            params = {}
+            # Regex لاستخراج key="value" أو key=value
+            pattern = r'([\w-]+)=(?:"([^"]*)"|([^\s]+))'
+            for match in re.finditer(pattern, line):
+                key = match.group(1).lower()
+                value = match.group(2) if match.group(2) is not None else match.group(3)
+                params[key] = value
+
+            if current_section == 'profile':
+                name = params.get('name', '').strip()
+                if name and name not in ('default', 'default-encryption'):
+                    rate_limit = params.get('rate-limit', '').strip()
+                    packages.append({
+                        'name': name,
+                        'speed': rate_limit if rate_limit else 'N/A',
+                        'price': 0,
+                        'duration': 30,
+                        'duration_unit': 'days',
+                        'user_type': 'pppoe'
+                    })
+
+            elif current_section == 'secret':
+                username = params.get('name', '').strip()
+                if not username:
+                    continue
+                password = params.get('password', '').strip()
+                profile = params.get('profile', '').strip()
+                comment = params.get('comment', '').strip()
+                disabled = params.get('disabled', 'no').strip().lower()
+
+                status = 'paused' if disabled in ('yes', 'true') else 'active'
+
+                subscribers.append({
+                    'username': username,
+                    'password': password,
+                    'package': profile,
+                    'name': comment if comment else username,
+                    'user_type': 'pppoe',
+                    'status': status
+                })
+
+    return packages, subscribers
 
 
 # ============ Telegram Helper ============
@@ -302,19 +382,19 @@ def telegram_webhook():
         data = request.get_json(silent=True)
         if not data:
             return jsonify({'ok': True})
-        
+
         msg = data.get('message') or data.get('channel_post')
         if msg:
             chat_id = msg.get('chat', {}).get('id')
             text = msg.get('text', '')
             chat_title = msg.get('chat', {}).get('title', '')
             user_info = msg.get('from', {})
-            
+
             if user_info.get('is_bot', False):
                 return jsonify({'ok': True})
-            
+
             user_name = user_info.get('username') or user_info.get('first_name', 'مستخدم')
-            
+
             log = TelegramLog(
                 message_type='incoming_group' if chat_title else 'incoming',
                 status='success',
@@ -322,7 +402,7 @@ def telegram_webhook():
             )
             db.session.add(log)
             db.session.commit()
-            
+
             if text.strip() == '/start' and not chat_title:
                 send_telegram_message(
                     f"أهلاً بك يا {user_name} 👋\nتم استلام رسالتك وربط حسابك بنجاح مع النظام.",
@@ -382,7 +462,7 @@ def notify_router_status_change(router_name, ip_address, is_up):
         return False
     if not settings.token or not settings.chat_id:
         return False
-    
+
     status_symbol = "🟢" if is_up else "🔴"
     status_text = "يعمل" if is_up else "متوقف"
     msg = f"{status_symbol} {router_name} `{ip_address}` {status_text}"
@@ -424,7 +504,7 @@ def background_router_monitor():
                 for r in routers:
                     try:
                         current_state = check_router_connection(r.ip_address, r.port or 22)
-                        
+
                         if current_state == 'private':
                             if not r.is_active:
                                 r.is_active = True
@@ -518,7 +598,7 @@ def init_database():
                     email='admin@zinar.com'
                 ))
                 db.session.commit()
-            
+
             if not TelegramSetting.query.first():
                 db.session.add(TelegramSetting(
                     enabled=False,
@@ -529,7 +609,7 @@ def init_database():
                     notify_router_status=True
                 ))
                 db.session.commit()
-            
+
             logger.info("✅ تم تهيئة قاعدة البيانات")
         except Exception as e:
             db.session.rollback()
@@ -663,11 +743,11 @@ def api_router_notify():
             data = request.form.to_dict()
         elif request.args:
             data = request.args.to_dict()
-        
+
         router_name = data.get('name', 'راوتر غير معروف')
         status = data.get('status', 'unknown').lower()
         ip_address = data.get('ip', '')
-        
+
         if status in ('working', 'up', 'online'):
             status_ar = 'يعمل'
             status_icon = '🟢'
@@ -684,7 +764,7 @@ def api_router_notify():
         db.session.add(log)
         log_event('تنبيه راوتر', router_name, message, admin_name='الميكروتيك')
         db.session.commit()
-        
+
         try:
             send_telegram_message(message, message_type='router_alert')
         except Exception as tg_err:
@@ -698,7 +778,6 @@ def api_router_notify():
         return jsonify({'ok': False, 'error': str(e)}), 500
 
 
-# ✅ مسار استيراد المشتركين من الميكروتيك
 @app.route('/api/import_subscribers', methods=['POST'])
 def api_import_subscribers():
     try:
@@ -742,19 +821,15 @@ def api_import_subscribers():
                 updated += 1
             else:
                 db.session.add(Subscriber(
-                    name=name,
-                    username=username,
-                    password=password,
-                    package=package,
-                    user_type=user_type,
-                    status=status,
+                    name=name, username=username, password=password,
+                    package=package, user_type=user_type, status=status,
                     expires_at=None
                 ))
                 imported += 1
 
         db.session.commit()
         log_event(
-            'استيراد مشتركين من الميكروتيك',
+            'استيراد مشتركين (API)',
             f'{imported + updated} مشترك',
             f'جديد: {imported} | محدّث: {updated} | متجاهل: {skipped}',
             admin_name='النظام (API)'
@@ -771,11 +846,9 @@ def api_import_subscribers():
         return jsonify({'ok': False, 'error': str(e)}), 500
 
 
-# ✅✅✅ مسار استيراد الباقات (Profiles) من الميكروتيك (جديد)
 @app.route('/api/import_packages', methods=['POST'])
 def api_import_packages():
     try:
-        # التحقق من مفتاح API
         api_key = request.headers.get('X-API-Key') or request.args.get('api_key')
         if api_key != IMPORT_API_KEY:
             logger.warning(f"⚠️ محاولة استيراد باقات فاشلة (مفتاح خاطئ) من {request.remote_addr}")
@@ -801,7 +874,6 @@ def api_import_packages():
                 skipped += 1
                 continue
 
-            # التحقق من صحة القيم
             try:
                 price = float(price) if price else 0
             except (ValueError, TypeError):
@@ -814,14 +886,11 @@ def api_import_packages():
 
             if duration_unit not in ('days', 'months'):
                 duration_unit = 'days'
-
             if user_type not in ('pppoe', 'hotspot'):
                 user_type = 'pppoe'
 
-            # التحقق من وجود الباقة
             pkg = Package.query.filter_by(name=name).first()
             if pkg:
-                # تحديث الباقة الموجودة
                 pkg.speed = speed or pkg.speed
                 pkg.price = price
                 pkg.duration = duration
@@ -829,20 +898,16 @@ def api_import_packages():
                 pkg.user_type = user_type
                 updated += 1
             else:
-                # إضافة باقة جديدة
                 db.session.add(Package(
-                    name=name,
-                    speed=speed,
-                    price=price,
-                    duration=duration,
-                    duration_unit=duration_unit,
+                    name=name, speed=speed, price=price,
+                    duration=duration, duration_unit=duration_unit,
                     user_type=user_type
                 ))
                 imported += 1
 
         db.session.commit()
         log_event(
-            'استيراد باقات من الميكروتيك',
+            'استيراد باقات (API)',
             f'{imported + updated} باقة',
             f'جديدة: {imported} | محدّثة: {updated} | متجاهلة: {skipped}',
             admin_name='النظام (API)'
@@ -990,6 +1055,99 @@ def logout():
     session.clear()
     flash('✅ تم تسجيل الخروج', 'success')
     return redirect(url_for('login'))
+
+
+# ✅✅✅ مسار استيراد النسخة الاحتياطية من الميكروتيك (جديد)
+@app.route('/import-backup', methods=['GET', 'POST'])
+def import_backup():
+    if request.method == 'POST':
+        try:
+            if 'backup_file' not in request.files:
+                flash('❌ الرجاء اختيار ملف النسخة الاحتياطية', 'danger')
+                return redirect(url_for('import_backup'))
+
+            file = request.files['backup_file']
+            if not file.filename:
+                flash('❌ لم يتم اختيار أي ملف', 'danger')
+                return redirect(url_for('import_backup'))
+
+            if not file.filename.lower().endswith(('.rsc', '.txt')):
+                flash('❌ يجب أن يكون الملف بصيغة .rsc (من أمر /export)', 'danger')
+                return redirect(url_for('import_backup'))
+
+            # قراءة الملف
+            content = file.read().decode('utf-8', errors='ignore')
+
+            # تحليل الملف
+            packages, subscribers = parse_mikrotik_rsc(content)
+
+            if not packages and not subscribers:
+                flash('⚠️ لم يتم العثور على باقات أو مشتركين في الملف. تأكد أنك استخدمت /export file=name', 'warning')
+                return redirect(url_for('import_backup'))
+
+            # استيراد الباقات
+            pkg_imported = 0
+            pkg_updated = 0
+            for p in packages:
+                existing = Package.query.filter_by(name=p['name']).first()
+                if existing:
+                    existing.speed = p['speed'] or existing.speed
+                    pkg_updated += 1
+                else:
+                    db.session.add(Package(**p))
+                    pkg_imported += 1
+
+            # استيراد المشتركين
+            sub_imported = 0
+            sub_updated = 0
+            for s in subscribers:
+                existing = Subscriber.query.filter_by(username=s['username']).first()
+                if existing:
+                    existing.password = s['password']
+                    existing.package = s['package']
+                    existing.user_type = s['user_type']
+                    existing.status = s['status']
+                    existing.name = s['name']
+                    sub_updated += 1
+                else:
+                    db.session.add(Subscriber(
+                        name=s['name'],
+                        username=s['username'],
+                        password=s['password'],
+                        package=s['package'],
+                        user_type=s['user_type'],
+                        status=s['status'],
+                        expires_at=None
+                    ))
+                    sub_imported += 1
+
+            db.session.commit()
+
+            log_event(
+                'استيراد نسخة احتياطية',
+                f'ملف: {file.filename}',
+                f'باقات: {pkg_imported}+{pkg_updated} | مشتركين: {sub_imported}+{sub_updated}',
+                admin_name=session.get('admin_name', 'المدير')
+            )
+
+            flash(
+                f'✅ تم الاستيراد بنجاح! | '
+                f'📦 الباقات: {pkg_imported} جديدة، {pkg_updated} محدّثة | '
+                f'👥 المشتركون: {sub_imported} جديد، {sub_updated} محدّث',
+                'success'
+            )
+            return redirect(url_for('import_backup'))
+
+        except Exception as e:
+            db.session.rollback()
+            logger.error(f"❌ Backup import error: {e}")
+            flash(f'❌ خطأ في الاستيراد: {str(e)}', 'danger')
+            return redirect(url_for('import_backup'))
+
+    return render_template('import_backup.html',
+        total_packages=Package.query.count(),
+        total_subscribers=Subscriber.query.count()
+    )
 
 
 @app.route('/dashboard')
