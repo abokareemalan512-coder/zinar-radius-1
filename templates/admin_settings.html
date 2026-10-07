@@ -117,7 +117,6 @@
                 <hr class="border-secondary">
                 
                 <h6 class="text-white mb-3 fw-bold"><i class="bi bi-clock-history"></i> آخر الرسائل:</h6>
-                <!-- ✅ هذا العنصر هو المسؤول عن تحديث القائمة تلقائياً -->
                 <div class="list-group list-group-flush" id="telegram-logs-container" style="max-height: 250px; overflow-y: auto;">
                     {% if telegram_logs %}
                         {% for log in telegram_logs %}
@@ -145,7 +144,6 @@
 </div>
 
 <script>
-// دالة اختبار الإشعارات
 function testTelegram() {
     fetch('{{ url_for("test_telegram") }}', {
         method: 'POST',
@@ -159,10 +157,7 @@ function testTelegram() {
     .catch(error => alert('❌ حدث خطأ في الاتصال بالسيرفر'));
 }
 
-// ✅ دالة التحديث التلقائي (AJAX)
 function fetchTelegramData() {
-    console.log("🔄 جاري تحديث بيانات التلجرام...");
-    
     fetch('/api/telegram_data')
         .then(response => {
             if (!response.ok) throw new Error('Network response was not ok');
@@ -171,7 +166,6 @@ function fetchTelegramData() {
         .then(data => {
             if (data.error) return;
 
-            // تحديث الأرقام
             const totalEl = document.getElementById('stat-total-notifications');
             const newEl = document.getElementById('stat-new-subscribers');
             const expEl = document.getElementById('stat-expired-subscribers');
@@ -182,17 +176,26 @@ function fetchTelegramData() {
             if (expEl) expEl.textContent = data.expired_subscribers;
             if (bulkEl) bulkEl.textContent = data.bulk_adds;
 
-            // تحديث قائمة السجلات
             const container = document.getElementById('telegram-logs-container');
             if (container && data.logs) {
                 let html = '';
                 if (data.logs.length > 0) {
                     data.logs.forEach(log => {
                         const badgeClass = log.status === 'success' ? 'bg-success' : 'bg-danger';
+                        let typeAr = log.type;
+                        if (log.type === 'router_alert') typeAr = 'تنبيه راوتر';
+                        else if (log.type === 'incoming_group') typeAr = 'رسالة مجموعة';
+                        else if (log.type === 'incoming') typeAr = 'رسالة واردة';
+                        else if (log.type === 'new_subscriber') typeAr = 'مشترك جديد';
+                        else if (log.type === 'expired_subscriber') typeAr = 'اشتراك منتهي';
+                        else if (log.type === 'bulk_add') typeAr = 'إضافة جماعية';
+                        else if (log.type === 'admin_action') typeAr = 'إجراء إداري';
+                        else if (log.type === 'test') typeAr = 'اختبار';
+
                         html += `
                             <div class="list-group-item bg-transparent text-light border-secondary px-0 py-2">
                                 <div class="d-flex justify-content-between align-items-center mb-1">
-                                    <span class="badge ${badgeClass} bg-opacity-75" style="font-size: 0.7rem;">${log.type}</span>
+                                    <span class="badge ${badgeClass} bg-opacity-75" style="font-size: 0.7rem;">${typeAr}</span>
                                     <small class="text-muted" style="font-size: 0.7rem;">${log.time}</small>
                                 </div>
                                 <div class="small text-truncate" style="max-width: 100%; font-size: 0.8rem;">
@@ -210,10 +213,7 @@ function fetchTelegramData() {
         .catch(error => console.error('❌ خطأ في جلب البيانات:', error));
 }
 
-// تشغيل التحديث التلقائي كل 5 ثوانٍ
 setInterval(fetchTelegramData, 5000);
-
-// تشغيل التحديث فوراً عند فتح الصفحة
 document.addEventListener('DOMContentLoaded', fetchTelegramData);
 </script>
 {% endblock %}
