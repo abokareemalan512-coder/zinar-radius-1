@@ -36,7 +36,7 @@ except ImportError:
 
 app = Flask(__name__)
 app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', 'zinar-secret-key-2024')
-app.config['MAX_CONTENT_LENGTH'] = 20 * 1024 * 1024  # 20MB لدعم ملفات .rsc
+app.config['MAX_CONTENT_LENGTH'] = 20 * 1024 * 1024  # 20MB
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -237,80 +237,172 @@ def _day_bounds(day=None):
     return start, start + timedelta(days=1)
 
 
-# ============ MikroTik .rsc Parser (نسخة محسّنة) ============
+# ============ MikroTik Parser (يدعم print و export) ============
 
-def parse_mikrotik_rsc(content):
-    """
-    تحليل ملف MikroTik Export (.rsc) واستخراج الباقات والمشتركين.
-    يعيد: (packages, subscribers, debug_info)
-    """
-    packages = []
-    subscribers = []
-    debug_info = {
-        'lines_read': 0,
-        'sections_found': [],
-        'profile_lines': 0,
-        'secret_lines': 0,
-        'preview': '',
-        'errors': []
-    }
+def _extract_kv(text, params):
+    """استخراج key=value - يتوقف عند on-up/on-down لتجنب محتوى معقد"""
+    # قطع النص عند on-up أو on-down (لا نحتاجهما)
+    for stop in [' on-up=', ' on-down=', 'on-up=', 'on-down=']:
+        idx = text.find(stop)
+        if idx != -1:
+            text = text[:idx]
+            break
 
-    # إزالة BOM إذا وجد
-    if content.startswith('\ufeff'):
-        content = content[1:]
+    pattern = r'([\w\-]+)\s*=\s*(?:"([^"]*)"|(\S+))'
+    for match in re.finditer(pattern, text):
+        key = match.group(1).lower()
+        value = match.group(2) if match.group(2) is not None else match.group(3)
+        if key not in params:  # احتفظ بأول قيمة فقط
+            params[key] = value
 
-    # توحيد نهايات الأسطر
-    content = content.replace('\r\n', '\n').replace('\r', '\n')
 
-    # دمج أسطر المتابعة (line continuation)
-    content = re.sub(r'\\\s*\n', ' ', content)
-
-    lines = content.split('\n')
-    debug_info['lines_read'] = len(lines)
-    debug_info['preview'] = '\n'.join(lines[:15])
-
+def _parse_print_format(lines, debug_info, packages, subscribers):
+    """تحليل صيغة terminal print (مثل /ppp profile print و /ppp secret print)"""
     current_section = None
+    current_entry = None
+    current_disabled = False
 
-    for line_num, raw_line in enumerate(lines, 1):
-        line = raw_line.strip()
-        if not line:
+    def finalize():
+        nonlocal current_entry, current_disabled
+        if current_entry is None:
+            return
+
+        name = current_entry.get('name', '').strip()
+        if not name:
+            current_entry = None
+            current_disabled = False
+            return
+
+        if current_section == 'profile':
+            if name not in ('default', 'default-encryption'):
+                rate_limit = current_entry.get('rate-limit', '').strip()
+                packages.append({
+                    'name': name,
+                    'speed': rate_limit if rate_limit else 'N/A',
+                    'price': 0,
+                    'duration': 30,
+                    'duration_unit': 'days',
+                    'user_type': 'pppoe'
+                })
+                debug_info['profile_lines'] += 1
+
+        elif current_section == 'secret':
+            password = current_entry.get('password', '').strip()
+            profile = current_entry.get('profile', '').strip()
+            comment = current_entry.get('comment', '').strip()
+            service = current_entry.get('service', 'pppoe').strip().lower()
+
+            status = 'paused' if current_disabled else 'active'
+            user_type = 'hotspot' if 'hotspot' in service else 'pppoe'
+
+            subscribers.append({
+                'username': name,
+                'password': password,
+                'package': profile,
+                'name': comment if comment else name,
+                'user_type': user_type,
+                'status': status
+            })
+            debug_info['secret_lines'] += 1
+
+        current_entry = None
+        current_disabled = False
+
+    for line in lines:
+        stripped = line.strip()
+        if not stripped or stripped.startswith('#'):
             continue
 
-        if line.startswith('#'):
-            continue
-
-        # كشف بداية القسم
-        if line.startswith('/'):
-            lower = line.lower().strip()
-
+        # كشف القسم
+        if stripped.startswith('/'):
+            finalize()
+            lower = stripped.lower()
             if 'ppp/profile' in lower or 'ppp profile' in lower:
                 current_section = 'profile'
-                debug_info['sections_found'].append(f'L{line_num}: profile')
+                debug_info['sections_found'].append('profile')
             elif 'ppp/secret' in lower or 'ppp secret' in lower:
                 current_section = 'secret'
-                debug_info['sections_found'].append(f'L{line_num}: secret')
-            elif any(k in lower for k in [
-                '/interface', '/ip ', '/system', '/user', '/tool',
-                '/queue', '/routing', '/ipv6', '/snmp', '/radius',
-                '/log', '/certificate', '/file'
-            ]):
+                debug_info['sections_found'].append('secret')
+            else:
                 current_section = None
             continue
 
-        # معالجة أوامر add/set
-        if current_section and (line.startswith('add ') or line.startswith('set ')):
-            params = {}
-            pattern = r'([\w\-]+)\s*=\s*(?:"([^"]*)"|(\S+))'
+        if stripped.startswith('Flags:'):
+            continue
 
-            for match in re.finditer(pattern, line):
-                key = match.group(1).lower()
-                value = match.group(2) if match.group(2) is not None else match.group(3)
-                params[key] = value
+        if not current_section:
+            continue
+
+        # هل السطر بداية إدخال جديد؟ (يبدأ برقم)
+        m = re.match(r'^\s*(\d+)\s+(.*)$', line)
+        if m:
+            finalize()
+            content = m.group(2)
+
+            # كشف علامة X (معطل) أو * (افتراضي)
+            current_disabled = content.startswith('X ')
+            content = re.sub(r'^[X\*]\s+', '', content).strip()
+
+            current_entry = {}
+            _extract_kv(content, current_entry)
+        else:
+            # استمرارية لإدخال حالي
+            if current_entry is not None:
+                _extract_kv(stripped, current_entry)
+
+    finalize()
+
+
+def _parse_export_format(lines, debug_info, packages, subscribers):
+    """تحليل صيغة .rsc export"""
+    current_section = None
+
+    # دمج أسطر المتابعة (line continuation)
+    merged = []
+    buffer = ''
+    for line in lines:
+        if line.rstrip().endswith('\\'):
+            buffer += line.rstrip()[:-1] + ' '
+        else:
+            if buffer:
+                merged.append(buffer + line)
+                buffer = ''
+            else:
+                merged.append(line)
+    if buffer:
+        merged.append(buffer)
+
+    for line in merged:
+        stripped = line.strip()
+        if not stripped or stripped.startswith('#'):
+            continue
+
+        # كشف القسم
+        if stripped.startswith('/'):
+            lower = stripped.lower()
+            if 'ppp/profile' in lower or 'ppp profile' in lower:
+                current_section = 'profile'
+                debug_info['sections_found'].append('profile')
+            elif 'ppp/secret' in lower or 'ppp secret' in lower:
+                current_section = 'secret'
+                debug_info['sections_found'].append('secret')
+            else:
+                current_section = None
+            continue
+
+        if not current_section:
+            continue
+
+        if stripped.startswith('add ') or stripped.startswith('set '):
+            params = {}
+            _extract_kv(stripped, params)
+
+            name = params.get('name', '').strip()
+            if not name:
+                continue
 
             if current_section == 'profile':
-                debug_info['profile_lines'] += 1
-                name = params.get('name', '').strip()
-                if name and name not in ('default', 'default-encryption'):
+                if name not in ('default', 'default-encryption'):
                     rate_limit = params.get('rate-limit', '').strip()
                     packages.append({
                         'name': name,
@@ -320,12 +412,9 @@ def parse_mikrotik_rsc(content):
                         'duration_unit': 'days',
                         'user_type': 'pppoe'
                     })
+                    debug_info['profile_lines'] += 1
 
             elif current_section == 'secret':
-                debug_info['secret_lines'] += 1
-                username = params.get('name', '').strip()
-                if not username:
-                    continue
                 password = params.get('password', '').strip()
                 profile = params.get('profile', '').strip()
                 comment = params.get('comment', '').strip()
@@ -336,13 +425,58 @@ def parse_mikrotik_rsc(content):
                 user_type = 'hotspot' if 'hotspot' in service else 'pppoe'
 
                 subscribers.append({
-                    'username': username,
+                    'username': name,
                     'password': password,
                     'package': profile,
-                    'name': comment if comment else username,
+                    'name': comment if comment else name,
                     'user_type': user_type,
                     'status': status
                 })
+                debug_info['secret_lines'] += 1
+
+
+def parse_mikrotik_rsc(content):
+    """
+    تحليل ملف MikroTik (سواء من /export أو من terminal print)
+    يعيد: (packages, subscribers, debug_info)
+    """
+    packages = []
+    subscribers = []
+    debug_info = {
+        'lines_read': 0,
+        'sections_found': [],
+        'profile_lines': 0,
+        'secret_lines': 0,
+        'preview': '',
+        'format': 'unknown',
+    }
+
+    # تنظيف
+    if content.startswith('\ufeff'):
+        content = content[1:]
+    content = content.replace('\r\n', '\n').replace('\r', '\n')
+
+    lines = content.split('\n')
+    debug_info['lines_read'] = len(lines)
+    debug_info['preview'] = '\n'.join(lines[:20])
+
+    # كشف الصيغة: print أم export
+    is_print = False
+    for line in lines[:80]:
+        s = line.strip()
+        if s.startswith('Flags:'):
+            is_print = True
+            break
+        if s.startswith('/') and s.endswith(' print'):
+            is_print = True
+            break
+
+    debug_info['format'] = 'print' if is_print else 'export'
+
+    if is_print:
+        _parse_print_format(lines, debug_info, packages, subscribers)
+    else:
+        _parse_export_format(lines, debug_info, packages, subscribers)
 
     return packages, subscribers, debug_info
 
@@ -1089,7 +1223,6 @@ def logout():
     return redirect(url_for('login'))
 
 
-# ✅✅✅ مسار استيراد النسخة الاحتياطية (نسخة محسّنة برسائل تشخيص)
 @app.route('/import-backup', methods=['GET', 'POST'])
 def import_backup():
     if request.method == 'POST':
@@ -1104,7 +1237,7 @@ def import_backup():
                 return redirect(url_for('import_backup'))
 
             if not file.filename.lower().endswith(('.rsc', '.txt')):
-                flash('❌ يجب أن يكون الملف بصيغة .rsc (من أمر /export) أو .txt', 'danger')
+                flash('❌ يجب أن يكون الملف بصيغة .rsc أو .txt', 'danger')
                 return redirect(url_for('import_backup'))
 
             # قراءة الملف
@@ -1119,7 +1252,7 @@ def import_backup():
 
             # كشف ملف .backup الثنائي
             if content[:5] == 'PK\x03\x04' or raw_bytes[:4] == b'\x00\x00\x00\x00':
-                flash('❌ هذا ملف Backup ثنائي وليس RSC! استخدم أمر /export file=name وليس /system backup', 'danger')
+                flash('❌ هذا ملف Backup ثنائي وليس RSC! استخدم أمر /export file=name', 'danger')
                 return redirect(url_for('import_backup'))
 
             # تحليل الملف
@@ -1131,6 +1264,7 @@ def import_backup():
                 sections = ', '.join(debug_info['sections_found']) or 'لا يوجد'
                 error_msg = (
                     f'⚠️ لم يتم العثور على بيانات!<br>'
+                    f'📄 صيغة الملف: <strong>{debug_info["format"]}</strong><br>'
                     f'📄 عدد الأسطر: {debug_info["lines_read"]}<br>'
                     f'🔍 الأقسام المكتشفة: {sections}<br>'
                     f'📊 أسطر Profiles: {debug_info["profile_lines"]} | أسطر Secrets: {debug_info["secret_lines"]}<br>'
@@ -1186,7 +1320,7 @@ def import_backup():
             )
 
             flash(
-                f'✅ تم الاستيراد بنجاح! | '
+                f'✅ تم الاستيراد بنجاح! (صيغة: {debug_info["format"]}) | '
                 f'📦 الباقات: {pkg_imported} جديدة، {pkg_updated} محدّثة | '
                 f'👥 المشتركون: {sub_imported} جديد، {sub_updated} محدّث',
                 'success'
