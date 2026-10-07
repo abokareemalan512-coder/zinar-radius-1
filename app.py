@@ -10,6 +10,7 @@ import socket
 import time
 import threading
 from datetime import datetime, timedelta
+from zoneinfo import ZoneInfo  # ✅ إضافة مكتبة التوقيت
 
 from flask import (
     Flask, render_template, request, redirect, url_for,
@@ -38,6 +39,10 @@ app.config['MAX_CONTENT_LENGTH'] = 5 * 1024 * 1024
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
+# ✅ تحديد التوقيت المحلي (توقيت سوريا كافتراضي)
+# يمكنك تغيير "Asia/Damascus" إلى "Asia/Riyadh" أو "Africa/Cairo" حسب بلدك
+LOCAL_TZ = ZoneInfo("Asia/Damascus")
+
 # ============ Database Config ============
 
 database_url = os.environ.get('DATABASE_URL')
@@ -53,10 +58,6 @@ app.config['SQLALCHEMY_DATABASE_URI'] = database_url
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 
 # إعدادات محسنة لمنع انقطاع الاتصال (SSL SYSCALL error)
-# pool_pre_ping: يتحقق من صحة الاتصال قبل استخدامه
-# pool_recycle: يعيد تدوير الاتصالات كل 3 دقائق لتجنب إغلاقها من قبل الخادم
-# pool_size و max_overflow: لضبط حجم التجمع
-# connect_args: لفرض SSL في PostgreSQL
 app.config['SQLALCHEMY_ENGINE_OPTIONS'] = {
     'pool_pre_ping': True,
     'pool_recycle': 180,
@@ -173,8 +174,25 @@ class TelegramLog(db.Model):
     message = db.Column(db.Text)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
 
+    @property
+    def created_at_local(self):
+        """تحويل وقت الإنشاء إلى التوقيت المحلي للعرض"""
+        if self.created_at:
+            # نفترض أن الوقت المخزن هو UTC، نحوله إلى التوقيت المحلي
+            utc_time = self.created_at.replace(tzinfo=ZoneInfo("UTC"))
+            return utc_time.astimezone(LOCAL_TZ)
+        return None
+
 
 # ============ Helpers ============
+
+def get_local_time():
+    """الحصول على الوقت الحالي بالتوقيت المحلي"""
+    return datetime.now(LOCAL_TZ)
+
+def get_local_time_str():
+    """الحصول على الوقت الحالي بالتوقيت المحلي كـ String"""
+    return get_local_time().strftime('%Y-%m-%d %H:%M:%S')
 
 def log_event(action, target="", details="", admin_name=None):
     try:
@@ -323,7 +341,8 @@ def notify_new_subscriber(username):
         return False
     if not settings.token or not settings.chat_id:
         return False
-    msg = f"*🆕 مشترك جديد*\n👤 المستخدم: `{username}`\n🕒 الوقت: {datetime.utcnow().strftime('%Y-%m-%d %H:%M:%S')} UTC"
+    # ✅ استخدام التوقيت المحلي بدلاً من UTC
+    msg = f"*🆕 مشترك جديد*\n👤 المستخدم: `{username}`\n🕒 الوقت: {get_local_time_str()}"
     return send_telegram_message(msg, message_type='new_subscriber')[0]
 
 
@@ -387,7 +406,7 @@ def check_router_connection(ip, port=22, timeout=3):
 
 
 def background_router_monitor():
-    time.sleep(15)  # انتظار قليلاً حتى يتم بدء التطبيق وتجهيز قاعدة البيانات
+    time.sleep(15)
     while True:
         try:
             with app.app_context():
@@ -405,12 +424,11 @@ def background_router_monitor():
         except Exception as e:
             logger.warning(f"⚠️ خطأ في مراقبة الراوترات بالخلفية: {e}")
         finally:
-            # تنظيف الجلسة نهائياً لمنع تلف الـ Connection في الدورة القادمة
             try:
                 db.session.remove()
             except Exception:
                 pass
-        time.sleep(60)  # فحص كل دقيقة
+        time.sleep(60)
 
 
 # ============ Kick via SSH ============
@@ -498,7 +516,6 @@ def init_database():
             logger.info("✅ تم تهيئة قاعدة البيانات")
         except Exception as e:
             db.session.rollback()
-            # تجاهل خطأ التكرار في حالة تشغيل أكثر من عامل (Worker)
             if "already exists" not in str(e).lower():
                 logger.error(f"❌ خطأ تهيئة قاعدة البيانات: {e}")
 
@@ -548,7 +565,6 @@ def ensure_columns():
 init_database()
 ensure_columns()
 
-# تشغيل خيط المراقبة بالخلفية
 monitor_thread = threading.Thread(target=background_router_monitor, daemon=True)
 monitor_thread.start()
 
@@ -1456,6 +1472,7 @@ def admin_settings():
             notify_admin_action=False,
             notify_router_status=True
         )
+    # ✅ جلب السجلات مع تحويل التوقيت المحلي للعرض
     logs = TelegramLog.query.order_by(TelegramLog.created_at.desc()).limit(10).all()
     total_notifications = TelegramLog.query.count()
     new_subscribers = TelegramLog.query.filter_by(message_type='new_subscriber').count()
