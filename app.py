@@ -183,13 +183,6 @@ class TelegramLog(db.Model):
     message = db.Column(db.Text)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
 
-    @property
-    def created_at_local(self):
-        if self.created_at:
-            utc_time = self.created_at.replace(tzinfo=ZoneInfo("UTC"))
-            return utc_time.astimezone(LOCAL_TZ)
-        return None
-
 
 # ============ Helpers ============
 
@@ -311,22 +304,26 @@ def telegram_webhook():
         if not data:
             return jsonify({'ok': True})
         
-        msg = data.get('message')
+        # ✅ التعامل مع رسائل المجموعات والقنوات والمحادثات الفردية
+        msg = data.get('message') or data.get('channel_post')
+        
         if msg:
             chat_id = msg.get('chat', {}).get('id')
             text = msg.get('text', '')
+            chat_title = msg.get('chat', {}).get('title', '')
             user_info = msg.get('from', {})
             user_name = user_info.get('username') or user_info.get('first_name', 'مستخدم')
             
+            # ✅ حفظ الرسالة الواردة في قاعدة البيانات لتظهر في الموقع
             log = TelegramLog(
-                message_type='incoming',
+                message_type='incoming_group' if chat_title else 'incoming',
                 status='success',
-                message=f"📥 من: {user_name} (ID: {chat_id})\n💬 النص: {text}"
+                message=f"📥 {chat_title} | {user_name}:\n{text}" if chat_title else f"📥 {user_name}:\n{text}"
             )
             db.session.add(log)
             db.session.commit()
             
-            if text.strip() == '/start':
+            if text.strip() == '/start' and not chat_title:
                 send_telegram_message(
                     f"أهلاً بك يا {user_name} 👋\nتم استلام رسالتك وربط حسابك بنجاح مع النظام.",
                     message_type='reply',
@@ -336,7 +333,7 @@ def telegram_webhook():
         return jsonify({'ok': True})
     except Exception as e:
         db.session.rollback()
-        print(f"Webhook Error: {e}")
+        logger.error(f"Webhook Error: {e}")
         return jsonify({'ok': False}), 500
 
 
@@ -833,7 +830,7 @@ def dashboard():
             telegram_status=telegram_status,
             recent_telegram_logs=recent_telegram_logs,
             pending_pays=pending_pays,
-            active_sessions=0  # يمكن ربطها لاحقاً بنظام RADIUS
+            active_sessions=0
         )
     except Exception as e:
         db.session.rollback()
