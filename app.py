@@ -656,6 +656,77 @@ def api_log():
     return jsonify({'ok': True})
 
 
+# ============ API for Live Updates (AJAX) ============
+
+@app.route('/api/dashboard_data')
+def api_dashboard_data():
+    try:
+        start, end = _day_bounds()
+        today_revenue = db.session.query(db.func.sum(Payment.amount)).filter(
+            Payment.status == 'completed',
+            Payment.created_at >= start,
+            Payment.created_at < end
+        ).scalar() or 0
+
+        new_users_today = Subscriber.query.filter(
+            Subscriber.created_at >= start,
+            Subscriber.created_at < end
+        ).count()
+
+        events = SystemEvent.query.order_by(SystemEvent.created_at.desc()).limit(15).all()
+        events_data = [{
+            'time': e.created_at.astimezone(LOCAL_TZ).strftime('%H:%M'),
+            'admin': e.admin_name or 'النظام',
+            'action': e.action,
+            'target': e.target or '-',
+            'details': e.details or '-'
+        } for e in events]
+
+        recent_logs = TelegramLog.query.order_by(TelegramLog.created_at.desc()).limit(5).all()
+        logs_data = [{
+            'time': l.created_at.astimezone(LOCAL_TZ).strftime('%m-%d %H:%M'),
+            'type': l.message_type,
+            'status': l.status
+        } for l in recent_logs]
+
+        return jsonify({
+            'routers_count': Router.query.count(),
+            'routers_online': Router.query.filter_by(is_active=True).count(),
+            'sub_count': Subscriber.query.count(),
+            'active_subs': Subscriber.query.filter_by(status='active').count(),
+            'today_revenue': f"{today_revenue:.0f}",
+            'new_users_today': new_users_today,
+            'events': events_data,
+            'telegram_logs': logs_data
+        })
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/telegram_data')
+def api_telegram_data():
+    try:
+        logs = TelegramLog.query.order_by(TelegramLog.created_at.desc()).limit(10).all()
+        logs_data = [{
+            'time': l.created_at.astimezone(LOCAL_TZ).strftime('%Y-%m-%d %H:%M:%S'),
+            'type': l.message_type,
+            'status': l.status,
+            'message': l.message
+        } for l in logs]
+
+        return jsonify({
+            'total_notifications': TelegramLog.query.count(),
+            'new_subscribers': TelegramLog.query.filter_by(message_type='new_subscriber').count(),
+            'expired_subscribers': TelegramLog.query.filter_by(message_type='expired_subscriber').count(),
+            'bulk_adds': TelegramLog.query.filter_by(message_type='bulk_add').count(),
+            'logs': logs_data
+        })
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'error': str(e)}), 500
+
+
 # ============ Auth Guard ============
 
 @app.route('/mobile')
@@ -738,6 +809,8 @@ def dashboard():
             Subscriber.created_at < end
         ).count()
 
+        pending_pays = Payment.query.filter_by(status='pending').count()
+
         events_list = SystemEvent.query.order_by(SystemEvent.created_at.desc()).limit(15).all()
 
         current_time = get_local_time_str()
@@ -758,7 +831,9 @@ def dashboard():
             admin_name=session.get('admin_name', 'مدير'),
             current_time=current_time,
             telegram_status=telegram_status,
-            recent_telegram_logs=recent_telegram_logs
+            recent_telegram_logs=recent_telegram_logs,
+            pending_pays=pending_pays,
+            active_sessions=0  # يمكن ربطها لاحقاً بنظام RADIUS
         )
     except Exception as e:
         db.session.rollback()
