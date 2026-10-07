@@ -89,6 +89,15 @@
             background-color: var(--bg-hover);
             color: var(--accent);
         }
+        /* ✅ تمييز خاص لرابط الاستيراد */
+        .sidebar .nav-item.import-link {
+            border: 1px dashed rgba(56, 189, 248, 0.3);
+            background: rgba(56, 189, 248, 0.05);
+        }
+        .sidebar .nav-item.import-link:hover {
+            border-color: var(--accent);
+            background: rgba(56, 189, 248, 0.15);
+        }
         .sidebar .btn-add {
             background-color: var(--accent);
             color: #0f172a;
@@ -182,6 +191,10 @@
         </a>
         <a href="{{ url_for('subscribers') }}" class="nav-item {% if request.endpoint in ['subscribers','add_subscriber'] %}active{% endif %}">
             <i class="bi bi-people"></i> المشتركين
+        </a>
+        <!-- ✅ رابط استيراد من الميكروتيك (جديد) -->
+        <a href="{{ url_for('import_backup') }}" class="nav-item import-link {% if request.endpoint == 'import_backup' %}active{% endif %}">
+            <i class="bi bi-cloud-upload"></i> استيراد من الميكروتيك
         </a>
         <a href="{{ url_for('packages') }}" class="nav-item {% if request.endpoint == 'packages' %}active{% endif %}">
             <i class="bi bi-box-seam"></i> الباقات
