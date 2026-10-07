@@ -2,153 +2,84 @@
 {% block title %}إعدادات التلجرام{% endblock %}
 
 {% block content %}
-<div class="d-flex justify-content-between align-items-center mb-2">
-    <h6 class="mb-0 fw-bold">⚙️ إعدادات التلجرام</h6>
+<div class="d-flex justify-content-between align-items-center mb-3">
+    <h5 class="mb-0 fw-bold text-white">⚙️ إعدادات التلجرام</h5>
 </div>
 
-<div class="row g-2 justify-content-center">
-    <!-- إحصائيات الإشعارات -->
-    <div class="col-md-4">
+<div class="row g-3">
+    <!-- إعدادات الاتصال (اليسار) -->
+    <div class="col-md-5 order-md-1">
         <div class="card border-0 shadow-sm h-100" style="background: rgba(18, 35, 58, 0.9); border: 1px solid rgba(255,255,255,0.08);">
-            <div class="card-header bg-primary bg-opacity-75 text-white py-1">
-                <small class="mb-0 fw-bold"><i class="bi bi-bar-chart-fill"></i> إحصائيات الإشعارات</small>
+            <div class="card-header bg-primary text-white py-2" style="background: linear-gradient(90deg, #0d6efd, #0b5ed7) !important;">
+                <h6 class="mb-0 fw-bold"><i class="bi bi-plug-fill"></i> إعدادات الاتصال</h6>
             </div>
-            <div class="card-body p-2">
-                <div class="row text-center mb-2 g-1">
-                    <div class="col-6">
-                        <h6 class="text-accent fw-bold mb-0">{{ total_notifications }}</h6>
-                        <small class="text-muted" style="font-size: 0.65rem;">إجمالي الإشعارات</small>
-                    </div>
-                    <div class="col-6">
-                        <h6 class="text-success fw-bold mb-0">{{ new_subscribers }}</h6>
-                        <small class="text-muted" style="font-size: 0.65rem;">مشتركين جدد</small>
-                    </div>
-                    <div class="col-6">
-                        <h6 class="text-danger fw-bold mb-0">{{ expired_subscribers }}</h6>
-                        <small class="text-muted" style="font-size: 0.65rem;">اشتراكات منتهية</small>
-                    </div>
-                    <div class="col-6">
-                        <h6 class="text-warning fw-bold mb-0">{{ bulk_adds }}</h6>
-                        <small class="text-muted" style="font-size: 0.65rem;">إضافات جماعية</small>
-                    </div>
-                </div>
-                
-                <hr class="border-secondary my-2">
-                
-                <h6 class="text-white mb-2 fw-bold" style="font-size: 0.8rem;"><i class="bi bi-clock-history"></i> آخر الرسائل:</h6>
-                <div class="list-group list-group-flush" style="max-height: 220px; overflow-y: auto;">
-                    {% if telegram_logs %}
-                        {% for log in telegram_logs %}
-                        <div class="list-group-item bg-transparent text-light border-secondary px-0 py-1">
-                            <div class="d-flex justify-content-between align-items-center mb-1">
-                                <span class="badge {% if log.status == 'success' %}bg-success{% else %}bg-danger{% endif %} bg-opacity-75" style="font-size: 0.6rem;">
-                                    {{ log.status }}
-                                </span>
-                                <small class="text-muted" style="font-size: 0.6rem;">
-                                    {{ log.created_at | localtime('%m-%d %H:%M') }}
-                                </small>
-                            </div>
-                            <div class="text-truncate" style="font-size: 0.7rem; max-width: 100%;">
-                                <span class="text-accent">{{ log.message_type }}:</span> {{ log.message }}
-                            </div>
-                        </div>
-                        {% endfor %}
-                    {% else %}
-                        <div class="text-center text-muted py-2" style="font-size: 0.75rem;">لا توجد رسائل بعد</div>
-                    {% endif %}
-                </div>
-            </div>
-        </div>
-    </div>
-
-    <!-- إعدادات الاتصال -->
-    <div class="col-md-5">
-        <div class="card border-0 shadow-sm h-100" style="background: rgba(18, 35, 58, 0.9); border: 1px solid rgba(255,255,255,0.08);">
-            <div class="card-header bg-primary bg-opacity-75 text-white py-1">
-                <small class="mb-0 fw-bold"><i class="bi bi-plug-fill"></i> إعدادات الاتصال</small>
-            </div>
-            <div class="card-body p-2">
+            <div class="card-body p-3">
                 <form method="POST" action="{{ url_for('save_telegram_settings') }}">
-                    <div class="mb-2">
-                        <label class="form-label fw-bold text-light mb-1" style="font-size: 0.75rem;">Bot Token <i class="bi bi-robot"></i></label>
-                        <input type="text" name="telegram_token" class="form-control form-control-sm border-secondary" 
-                               style="background:rgba(255,255,255,0.05);color:#fff; font-size: 0.75rem;" 
+                    <div class="mb-3">
+                        <label class="form-label fw-bold text-light" style="font-size: 0.85rem;">Bot Token <i class="bi bi-robot"></i></label>
+                        <input type="text" name="telegram_token" class="form-control border-secondary" 
+                               style="background:rgba(0,0,0,0.3);color:#fff; font-size: 0.85rem;" 
                                value="{{ telegram_settings.token or '' }}" placeholder="أدخل التوكن هنا">
-                        <small class="text-muted" style="font-size: 0.6rem;">احصل على التوكن من @BotFather</small>
+                        <small class="text-muted" style="font-size: 0.7rem;">احصل على التوكن من @BotFather</small>
                     </div>
 
-                    <div class="mb-2">
-                        <label class="form-label fw-bold text-light mb-1" style="font-size: 0.75rem;">Chat ID <i class="bi bi-chat-dots-fill"></i></label>
-                        <input type="text" name="telegram_chat_id" class="form-control form-control-sm border-secondary" 
-                               style="background:rgba(255,255,255,0.05);color:#fff; font-size: 0.75rem;" 
+                    <div class="mb-3">
+                        <label class="form-label fw-bold text-light" style="font-size: 0.85rem;">Chat ID <i class="bi bi-chat-dots-fill"></i></label>
+                        <input type="text" name="telegram_chat_id" class="form-control border-secondary" 
+                               style="background:rgba(0,0,0,0.3);color:#fff; font-size: 0.85rem;" 
                                value="{{ telegram_settings.chat_id or '' }}" placeholder="أدخل Chat ID هنا">
-                        <small class="text-muted" style="font-size: 0.6rem;">احصل على Chat ID من @userinfobot</small>
+                        <small class="text-muted" style="font-size: 0.7rem;">احصل على Chat ID من @userinfobot</small>
                     </div>
 
-                    <div class="form-check form-switch mb-2">
+                    <div class="form-check form-switch mb-3">
                         <input class="form-check-input" type="checkbox" name="telegram_enabled" id="telegram_enabled" 
                                {% if telegram_settings.enabled %}checked{% endif %}>
-                        <label class="form-check-label fw-bold text-light" for="telegram_enabled" style="font-size: 0.75rem;">
+                        <label class="form-check-label fw-bold text-light" for="telegram_enabled" style="font-size: 0.85rem;">
                             تفعيل الإشعارات
                         </label>
                     </div>
 
-                    <hr class="border-secondary my-2">
-                    <h6 class="text-light mb-2 fw-bold" style="font-size: 0.75rem;">نوع الإشعارات المفعلة:</h6>
+                    <hr class="border-secondary">
+                    <h6 class="text-light mb-3 fw-bold" style="font-size: 0.85rem;">نوع الإشعارات المفعلة:</h6>
 
-                    <div class="row g-1">
+                    <div class="row g-2">
                         <div class="col-md-6">
                             <div class="form-check">
-                                <input class="form-check-input" type="checkbox" name="notify_new_subscriber" id="notify_new_subscriber" 
-                                       {% if telegram_settings.notify_new_subscriber %}checked{% endif %}>
-                                <label class="form-check-label text-light" for="notify_new_subscriber" style="font-size: 0.7rem;">
-                                    إشعار مشترك جديد
-                                </label>
+                                <input class="form-check-input" type="checkbox" name="notify_new_subscriber" id="notify_new_subscriber" {% if telegram_settings.notify_new_subscriber %}checked{% endif %}>
+                                <label class="form-check-label text-light" for="notify_new_subscriber" style="font-size: 0.8rem;">إشعار مشترك جديد</label>
                             </div>
                         </div>
                         <div class="col-md-6">
                             <div class="form-check">
-                                <input class="form-check-input" type="checkbox" name="notify_subscriber_expired" id="notify_subscriber_expired" 
-                                       {% if telegram_settings.notify_subscriber_expired %}checked{% endif %}>
-                                <label class="form-check-label text-light" for="notify_subscriber_expired" style="font-size: 0.7rem;">
-                                    إشعار انتهاء الاشتراك
-                                </label>
+                                <input class="form-check-input" type="checkbox" name="notify_subscriber_expired" id="notify_subscriber_expired" {% if telegram_settings.notify_subscriber_expired %}checked{% endif %}>
+                                <label class="form-check-label text-light" for="notify_subscriber_expired" style="font-size: 0.8rem;">إشعار انتهاء الاشتراك</label>
                             </div>
                         </div>
                         <div class="col-md-6">
                             <div class="form-check">
-                                <input class="form-check-input" type="checkbox" name="notify_bulk_add" id="notify_bulk_add" 
-                                       {% if telegram_settings.notify_bulk_add %}checked{% endif %}>
-                                <label class="form-check-label text-light" for="notify_bulk_add" style="font-size: 0.7rem;">
-                                    إشعار إضافة جماعية
-                                </label>
+                                <input class="form-check-input" type="checkbox" name="notify_bulk_add" id="notify_bulk_add" {% if telegram_settings.notify_bulk_add %}checked{% endif %}>
+                                <label class="form-check-label text-light" for="notify_bulk_add" style="font-size: 0.8rem;">إشعار إضافة جماعية</label>
                             </div>
                         </div>
                         <div class="col-md-6">
                             <div class="form-check">
-                                <input class="form-check-input" type="checkbox" name="notify_admin_action" id="notify_admin_action" 
-                                       {% if telegram_settings.notify_admin_action %}checked{% endif %}>
-                                <label class="form-check-label text-light" for="notify_admin_action" style="font-size: 0.7rem;">
-                                    إشعار العمليات الإدارية
-                                </label>
+                                <input class="form-check-input" type="checkbox" name="notify_admin_action" id="notify_admin_action" {% if telegram_settings.notify_admin_action %}checked{% endif %}>
+                                <label class="form-check-label text-light" for="notify_admin_action" style="font-size: 0.8rem;">إشعار العمليات الإدارية</label>
                             </div>
                         </div>
                         <div class="col-md-6">
                             <div class="form-check">
-                                <input class="form-check-input" type="checkbox" name="notify_router_status" id="notify_router_status" 
-                                       {% if telegram_settings.notify_router_status %}checked{% endif %}>
-                                <label class="form-check-label text-light" for="notify_router_status" style="font-size: 0.7rem;">
-                                    إشعار حالة الراوترات
-                                </label>
+                                <input class="form-check-input" type="checkbox" name="notify_router_status" id="notify_router_status" {% if telegram_settings.notify_router_status %}checked{% endif %}>
+                                <label class="form-check-label text-light" for="notify_router_status" style="font-size: 0.8rem;">إشعار حالة الراوترات</label>
                             </div>
                         </div>
                     </div>
 
-                    <div class="d-flex gap-2 mt-3">
-                        <button type="submit" class="btn btn-primary btn-sm flex-grow-1" style="font-size: 0.75rem;">
+                    <div class="d-flex gap-2 mt-4">
+                        <button type="submit" class="btn btn-primary flex-grow-1 fw-bold">
                             <i class="bi bi-save"></i> حفظ الإعدادات
                         </button>
-                        <button type="button" class="btn btn-info btn-sm text-white" onclick="testTelegram()" style="font-size: 0.75rem;">
+                        <button type="button" class="btn btn-info text-white fw-bold" onclick="testTelegram()">
                             <i class="bi bi-send"></i> اختبار
                         </button>
                     </div>
@@ -156,27 +87,137 @@
             </div>
         </div>
     </div>
+
+    <!-- إحصائيات الإشعارات (اليمين) -->
+    <div class="col-md-7 order-md-2">
+        <div class="card border-0 shadow-sm h-100" style="background: rgba(18, 35, 58, 0.9); border: 1px solid rgba(255,255,255,0.08);">
+            <div class="card-header bg-primary text-white py-2" style="background: linear-gradient(90deg, #0d6efd, #0b5ed7) !important;">
+                <h6 class="mb-0 fw-bold"><i class="bi bi-bar-chart-fill"></i> إحصائيات الإشعارات</h6>
+            </div>
+            <div class="card-body p-3">
+                <div class="row text-center mb-4">
+                    <div class="col-6">
+                        <h3 class="text-info fw-bold mb-0" id="stat-total-notifications">{{ total_notifications }}</h3>
+                        <small class="text-muted">إجمالي الإشعارات</small>
+                    </div>
+                    <div class="col-6">
+                        <h3 class="text-success fw-bold mb-0" id="stat-new-subscribers">{{ new_subscribers }}</h3>
+                        <small class="text-muted">مشتركين جدد</small>
+                    </div>
+                    <div class="col-6 mt-3">
+                        <h3 class="text-danger fw-bold mb-0" id="stat-expired-subscribers">{{ expired_subscribers }}</h3>
+                        <small class="text-muted">اشتراكات منتهية</small>
+                    </div>
+                    <div class="col-6 mt-3">
+                        <h3 class="text-warning fw-bold mb-0" id="stat-bulk-adds">{{ bulk_adds }}</h3>
+                        <small class="text-muted">إضافات جماعية</small>
+                    </div>
+                </div>
+                
+                <hr class="border-secondary">
+                
+                <h6 class="text-white mb-3 fw-bold"><i class="bi bi-clock-history"></i> آخر الرسائل:</h6>
+                <div class="list-group list-group-flush" id="telegram-logs-container" style="max-height: 250px; overflow-y: auto;">
+                    {% if telegram_logs %}
+                        {% for log in telegram_logs %}
+                        <div class="list-group-item bg-transparent text-light border-secondary px-0 py-2">
+                            <div class="d-flex justify-content-between align-items-center mb-1">
+                                <span class="badge {% if log.status == 'success' %}bg-success{% else %}bg-danger{% endif %} bg-opacity-75" style="font-size: 0.7rem;">
+                                    {{ log.status }}
+                                </span>
+                                <small class="text-muted" style="font-size: 0.7rem;">
+                                    {{ log.created_at | localtime('%Y-%m-%d %H:%M:%S') }}
+                                </small>
+                            </div>
+                            <div class="small text-truncate" style="max-width: 100%; font-size: 0.8rem;">
+                                <span class="text-accent">{{ log.message_type }}:</span> {{ log.message }}
+                            </div>
+                        </div>
+                        {% endfor %}
+                    {% else %}
+                        <div class="text-center text-muted py-3">لا توجد رسائل بعد</div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
 </div>
 
 <script>
+// دالة اختبار الإشعارات
 function testTelegram() {
     fetch('{{ url_for("test_telegram") }}', {
         method: 'POST',
-        headers: {
-            'Content-Type': 'application/json',
-        }
+        headers: { 'Content-Type': 'application/json' }
     })
     .then(response => response.json())
     .then(data => {
-        if (data.success) {
-            alert('✅ تم إرسال رسالة الاختبار بنجاح!');
-        } else {
-            alert('❌ فشل الإرسال: ' + (data.error || 'خطأ غير معروف'));
-        }
+        if (data.success) alert('✅ تم إرسال رسالة الاختبار بنجاح!');
+        else alert('❌ فشل الإرسال: ' + (data.error || 'خطأ غير معروف'));
     })
-    .catch(error => {
-        alert('❌ حدث خطأ في الاتصال بالسيرفر');
-    });
+    .catch(error => alert('❌ حدث خطأ في الاتصال بالسيرفر'));
 }
+
+// ✅ دالة التحديث التلقائي (AJAX)
+function fetchTelegramData() {
+    console.log("🔄 جاري تحديث بيانات التلجرام..."); // رسالة للمطور في الـ Console
+    
+    fetch('/api/telegram_data')
+        .then(response => {
+            if (!response.ok) throw new Error('Network response was not ok');
+            return response.json();
+        })
+        .then(data => {
+            if (data.error) {
+                console.error("خطأ من السيرفر:", data.error);
+                return;
+            }
+
+            // 1. تحديث الأرقام
+            const totalEl = document.getElementById('stat-total-notifications');
+            const newEl = document.getElementById('stat-new-subscribers');
+            const expEl = document.getElementById('stat-expired-subscribers');
+            const bulkEl = document.getElementById('stat-bulk-adds');
+
+            if (totalEl) totalEl.textContent = data.total_notifications;
+            if (newEl) newEl.textContent = data.new_subscribers;
+            if (expEl) expEl.textContent = data.expired_subscribers;
+            if (bulkEl) bulkEl.textContent = data.bulk_adds;
+
+            // 2. تحديث قائمة السجلات
+            const container = document.getElementById('telegram-logs-container');
+            if (container && data.logs) {
+                let html = '';
+                if (data.logs.length > 0) {
+                    data.logs.forEach(log => {
+                        const badgeClass = log.status === 'success' ? 'bg-success' : 'bg-danger';
+                        html += `
+                            <div class="list-group-item bg-transparent text-light border-secondary px-0 py-2">
+                                <div class="d-flex justify-content-between align-items-center mb-1">
+                                    <span class="badge ${badgeClass} bg-opacity-75" style="font-size: 0.7rem;">${log.status}</span>
+                                    <small class="text-muted" style="font-size: 0.7rem;">${log.time}</small>
+                                </div>
+                                <div class="small text-truncate" style="max-width: 100%; font-size: 0.8rem;">
+                                    <span class="text-accent">${log.type}:</span> ${log.message}
+                                </div>
+                            </div>
+                        `;
+                    });
+                } else {
+                    html = '<div class="text-center text-muted py-3">لا توجد رسائل بعد</div>';
+                }
+                container.innerHTML = html;
+            }
+            
+            console.log("✅ تم تحديث البيانات بنجاح");
+        })
+        .catch(error => console.error('❌ خطأ في جلب البيانات:', error));
+}
+
+// تشغيل التحديث التلقائي كل 5 ثوانٍ (5000 مللي ثانية)
+setInterval(fetchTelegramData, 5000);
+
+// تشغيل التحديث فوراً عند فتح الصفحة
+document.addEventListener('DOMContentLoaded', fetchTelegramData);
 </script>
 {% endblock %}
