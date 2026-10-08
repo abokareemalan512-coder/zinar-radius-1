@@ -1478,9 +1478,14 @@ def my_account_refresh():
         return jsonify({'ok': False, 'error': str(e)}), 500
 
 
+# ============ ✅ السرعة الحية (مُصحّحة) ============
+
 @app.route('/my-account/live-speed', methods=['POST'])
 def my_account_live_speed():
-    """جلب السرعة اللحظية من MikroTik مباشرة عبر monitor-traffic"""
+    """
+    جلب السرعة اللحظية من MikroTik عبر طريقة الفرق
+    مع Cache ذكي لمنع التذبذب
+    """
     if not session.get('subscriber_id'):
         return jsonify({'ok': False, 'error': 'Unauthorized'}), 401
 
@@ -1492,27 +1497,33 @@ def my_account_live_speed():
     if not router:
         return jsonify({'ok': False, 'error': 'Router not found'})
 
+    cache_key = f"live_speed_{sub.id}"
+    now = time.time()
+
     api = None
     try:
         api = get_mikrotik_api(router)
         iface_name = f"<pppoe-{sub.username}>"
 
-        found_iface = None
+        # ✅ جلب الواجهة الحقيقية للمشترك
+        target_iface = None
         all_ifaces = list(api.path('interface'))
+
+        # 1. مطابقة تامة
         for iface in all_ifaces:
-            name = _safe_str(iface.get('name'))
-            if name == iface_name:
-                found_iface = name
+            if _safe_str(iface.get('name')) == iface_name:
+                target_iface = iface
                 break
 
-        if not found_iface:
+        # 2. مطابقة جزئية (fallback)
+        if not target_iface:
             for iface in all_ifaces:
                 name = _safe_str(iface.get('name'))
                 if sub.username in name and 'pppoe' in name.lower():
-                    found_iface = name
+                    target_iface = iface
                     break
 
-        if not found_iface:
+        if not target_iface:
             api.close()
             api = None
             return jsonify({
@@ -1526,73 +1537,52 @@ def my_account_live_speed():
                 'download_total': 0,
             })
 
-        rx_rate_bps = 0
-        tx_rate_bps = 0
-        rx_byte = 0
-        tx_byte = 0
-
-        try:
-            monitor_path = api.path('interface', 'monitor-traffic')
-            result = list(monitor_path(**{
-                'interface': found_iface,
-                'once': ''
-            }))
-
-            if result and len(result) > 0:
-                data = result[0]
-                rx_rate_str = _safe_str(data.get('rx-rate', '0'))
-                tx_rate_str = _safe_str(data.get('tx-rate', '0'))
-                rx_byte = _safe_int(data.get('rx-byte', 0), 0)
-                tx_byte = _safe_int(data.get('tx-byte', 0), 0)
-
-                def parse_rate(rate_str):
-                    rate_str = str(rate_str).strip()
-                    if not rate_str or rate_str == '0':
-                        return 0
-                    try:
-                        if rate_str.endswith('k') or rate_str.endswith('K'):
-                            return float(rate_str[:-1]) * 1000
-                        elif rate_str.endswith('M'):
-                            return float(rate_str[:-1]) * 1_000_000
-                        elif rate_str.endswith('G'):
-                            return float(rate_str[:-1]) * 1_000_000_000
-                        else:
-                            return float(rate_str)
-                    except (ValueError, TypeError):
-                        return 0
-
-                rx_rate_bps = parse_rate(rx_rate_str)
-                tx_rate_bps = parse_rate(tx_rate_str)
-
-                logger.info(f"📊 {sub.username}: iface={found_iface}, rx-rate={rx_rate_str}, tx-rate={tx_rate_str}")
-        except Exception as me:
-            logger.warning(f"⚠️ monitor-traffic فشل: {me} — استخدام طريقة الفرق")
-            cache_key = f"live_fallback_{sub.id}"
-            now = time.time()
-
-            if cache_key in _traffic_cache:
-                prev = _traffic_cache[cache_key]
-                elapsed = now - prev['time']
-                if elapsed >= 1.5:
-                    target = None
-                    for iface in all_ifaces:
-                        if _safe_str(iface.get('name')) == found_iface:
-                            target = iface
-                            break
-                    if target:
-                        rx_byte = _safe_int(target.get('rx-byte', 0), 0)
-                        tx_byte = _safe_int(target.get('tx-byte', 0), 0)
-                        rx_diff = max(0, rx_byte - prev['rx_byte'])
-                        tx_diff = max(0, tx_byte - prev['tx_byte'])
-                        rx_rate_bps = (rx_diff / elapsed) * 8
-                        tx_rate_bps = (tx_diff / elapsed) * 8
-                        _traffic_cache[cache_key] = {
-                            'time': now, 'rx_byte': rx_byte, 'tx_byte': tx_byte
-                        }
+        rx_byte = _safe_int(target_iface.get('rx-byte', 0), 0)
+        tx_byte = _safe_int(target_iface.get('tx-byte', 0), 0)
 
         api.close()
         api = None
 
+        # ✅ حساب السرعة
+        rx_rate_bps = 0
+        tx_rate_bps = 0
+
+        if cache_key in _traffic_cache:
+            prev = _traffic_cache[cache_key]
+            elapsed = now - prev['time']
+
+            # إذا مرّ وقت كافٍ، احسب السرعة الجديدة
+            if elapsed >= 1.0:
+                rx_diff = max(0, rx_byte - prev['rx_byte'])
+                tx_diff = max(0, tx_byte - prev['tx_byte'])
+                rx_rate_bps = (rx_diff / elapsed) * 8
+                tx_rate_bps = (tx_diff / elapsed) * 8
+
+                _traffic_cache[cache_key] = {
+                    'time': now,
+                    'rx_byte': rx_byte,
+                    'tx_byte': tx_byte,
+                    'rx_rate': rx_rate_bps,
+                    'tx_rate': tx_rate_bps,
+                }
+            else:
+                # لا تزال القيمة القديمة صالحة
+                rx_rate_bps = prev.get('rx_rate', 0)
+                tx_rate_bps = prev.get('tx_rate', 0)
+                # حدّث البايتات لكن لا تغيّر الوقت
+                _traffic_cache[cache_key]['rx_byte'] = rx_byte
+                _traffic_cache[cache_key]['tx_byte'] = tx_byte
+        else:
+            # أول قراءة — لا يمكن حساب السرعة
+            _traffic_cache[cache_key] = {
+                'time': now,
+                'rx_byte': rx_byte,
+                'tx_byte': tx_byte,
+                'rx_rate': 0,
+                'tx_rate': 0,
+            }
+
+        # ✅ تنسيق السرعة
         def format_speed(bps):
             if bps >= 1_000_000_000:
                 return round(bps / 1_000_000_000, 2), 'Gbps'
@@ -1606,6 +1596,7 @@ def my_account_live_speed():
         up_val, up_unit = format_speed(rx_rate_bps)
         down_val, down_unit = format_speed(tx_rate_bps)
 
+        # ✅ تحديث DB
         if rx_byte > 0 or tx_byte > 0:
             sub.session_rx_bytes = rx_byte
             sub.session_tx_bytes = tx_byte
