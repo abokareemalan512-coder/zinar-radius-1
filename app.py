@@ -256,7 +256,6 @@ def _day_bounds(day=None):
 
 # ✅ دوال مساعدة لتحويل القيم من bytes إلى string آمن للـ JSON
 def _safe_str(value, default=''):
-    """تحويل أي قيمة إلى string آمن للـ JSON"""
     if value is None:
         return default
     if isinstance(value, bytes):
@@ -268,7 +267,6 @@ def _safe_str(value, default=''):
 
 
 def _safe_bool(value, default=False):
-    """تحويل القيمة إلى Boolean"""
     if value is None:
         return default
     if isinstance(value, bool):
@@ -283,7 +281,6 @@ def _safe_bool(value, default=False):
 
 
 def _safe_int(value, default=0):
-    """تحويل القيمة إلى int بأمان"""
     try:
         return int(_safe_str(value, str(default)))
     except (ValueError, TypeError):
@@ -759,12 +756,9 @@ def background_router_monitor():
         time.sleep(60)
 
 
-# ============ ✅ Background IP Updater ============
+# ============ Background IP Updater ============
 
 def fetch_active_ips_from_router(router):
-    """
-    جلب جميع المستخدمين النشطين (PPPoE + Hotspot) من راوتر MikroTik مع IP الحقيقي
-    """
     if not LIBROUTEROS_AVAILABLE:
         return {}
     
@@ -773,7 +767,6 @@ def fetch_active_ips_from_router(router):
     try:
         api = get_mikrotik_api(router)
         
-        # جلب مستخدمي PPPoE النشطين
         try:
             for ppp in api.path('ppp', 'active'):
                 uname = _safe_str(ppp.get('name'))
@@ -788,7 +781,6 @@ def fetch_active_ips_from_router(router):
         except Exception as e:
             logger.warning(f"⚠️ فشل جلب PPP active من {router.name}: {e}")
         
-        # جلب مستخدمي Hotspot النشطين
         try:
             for hs in api.path('ip', 'hotspot', 'active'):
                 uname = _safe_str(hs.get('user'))
@@ -820,9 +812,6 @@ def fetch_active_ips_from_router(router):
 
 
 def background_ip_updater():
-    """
-    تحديث IP المشتركين من جميع الراوترات كل دقيقتين
-    """
     time.sleep(30)
     while True:
         try:
@@ -1264,7 +1253,6 @@ def api_import_packages():
 # ============ API لمراقبة حركة المرور ============
 
 def get_mikrotik_api(router):
-    """إنشاء اتصال مع MikroTik API"""
     if not LIBROUTEROS_AVAILABLE:
         raise Exception("مكتبة librouteros غير مثبتة")
     
@@ -1285,7 +1273,6 @@ def get_mikrotik_api(router):
 
 @app.route('/api/traffic/interfaces/<int:router_id>')
 def api_get_interfaces(router_id):
-    """جلب قائمة المنافذ من MikroTik"""
     router = Router.query.get_or_404(router_id)
     api = None
     try:
@@ -1294,7 +1281,6 @@ def api_get_interfaces(router_id):
         interfaces = []
         
         for iface in interfaces_data:
-            # ✅ تحويل آمن لكل القيم
             name = _safe_str(iface.get('name'))
             if not name:
                 continue
@@ -1312,7 +1298,6 @@ def api_get_interfaces(router_id):
                 'running': running
             })
         
-        # ترتيب حسب الاسم
         interfaces.sort(key=lambda x: x['name'])
         
         return jsonify({
@@ -1335,7 +1320,6 @@ def api_get_interfaces(router_id):
 
 @app.route('/api/traffic/stats/<int:router_id>/<interface>')
 def api_get_traffic_stats(router_id, interface):
-    """جلب إحصائيات حركة المرور عبر MikroTik API"""
     router = Router.query.get_or_404(router_id)
     api = None
     try:
@@ -1351,7 +1335,6 @@ def api_get_traffic_stats(router_id, interface):
         if not target:
             return jsonify({'ok': False, 'error': f'المنفذ {interface} غير موجود'}), 404
         
-        # ✅ تحويل آمن للبايتات
         rx_byte = _safe_int(target.get('rx-byte', '0'), 0)
         tx_byte = _safe_int(target.get('tx-byte', '0'), 0)
         
@@ -1656,7 +1639,6 @@ def import_backup():
 
 @app.route('/traffic-monitor')
 def traffic_monitor_page():
-    """صفحة مراقبة حركة المرور عبر MikroTik API"""
     routers_list = Router.query.all()
     return render_template('traffic_monitor.html', routers=routers_list)
 
@@ -1707,6 +1689,15 @@ def dashboard():
         telegram_status = TelegramSetting.query.first()
         recent_telegram_logs = TelegramLog.query.order_by(TelegramLog.created_at.desc()).limit(5).all()
 
+        # ✅ آخر 5 مشتركين جدد
+        recent_subs = Subscriber.query.order_by(Subscriber.created_at.desc()).limit(5).all()
+
+        # ✅ آخر 5 دفعات مكتملة
+        recent_payments = Payment.query.filter_by(status='completed').order_by(Payment.created_at.desc()).limit(5).all()
+
+        # ✅ آخر 5 سيرفرات مضافة
+        recent_routers = Router.query.order_by(Router.created_at.desc()).limit(5).all()
+
         return render_template(
             'dashboard.html',
             routers_count=routers_count,
@@ -1726,7 +1717,10 @@ def dashboard():
             telegram_status=telegram_status,
             recent_telegram_logs=recent_telegram_logs,
             pending_pays=pending_pays,
-            active_sessions=0
+            active_sessions=0,
+            recent_subs=recent_subs,
+            recent_payments=recent_payments,
+            recent_routers=recent_routers,
         )
     except Exception as e:
         db.session.rollback()
