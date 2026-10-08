@@ -151,6 +151,11 @@ class Subscriber(db.Model):
     session_rx_bytes = db.Column(db.BigInteger, default=0)
     session_tx_bytes = db.Column(db.BigInteger, default=0)
     connected_at = db.Column(db.DateTime)
+    phone = db.Column(db.String(20))
+    reminder_3d_sent = db.Column(db.Boolean, default=False)
+    reminder_2d_sent = db.Column(db.Boolean, default=False)
+    reminder_1d_sent = db.Column(db.Boolean, default=False)
+    reminder_0d_sent = db.Column(db.Boolean, default=False)
 
 
 class Payment(db.Model):
@@ -195,6 +200,7 @@ class TelegramSetting(db.Model):
     notify_bulk_add = db.Column(db.Boolean, default=True)
     notify_admin_action = db.Column(db.Boolean, default=False)
     notify_router_status = db.Column(db.Boolean, default=True)
+    notify_expiry_reminder = db.Column(db.Boolean, default=True)
 
 
 class TelegramLog(db.Model):
@@ -652,6 +658,102 @@ def notify_router_status_change(router_name, ip_address, is_up):
     return send_telegram_message(msg, message_type='router_status')[0]
 
 
+def send_expiry_reminder(sub, days_left):
+    settings = get_telegram_settings()
+    if not settings or not settings.enabled or not settings.notify_expiry_reminder:
+        return False
+    if not settings.token or not settings.chat_id:
+        return False
+
+    expires_str = sub.expires_at.strftime('%Y-%m-%d') if sub.expires_at else '—'
+
+    if days_left == 0:
+        title = "🔴 *ينتهي اليوم!*"
+        note = "اشتراك المشترك ينتهي *اليوم* (آخر يوم)"
+    elif days_left == 1:
+        title = "⚠️ *تذكير مهم: يوم واحد متبقٍ*"
+        note = "اشتراك المشترك ينتهي *غداً*"
+    elif days_left == 2:
+        title = "⏰ *تذكير: يومان متبقيان*"
+        note = "اشتراك المشترك ينتهي خلال *يومين*"
+    elif days_left == 3:
+        title = "📢 *تذكير: 3 أيام متبقية*"
+        note = "اشتراك المشترك ينتهي خلال *3 أيام*"
+    else:
+        return False
+
+    text = (
+        f"{title}\n"
+        f"━━━━━━━━━━━━━━━━━━\n"
+        f"👤 *اسم المستخدم:* `{sub.username}`\n"
+        f"📝 *الاسم:* {sub.name or 'غير محدد'}\n"
+        f"📦 *الباقة:* `{sub.package or 'غير محددة'}`\n"
+        f"🌐 *النوع:* {'هوت سبوت' if sub.user_type == 'hotspot' else 'برودباند'}\n"
+        f"📅 *تاريخ الانتهاء:* `{expires_str}`\n"
+        f"⏱ *المتبقي:* {days_left} يوم\n"
+        f"━━━━━━━━━━━━━━━━━━\n"
+        f"{note}\n\n"
+        f"📞 يرجى التواصل مع المشترك لتجديد الاشتراك."
+    )
+
+    ok, msg = send_telegram_message(text, message_type='expiry_reminder')
+    if ok:
+        logger.info(f"📢 تذكير {days_left} أيام أُرسل لـ {sub.username}")
+    return ok
+
+
+def background_expiry_reminder():
+    time.sleep(60)
+    while True:
+        try:
+            with app.app_context():
+                now = datetime.utcnow()
+                upcoming = Subscriber.query.filter(
+                    Subscriber.expires_at.isnot(None),
+                    Subscriber.expires_at > now,
+                    Subscriber.expires_at <= now + timedelta(days=4),
+                    Subscriber.status == 'active'
+                ).all()
+
+                sent_count = 0
+                for sub in upcoming:
+                    days_left = (sub.expires_at - now).days
+
+                    if days_left == 3 and not sub.reminder_3d_sent:
+                        if send_expiry_reminder(sub, 3):
+                            sub.reminder_3d_sent = True
+                            sent_count += 1
+
+                    elif days_left == 2 and not sub.reminder_2d_sent:
+                        if send_expiry_reminder(sub, 2):
+                            sub.reminder_2d_sent = True
+                            sent_count += 1
+
+                    elif days_left == 1 and not sub.reminder_1d_sent:
+                        if send_expiry_reminder(sub, 1):
+                            sub.reminder_1d_sent = True
+                            sent_count += 1
+
+                    elif days_left == 0 and not sub.reminder_0d_sent:
+                        if send_expiry_reminder(sub, 0):
+                            sub.reminder_0d_sent = True
+                            sent_count += 1
+
+                if sent_count > 0:
+                    db.session.commit()
+                    logger.info(f"✅ تم إرسال {sent_count} تذكير انتهاء اشتراك")
+
+        except Exception as e:
+            logger.warning(f"⚠️ خطأ في تذكيرات الانتهاء: {e}")
+        finally:
+            try:
+                db.session.remove()
+            except Exception:
+                pass
+
+        time.sleep(3600)
+
+
 # ============ Background Router Monitor ============
 
 def is_private_ip(ip):
@@ -918,7 +1020,8 @@ def init_database():
             if not TelegramSetting.query.first():
                 db.session.add(TelegramSetting(
                     enabled=False, notify_new_subscriber=True, notify_subscriber_expired=True,
-                    notify_bulk_add=True, notify_admin_action=False, notify_router_status=True
+                    notify_bulk_add=True, notify_admin_action=False, notify_router_status=True,
+                    notify_expiry_reminder=True
                 ))
                 db.session.commit()
             logger.info("✅ تم تهيئة قاعدة البيانات")
@@ -945,6 +1048,8 @@ def ensure_columns():
                     cols = [c['name'] for c in insp.get_columns('telegram_settings')]
                     if 'notify_router_status' not in cols:
                         conn.execute(text("ALTER TABLE telegram_settings ADD COLUMN notify_router_status BOOLEAN DEFAULT TRUE"))
+                    if 'notify_expiry_reminder' not in cols:
+                        conn.execute(text("ALTER TABLE telegram_settings ADD COLUMN notify_expiry_reminder BOOLEAN DEFAULT TRUE"))
                 if 'subscribers' in tables:
                     cols = [c['name'] for c in insp.get_columns('subscribers')]
                     for col, sql in [
@@ -958,6 +1063,11 @@ def ensure_columns():
                         ('session_rx_bytes', "ALTER TABLE subscribers ADD COLUMN session_rx_bytes BIGINT DEFAULT 0"),
                         ('session_tx_bytes', "ALTER TABLE subscribers ADD COLUMN session_tx_bytes BIGINT DEFAULT 0"),
                         ('connected_at', "ALTER TABLE subscribers ADD COLUMN connected_at TIMESTAMP"),
+                        ('phone', "ALTER TABLE subscribers ADD COLUMN phone VARCHAR(20)"),
+                        ('reminder_3d_sent', "ALTER TABLE subscribers ADD COLUMN reminder_3d_sent BOOLEAN DEFAULT FALSE"),
+                        ('reminder_2d_sent', "ALTER TABLE subscribers ADD COLUMN reminder_2d_sent BOOLEAN DEFAULT FALSE"),
+                        ('reminder_1d_sent', "ALTER TABLE subscribers ADD COLUMN reminder_1d_sent BOOLEAN DEFAULT FALSE"),
+                        ('reminder_0d_sent', "ALTER TABLE subscribers ADD COLUMN reminder_0d_sent BOOLEAN DEFAULT FALSE"),
                     ]:
                         if col not in cols:
                             conn.execute(text(sql))
@@ -983,6 +1093,9 @@ monitor_thread.start()
 
 ip_updater_thread = threading.Thread(target=background_ip_updater, daemon=True)
 ip_updater_thread.start()
+
+reminder_thread = threading.Thread(target=background_expiry_reminder, daemon=True)
+reminder_thread.start()
 
 
 # ============ API للميكروتيك ============
@@ -1332,6 +1445,102 @@ def api_telegram_data():
         return jsonify({'error': str(e)}), 500
 
 
+# ============ ✅ استقبال بيانات MikroTik Push (جديد) ============
+
+@app.route('/api/mikrotik/push', methods=['POST'])
+def mikrotik_push():
+    """
+    يستقبل بيانات المستخدمين النشطين من MikroTik مباشرة
+    MikroTik يرسلها كل 5 ثواني تلقائياً
+    """
+    try:
+        api_key = request.args.get('key')
+        if api_key != 'zinar-push-key-2026':
+            return jsonify({'ok': False, 'error': 'Unauthorized'}), 401
+
+        data = request.get_json(silent=True)
+        if not data or 'users' not in data:
+            return jsonify({'ok': False, 'error': 'Invalid data'}), 400
+
+        router_name = data.get('router', 'Unknown')
+        users = data.get('users', [])
+
+        router = Router.query.filter_by(name=router_name).first() or Router.query.first()
+        now = time.time()
+        updated_count = 0
+
+        for user_info in users:
+            username = user_info.get('username', '').strip()
+            if not username:
+                continue
+
+            sub = Subscriber.query.filter_by(username=username).first()
+            if not sub:
+                continue
+
+            ip = user_info.get('ip', '')
+            uptime = user_info.get('uptime', '')
+            rx = int(user_info.get('rx', 0))
+            tx = int(user_info.get('tx', 0))
+
+            sub.current_ip = ip
+            sub.session_uptime = uptime
+            sub.session_rx_bytes = rx
+            sub.session_tx_bytes = tx
+            sub.ip_updated_at = datetime.utcnow()
+            sub.last_seen_at = datetime.utcnow()
+
+            if router and sub.router_id != router.id:
+                sub.router_id = router.id
+
+            if uptime:
+                sub.connected_at = _calculate_connected_at(uptime)
+
+            cache_key = f"push_speed_{sub.id}"
+            if cache_key in _traffic_cache:
+                prev = _traffic_cache[cache_key]
+                elapsed = now - prev['time']
+                if elapsed >= 2.0:
+                    rx_diff = max(0, rx - prev['rx_byte'])
+                    tx_diff = max(0, tx - prev['tx_byte'])
+                    _traffic_cache[cache_key] = {
+                        'time': now,
+                        'rx_byte': rx,
+                        'tx_byte': tx,
+                        'rx_rate': (rx_diff / elapsed) * 8,
+                        'tx_rate': (tx_diff / elapsed) * 8,
+                    }
+                else:
+                    _traffic_cache[cache_key]['rx_byte'] = rx
+                    _traffic_cache[cache_key]['tx_byte'] = tx
+            else:
+                _traffic_cache[cache_key] = {
+                    'time': now,
+                    'rx_byte': rx,
+                    'tx_byte': tx,
+                    'rx_rate': 0,
+                    'tx_rate': 0,
+                }
+
+            updated_count += 1
+
+        try:
+            db.session.commit()
+        except Exception:
+            db.session.rollback()
+
+        logger.info(f"📥 MikroTik Push من {router_name}: {updated_count} مشترك محدّث")
+
+        return jsonify({
+            'ok': True,
+            'updated': updated_count,
+            'total': len(users),
+        })
+    except Exception as e:
+        logger.error(f"❌ MikroTik push error: {e}")
+        return jsonify({'ok': False, 'error': str(e)}), 500
+
+
 # ============ Auth Guard ============
 
 @app.route('/mobile')
@@ -1355,7 +1564,8 @@ def check_admin_login():
         'api_get_interfaces', 'api_get_traffic_stats',
         'my_account_login', 'my_account_dashboard',
         'my_account_logout', 'my_account_refresh',
-        'my_account_live_speed'
+        'my_account_live_speed',
+        'mikrotik_push'
     )
     if request.endpoint in public:
         return
@@ -1478,153 +1688,42 @@ def my_account_refresh():
         return jsonify({'ok': False, 'error': str(e)}), 500
 
 
-# ============ ✅ السرعة الحية (مُصحّحة) ============
+# ============ ✅ السرعة الحية (تُقرأ من Cache الذي يعبّئه MikroTik Push) ============
 
 @app.route('/my-account/live-speed', methods=['POST'])
 def my_account_live_speed():
-    """
-    جلب السرعة اللحظية من MikroTik عبر طريقة الفرق
-    مع Cache ذكي لمنع التذبذب
-    """
     if not session.get('subscriber_id'):
         return jsonify({'ok': False, 'error': 'Unauthorized'}), 401
 
     sub = Subscriber.query.get(session['subscriber_id'])
-    if not sub or not sub.router_id:
-        return jsonify({'ok': False, 'error': 'No router'})
+    if not sub:
+        return jsonify({'ok': False, 'error': 'Not found'}), 404
 
-    router = Router.query.get(sub.router_id)
-    if not router:
-        return jsonify({'ok': False, 'error': 'Router not found'})
+    cache_key = f"push_speed_{sub.id}"
+    cached = _traffic_cache.get(cache_key, {})
+    is_fresh = cached and (time.time() - cached.get('time', 0)) < 30
 
-    cache_key = f"live_speed_{sub.id}"
-    now = time.time()
+    rx_rate = cached.get('rx_rate', 0) if is_fresh else 0
+    tx_rate = cached.get('tx_rate', 0) if is_fresh else 0
+    rx_byte = cached.get('rx_byte', sub.session_rx_bytes or 0)
+    tx_byte = cached.get('tx_byte', sub.session_tx_bytes or 0)
 
-    api = None
-    try:
-        api = get_mikrotik_api(router)
-        iface_name = f"<pppoe-{sub.username}>"
+    def fmt(bps):
+        if bps >= 1_000_000_000: return round(bps / 1_000_000_000, 2), 'Gbps'
+        if bps >= 1_000_000: return round(bps / 1_000_000, 2), 'Mbps'
+        if bps >= 1_000: return round(bps / 1_000, 1), 'kbps'
+        return round(bps, 0), 'bps'
 
-        # ✅ جلب الواجهة الحقيقية للمشترك
-        target_iface = None
-        all_ifaces = list(api.path('interface'))
+    up_val, up_unit = fmt(rx_rate)
+    down_val, down_unit = fmt(tx_rate)
 
-        # 1. مطابقة تامة
-        for iface in all_ifaces:
-            if _safe_str(iface.get('name')) == iface_name:
-                target_iface = iface
-                break
-
-        # 2. مطابقة جزئية (fallback)
-        if not target_iface:
-            for iface in all_ifaces:
-                name = _safe_str(iface.get('name'))
-                if sub.username in name and 'pppoe' in name.lower():
-                    target_iface = iface
-                    break
-
-        if not target_iface:
-            api.close()
-            api = None
-            return jsonify({
-                'ok': True,
-                'online': False,
-                'upload_speed': 0,
-                'upload_unit': 'bps',
-                'download_speed': 0,
-                'download_unit': 'bps',
-                'upload_total': 0,
-                'download_total': 0,
-            })
-
-        rx_byte = _safe_int(target_iface.get('rx-byte', 0), 0)
-        tx_byte = _safe_int(target_iface.get('tx-byte', 0), 0)
-
-        api.close()
-        api = None
-
-        # ✅ حساب السرعة
-        rx_rate_bps = 0
-        tx_rate_bps = 0
-
-        if cache_key in _traffic_cache:
-            prev = _traffic_cache[cache_key]
-            elapsed = now - prev['time']
-
-            # إذا مرّ وقت كافٍ، احسب السرعة الجديدة
-            if elapsed >= 1.0:
-                rx_diff = max(0, rx_byte - prev['rx_byte'])
-                tx_diff = max(0, tx_byte - prev['tx_byte'])
-                rx_rate_bps = (rx_diff / elapsed) * 8
-                tx_rate_bps = (tx_diff / elapsed) * 8
-
-                _traffic_cache[cache_key] = {
-                    'time': now,
-                    'rx_byte': rx_byte,
-                    'tx_byte': tx_byte,
-                    'rx_rate': rx_rate_bps,
-                    'tx_rate': tx_rate_bps,
-                }
-            else:
-                # لا تزال القيمة القديمة صالحة
-                rx_rate_bps = prev.get('rx_rate', 0)
-                tx_rate_bps = prev.get('tx_rate', 0)
-                # حدّث البايتات لكن لا تغيّر الوقت
-                _traffic_cache[cache_key]['rx_byte'] = rx_byte
-                _traffic_cache[cache_key]['tx_byte'] = tx_byte
-        else:
-            # أول قراءة — لا يمكن حساب السرعة
-            _traffic_cache[cache_key] = {
-                'time': now,
-                'rx_byte': rx_byte,
-                'tx_byte': tx_byte,
-                'rx_rate': 0,
-                'tx_rate': 0,
-            }
-
-        # ✅ تنسيق السرعة
-        def format_speed(bps):
-            if bps >= 1_000_000_000:
-                return round(bps / 1_000_000_000, 2), 'Gbps'
-            elif bps >= 1_000_000:
-                return round(bps / 1_000_000, 2), 'Mbps'
-            elif bps >= 1_000:
-                return round(bps / 1_000, 1), 'kbps'
-            else:
-                return round(bps, 0), 'bps'
-
-        up_val, up_unit = format_speed(rx_rate_bps)
-        down_val, down_unit = format_speed(tx_rate_bps)
-
-        # ✅ تحديث DB
-        if rx_byte > 0 or tx_byte > 0:
-            sub.session_rx_bytes = rx_byte
-            sub.session_tx_bytes = tx_byte
-            sub.ip_updated_at = datetime.utcnow()
-            try:
-                db.session.commit()
-            except Exception:
-                db.session.rollback()
-
-        return jsonify({
-            'ok': True,
-            'online': True,
-            'upload_speed': up_val,
-            'upload_unit': up_unit,
-            'download_speed': down_val,
-            'download_unit': down_unit,
-            'upload_total': rx_byte,
-            'download_total': tx_byte,
-        })
-    except Exception as e:
-        logger.error(f"❌ Live speed error: {e}")
-        return jsonify({'ok': False, 'error': str(e)}), 500
-    finally:
-        if api:
-            try:
-                api.close()
-            except Exception:
-                pass
+    return jsonify({
+        'ok': True,
+        'online': is_fresh,
+        'upload_speed': up_val, 'upload_unit': up_unit,
+        'download_speed': down_val, 'download_unit': down_unit,
+        'upload_total': rx_byte, 'download_total': tx_byte,
+    })
 
 
 @app.route('/my-account/logout')
@@ -2130,6 +2229,7 @@ def add_subscriber():
         pw = request.form.get('password', '').strip()
         pkg = request.form.get('package', '').strip()
         ut = request.form.get('user_type', 'pppoe').strip()
+        phone = request.form.get('phone', '').strip()
         if ut not in ('pppoe', 'hotspot'):
             ut = 'pppoe'
         if not un or not pw:
@@ -2141,7 +2241,8 @@ def add_subscriber():
         try:
             db.session.add(Subscriber(
                 name=name or un, username=un, password=pw, package=pkg,
-                user_type=ut, expires_at=None, status='active'
+                user_type=ut, expires_at=None, status='active',
+                phone=phone
             ))
             db.session.commit()
             if radius_sync:
@@ -2326,6 +2427,10 @@ def extend_subscriber(sub_id):
         base = sub.expires_at if sub.expires_at and sub.expires_at > datetime.utcnow() else datetime.utcnow()
         sub.expires_at = calculate_expiry(pkg, base) if pkg else base + timedelta(days=30)
         sub.status = 'active'
+        sub.reminder_3d_sent = False
+        sub.reminder_2d_sent = False
+        sub.reminder_1d_sent = False
+        sub.reminder_0d_sent = False
         db.session.commit()
         log_event('تتمديد اشتراك', sub.username, f'تاريخ الانتهاء الجديد: {sub.expires_at.strftime("%Y-%m-%d")}')
         flash(f'➕ ينتهي في {sub.expires_at.strftime("%Y-%m-%d")}', 'success')
@@ -2352,12 +2457,19 @@ def update_subscriber(sub_id):
         ut = request.form.get('user_type', '').strip()
         if ut in ('pppoe', 'hotspot'):
             sub.user_type = ut
+        phone = request.form.get('phone', '').strip()
+        if phone:
+            sub.phone = phone
         days_to_add = request.form.get('days_to_add', type=int)
         if days_to_add and days_to_add > 0:
             if sub.expires_at:
                 sub.expires_at = sub.expires_at + timedelta(days=days_to_add)
             else:
                 sub.expires_at = datetime.utcnow() + timedelta(days=days_to_add)
+            sub.reminder_3d_sent = False
+            sub.reminder_2d_sent = False
+            sub.reminder_1d_sent = False
+            sub.reminder_0d_sent = False
         db.session.commit()
         log_event('تعديل مشترك', sub.username)
         flash('✅ تم التحديث في قاعدة البيانات', 'success')
@@ -2575,7 +2687,8 @@ def admin_settings():
     if not settings:
         settings = TelegramSetting(
             enabled=False, notify_new_subscriber=True, notify_subscriber_expired=True,
-            notify_bulk_add=True, notify_admin_action=False, notify_router_status=True
+            notify_bulk_add=True, notify_admin_action=False, notify_router_status=True,
+            notify_expiry_reminder=True
         )
     logs = TelegramLog.query.order_by(TelegramLog.created_at.desc()).limit(10).all()
     total_notifications = TelegramLog.query.count()
@@ -2606,6 +2719,7 @@ def save_telegram_settings():
     settings.notify_bulk_add = 'notify_bulk_add' in request.form
     settings.notify_admin_action = 'notify_admin_action' in request.form
     settings.notify_router_status = 'notify_router_status' in request.form
+    settings.notify_expiry_reminder = 'notify_expiry_reminder' in request.form
     db.session.add(settings)
     db.session.commit()
     flash('✅ تم حفظ إعدادات التلجرام بنجاح', 'success')
