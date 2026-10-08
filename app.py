@@ -239,10 +239,6 @@ def _day_bounds(day=None):
 # ============ ✅ فك ترميز MikroTik (تحويل \XX إلى عربي) ============
 
 def decode_mikrotik_escapes(text):
-    """
-    تحويل رموز MikroTik مثل \E3\CD\E3\CF إلى نص عربي مقروء.
-    MikroTik يشفر البايتات غير ASCII إلى \XX حيث XX هو hex.
-    """
     if not text or '\\' not in text:
         return text
 
@@ -251,25 +247,20 @@ def decode_mikrotik_escapes(text):
     n = len(text)
 
     while i < n:
-        # هل نبدأ بـ \XX ?
         if text[i] == '\\' and i + 2 < n and all(c in '0123456789ABCDEFabcdef' for c in text[i+1:i+3]):
-            # جمع كل البايتات المتتالية
             byte_seq = []
             while i + 2 < n and text[i] == '\\' and all(c in '0123456789ABCDEFabcdef' for c in text[i+1:i+3]):
                 byte_seq.append(int(text[i+1:i+3], 16))
                 i += 3
 
-            # محاولة فك الترميز
             try:
                 decoded = bytes(byte_seq).decode('utf-8')
-                # إذا كان الفك ناجح لكن النتيجة غير معقولة، ارجع للـ hex
                 result.append(decoded)
             except UnicodeDecodeError:
                 try:
                     decoded = bytes(byte_seq).decode('windows-1256')
                     result.append(decoded)
                 except UnicodeDecodeError:
-                    # فشل كل شيء، احتفظ بالرموز الأصلية
                     result.append(''.join(f'\\{b:02X}' for b in byte_seq))
         else:
             result.append(text[i])
@@ -281,8 +272,6 @@ def decode_mikrotik_escapes(text):
 # ============ MikroTik Parser ============
 
 def _extract_kv(text, params):
-    """استخراج key=value مع فك الترميز العربي"""
-    # قطع النص عند on-up/on-down لتجنب محتوى معقد
     for stop in [' on-up=', ' on-down=', 'on-up=', 'on-down=']:
         idx = text.find(stop)
         if idx != -1:
@@ -294,7 +283,6 @@ def _extract_kv(text, params):
         key = match.group(1).lower()
         value = match.group(2) if match.group(2) is not None else match.group(3)
         if key not in params:
-            # ✅ فك الترميز العربي
             params[key] = decode_mikrotik_escapes(value)
 
 
@@ -391,7 +379,6 @@ def _parse_print_format(lines, debug_info, packages, subscribers):
 def _parse_export_format(lines, debug_info, packages, subscribers):
     current_section = None
 
-    # دمج أسطر المتابعة
     merged = []
     buffer = ''
     for line in lines:
@@ -1568,6 +1555,8 @@ def delete_router(router_id):
 def subscribers():
     search = request.args.get('q', '').strip()
     ft = request.args.get('type', '').strip()
+    page = request.args.get('page', 1, type=int)
+    per_page = 50  # ✅ عدد المشتركين في كل صفحة
     now = datetime.utcnow()
 
     try:
@@ -1594,15 +1583,19 @@ def subscribers():
         if ft in ('pppoe', 'hotspot'):
             q = q.filter_by(user_type=ft)
 
-        subs = q.order_by(Subscriber.created_at.desc()).all()
+        # ✅ تقسيم الصفحات (50 مشترك لكل صفحة)
+        pagination = q.order_by(Subscriber.created_at.desc()).paginate(page=page, per_page=per_page, error_out=False)
+        subs = pagination.items
     except Exception as e:
         db.session.rollback()
         logger.error(f"❌ error subscribers: {e}")
         subs = []
+        pagination = None
 
     return render_template(
         'subscribers.html',
         subscribers=subs,
+        pagination=pagination, # ✅ تمرير كائن الترقيم إلى القالب
         routers={r.id: r for r in Router.query.all()},
         packages=Package.query.order_by(Package.name).all(),
         search=search,
@@ -1862,6 +1855,15 @@ def update_subscriber(sub_id):
         ut = request.form.get('user_type', '').strip()
         if ut in ('pppoe', 'hotspot'):
             sub.user_type = ut
+        
+        # ✅ معالجة تفعيل الأيام (تمديد الباقة)
+        days_to_add = request.form.get('days_to_add', type=int)
+        if days_to_add and days_to_add > 0:
+            if sub.expires_at:
+                sub.expires_at = sub.expires_at + timedelta(days=days_to_add)
+            else:
+                sub.expires_at = datetime.utcnow() + timedelta(days=days_to_add)
+
         db.session.commit()
         log_event('تعديل مشترك', sub.username)
         flash('✅ تم التحديث في قاعدة البيانات', 'success')
