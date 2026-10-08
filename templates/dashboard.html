@@ -3,104 +3,107 @@
 
 {% block content %}
 <style>
-    .stat-card {
+    /* تنسيقات خاصة بلوحة التحكم لضمان تصميم أنيق */
+    .dashboard-card {
         background-color: var(--bg-card);
         border: 1px solid var(--bg-hover);
         border-radius: 16px;
-        padding: 20px;
+        padding: 24px;
         transition: all 0.3s ease;
-        position: relative;
-        overflow: hidden;
+        height: 100%;
     }
-    .stat-card:hover {
+    .dashboard-card:hover {
         transform: translateY(-5px);
         border-color: var(--accent);
-        box-shadow: 0 10px 20px -5px rgba(56, 189, 248, 0.2);
+        box-shadow: 0 10px 25px -5px rgba(56, 189, 248, 0.15);
     }
-    .stat-icon-circle {
-        width: 60px;
-        height: 60px;
+    .icon-circle {
+        width: 64px;
+        height: 64px;
         display: inline-flex;
         align-items: center;
         justify-content: center;
         border-radius: 50%;
-        font-size: 26px;
+        font-size: 28px;
+        margin-bottom: 15px;
     }
     .stat-number {
-        font-size: 2.2rem;
+        font-size: 2.5rem;
         font-weight: 800;
         color: var(--text-main);
         line-height: 1;
-        margin: 10px 0 5px;
+        margin: 5px 0;
     }
     .stat-label {
         color: var(--text-muted);
-        font-size: 0.9rem;
+        font-size: 1rem;
         font-weight: 500;
+        margin-bottom: 15px;
     }
     .pulse-dot {
-        width: 8px;
-        height: 8px;
+        width: 10px;
+        height: 10px;
         border-radius: 50%;
         background-color: currentColor;
+        display: inline-block;
         animation: pulse-animation 1.5s infinite;
     }
     @keyframes pulse-animation {
         0% { box-shadow: 0 0 0 0 currentColor; opacity: 1; }
-        70% { box-shadow: 0 0 0 8px transparent; opacity: 0.7; }
+        70% { box-shadow: 0 0 0 10px transparent; opacity: 0.7; }
         100% { box-shadow: 0 0 0 0 transparent; opacity: 1; }
     }
-    .activity-table th {
+    .table-clean th {
         font-size: 0.85rem;
         text-transform: uppercase;
-        color: var(--accent) !important;
+        color: var(--text-muted) !important;
         font-weight: 700;
-        background-color: var(--bg-hover) !important;
+        border-bottom: 1px solid var(--bg-hover) !important;
+        padding: 12px;
     }
-    .activity-table td {
+    .table-clean td {
         font-size: 0.9rem;
         color: var(--text-main);
-        border-color: var(--bg-hover) !important;
+        border-bottom: 1px solid var(--bg-hover) !important;
+        padding: 12px;
+        vertical-align: middle;
     }
-    .welcome-banner {
-        background: linear-gradient(135deg, rgba(56, 189, 248, 0.15), rgba(14, 165, 233, 0.05));
+    .welcome-box {
+        background: linear-gradient(135deg, rgba(56, 189, 248, 0.1), rgba(14, 165, 233, 0.02));
         border: 1px solid rgba(56, 189, 248, 0.2);
         border-radius: 16px;
-        padding: 20px 25px;
+        padding: 24px;
     }
 </style>
 
-<!-- ترحيب ووقت -->
-<div class="welcome-banner mb-4 d-flex justify-content-between align-items-center flex-wrap gap-3">
+<!-- ✅ ترحيب ووقت -->
+<div class="welcome-box mb-4 d-flex justify-content-between align-items-center flex-wrap gap-3">
     <div>
         <h4 class="fw-bold mb-1 text-accent">
-            <i class="bi bi-speedometer2"></i> مرحباً، {{ admin_name }}
+            <i class="bi bi-speedometer2"></i> مرحباً بك، {{ admin_name }}
         </h4>
-        <small class="text-muted">نظرة عامة على أداء النظام والشبكة</small>
+        <p class="text-muted mb-0 small">نظرة عامة على أداء النظام والشبكة</p>
     </div>
-    <div class="text-end">
-        <div class="badge bg-info bg-opacity-10 text-info border border-info px-3 py-2 rounded-3">
-            <i class="bi bi-clock"></i> {{ current_time }}
-        </div>
+    <div>
+        <span class="badge bg-info bg-opacity-10 text-info border border-info px-4 py-3 rounded-3 fs-6">
+            <i class="bi bi-clock-history"></i> {{ current_time }}
+        </span>
     </div>
 </div>
 
-<!-- ✅ بطاقات الإحصائيات -->
-<div class="row g-3 mb-4">
+<!-- ✅ الصف الأول: بطاقات الإحصائيات -->
+<div class="row g-4 mb-4">
     
-    <!-- ✅ بطاقة سيرفرات MikroTik (المعدلة) -->
-    <div class="col-md-3 col-sm-6">
-        <div class="stat-card text-center h-100">
-            <div class="d-flex justify-content-center mb-3">
-                <div class="stat-icon-circle" style="background: rgba(56, 189, 248, 0.1); border: 1px solid rgba(56, 189, 248, 0.2);">
-                    <i class="bi bi-router text-accent"></i>
-                </div>
+    <!-- بطاقة سيرفرات MikroTik -->
+    <div class="col-xl-3 col-md-6">
+        <div class="dashboard-card text-center">
+            <div class="icon-circle mx-auto" style="background: rgba(56, 189, 248, 0.1); border: 1px solid rgba(56, 189, 248, 0.2);">
+                <i class="bi bi-router text-accent"></i>
             </div>
             <div class="stat-number">{{ routers_count }}</div>
-            <div class="stat-label mb-3">سيرفرات MikroTik</div>
+            <div class="stat-label">سيرفرات MikroTik</div>
             
-            <!-- حالة الاتصال -->
-            <div class="d-flex justify-content-center">
+            <div class="d-flex justify-content-center mb-3">
                 {% if routers_online > 0 %}
                     <span class="badge bg-success bg-opacity-10 text-success border border-success px-3 py-2 rounded-pill d-flex align-items-center gap-2">
                         <span class="pulse-dot"></span>
@@ -114,132 +117,124 @@
                 {% endif %}
             </div>
             
-            <!-- تفاصيل سريعة -->
-            <div class="mt-3 pt-3 border-top" style="border-color: var(--bg-hover) !important;">
-                <small class="text-muted d-block">
-                    <i class="bi bi-check-circle-fill text-success me-1"></i> المتصل: {{ routers_online }}
-                </small>
-                <small class="text-muted d-block mt-1">
-                    <i class="bi bi-x-circle-fill text-danger me-1"></i> المتوقف: {{ routers_count - routers_online }}
-                </small>
+            <div class="d-flex justify-content-between text-muted small border-top pt-3" style="border-color: var(--bg-hover) !important;">
+                <span><i class="bi bi-check-circle-fill text-success"></i> متصل: {{ routers_online }}</span>
+                <span><i class="bi bi-x-circle-fill text-danger"></i> متوقف: {{ routers_count - routers_online }}</span>
             </div>
         </div>
     </div>
 
     <!-- بطاقة المشتركين -->
-    <div class="col-md-3 col-sm-6">
-        <div class="stat-card text-center h-100">
-            <div class="d-flex justify-content-center mb-3">
-                <div class="stat-icon-circle" style="background: rgba(34, 197, 94, 0.1); border: 1px solid rgba(34, 197, 94, 0.2);">
-                    <i class="bi bi-people-fill text-success"></i>
-                </div>
+    <div class="col-xl-3 col-md-6">
+        <div class="dashboard-card text-center">
+            <div class="icon-circle mx-auto" style="background: rgba(34, 197, 94, 0.1); border: 1px solid rgba(34, 197, 94, 0.2);">
+                <i class="bi bi-people-fill text-success"></i>
             </div>
             <div class="stat-number">{{ sub_count }}</div>
-            <div class="stat-label mb-3">إجمالي المشتركين</div>
-            <div class="d-flex justify-content-center">
+            <div class="stat-label">إجمالي المشتركين</div>
+            
+            <div class="d-flex justify-content-center mb-3">
                 <span class="badge bg-success bg-opacity-10 text-success border border-success px-3 py-2 rounded-pill">
                     <i class="bi bi-check-circle"></i> {{ active_subs }} نشط
                 </span>
             </div>
-            <div class="mt-3 pt-3 border-top" style="border-color: var(--bg-hover) !important;">
-                <small class="text-muted d-block">
-                    <i class="bi bi-pause-circle text-warning me-1"></i> الموقوفين: {{ sub_count - active_subs }}
-                </small>
+            
+            <div class="d-flex justify-content-between text-muted small border-top pt-3" style="border-color: var(--bg-hover) !important;">
+                <span><i class="bi bi-pause-circle text-warning"></i> موقوف: {{ sub_count - active_subs }}</span>
+                <span><i class="bi bi-calendar-check text-info"></i> اليوم: {{ new_users_today }}</span>
             </div>
         </div>
     </div>
 
     <!-- بطاقة إيرادات اليوم -->
-    <div class="col-md-3 col-sm-6">
-        <div class="stat-card text-center h-100">
-            <div class="d-flex justify-content-center mb-3">
-                <div class="stat-icon-circle" style="background: rgba(245, 158, 11, 0.1); border: 1px solid rgba(245, 158, 11, 0.2);">
-                    <i class="bi bi-cash-coin text-warning"></i>
-                </div>
+    <div class="col-xl-3 col-md-6">
+        <div class="dashboard-card text-center">
+            <div class="icon-circle mx-auto" style="background: rgba(245, 158, 11, 0.1); border: 1px solid rgba(245, 158, 11, 0.2);">
+                <i class="bi bi-cash-coin text-warning"></i>
             </div>
             <div class="stat-number">{{ today_revenue }}</div>
-            <div class="stat-label mb-3">إيرادات اليوم (ل.س)</div>
-            <div class="d-flex justify-content-center">
+            <div class="stat-label">إيرادات اليوم (ل.س)</div>
+            
+            <div class="d-flex justify-content-center mb-3">
                 <span class="badge bg-warning bg-opacity-10 text-warning border border-warning px-3 py-2 rounded-pill">
-                    <i class="bi bi-graph-up-arrow"></i> اليوم
+                    <i class="bi bi-graph-up-arrow"></i> إيراد يومي
                 </span>
             </div>
-            <div class="mt-3 pt-3 border-top" style="border-color: var(--bg-hover) !important;">
-                <small class="text-muted d-block">
-                    <i class="bi bi-hourglass-split text-info me-1"></i> دفعات معلقة: {{ pending_pays }}
-                </small>
+            
+            <div class="d-flex justify-content-between text-muted small border-top pt-3" style="border-color: var(--bg-hover) !important;">
+                <span><i class="bi bi-hourglass-split text-info"></i> معلقة: {{ pending_pays }}</span>
             </div>
         </div>
     </div>
 
-    <!-- بطاقة المشتركين الجدد -->
-    <div class="col-md-3 col-sm-6">
-        <div class="stat-card text-center h-100">
+    <!-- بطاقة إعدادات التلجرام -->
+    <div class="col-xl-3 col-md-6">
+        <div class="dashboard-card text-center">
+            <div class="icon-circle mx-auto" style="background: rgba(34, 158, 217, 0.1); border: 1px solid rgba(34, 158, 217, 0.2);">
+                <!-- ✅ أيقونة تلجرام الرسمية (SVG) لضمان الظهور -->
+                <svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" fill="#229ED9" viewBox="0 0 16 16">
+                    <path d="M16 8A8 8 0 1 1 0 8a8 8 0 0 1 16 0zM8.287 5.906c-.778.324-2.334.994-4.666 2.01-.378.15-.577.298-.595.442-.03.243.275.339.69.47l.175.055c.408.133.958.288 1.243.294.26.006.549-.1.868-.32 2.179-1.471 3.304-2.214 3.374-2.23.05-.012.12-.026.166.016.047.041.042.12.037.141-.03.129-1.227 1.241-1.846 1.817-.193.18-.33.307-.358.336a8.154 8.154 0 0 1-.188.186c-.38.366-.664.64.015 1.088.327.216.589.393.85.571.284.194.568.387.936.629.093.06.183.125.27.187.331.236.63.448.997.414.214-.02.435-.22.547-.82.265-1.417.786-4.486.906-5.751a1.426 1.426 0 0 0-.013-.315.337.337 0 0 0-.114-.217.526.526 0 0 0-.31-.093c-.3.005-.763.166-2.984 1.09z"/>
+                </svg>
+            </div>
+            <div class="stat-number">
+                {% if telegram_status and telegram_status.enabled %}
+                    <span class="text-success fs-3">مفعل</span>
+                {% else %}
+                    <span class="text-danger fs-3">معطل</span>
+                {% endif %}
+            </div>
+            <div class="stat-label">إشعارات التلجرام</div>
+            
             <div class="d-flex justify-content-center mb-3">
-                <div class="stat-icon-circle" style="background: rgba(168, 85, 247, 0.1); border: 1px solid rgba(168, 85, 247, 0.2);">
-                    <i class="bi bi-person-plus-fill" style="color: #a855f7;"></i>
-                </div>
+                <a href="{{ url_for('admin_settings') }}" class="btn btn-sm btn-outline-info rounded-pill px-3">
+                    <i class="bi bi-gear"></i> الإعدادات
+                </a>
             </div>
-            <div class="stat-number">{{ new_users_today }}</div>
-            <div class="stat-label mb-3">مشتركين جدد اليوم</div>
-            <div class="d-flex justify-content-center">
-                <span class="badge px-3 py-2 rounded-pill" style="background: rgba(168, 85, 247, 0.1); color: #a855f7; border: 1px solid rgba(168, 85, 247, 0.3);">
-                    <i class="bi bi-star-fill"></i> جديد
-                </span>
-            </div>
-            <div class="mt-3 pt-3 border-top" style="border-color: var(--bg-hover) !important;">
-                <small class="text-muted d-block">
-                    <i class="bi bi-calendar-event me-1"></i> تاريخ اليوم
-                </small>
+            
+            <div class="d-flex justify-content-between text-muted small border-top pt-3" style="border-color: var(--bg-hover) !important;">
+                <span><i class="bi bi-bell"></i> الإشعارات: {{ recent_telegram_logs|length }}</span>
             </div>
         </div>
     </div>
 </div>
 
-<!-- ✅ الصف الثاني: الأحداث + تلجرام -->
-<div class="row g-3 mb-4">
+<!-- ✅ الصف الثاني: الأحداث + سجل التلجرام -->
+<div class="row g-4 mb-4">
     
     <!-- آخر الأحداث -->
     <div class="col-lg-8">
-        <div class="card h-100">
-            <div class="card-header bg-transparent border-bottom d-flex justify-content-between align-items-center" style="border-color: var(--bg-hover) !important;">
+        <div class="dashboard-card p-0 overflow-hidden">
+            <div class="d-flex justify-content-between align-items-center p-4 border-bottom" style="border-color: var(--bg-hover) !important;">
                 <h6 class="mb-0 fw-bold text-accent">
                     <i class="bi bi-activity"></i> آخر الأحداث
                 </h6>
-                <span class="badge bg-secondary">{{ events|length }} حدث</span>
+                <span class="badge bg-secondary bg-opacity-25">{{ events|length }} حدث</span>
             </div>
-            <div class="table-responsive" style="max-height: 400px; overflow-y: auto;">
-                <table class="table table-hover activity-table mb-0">
+            <div class="table-responsive" style="max-height: 380px; overflow-y: auto;">
+                <table class="table table-hover table-clean mb-0 text-center">
                     <thead>
                         <tr>
                             <th>الوقت</th>
                             <th>المدير</th>
                             <th>الإجراء</th>
                             <th>الهدف</th>
+                            <th>التفاصيل</th>
                         </tr>
                     </thead>
                     <tbody>
                         {% for e in events %}
                         <tr>
-                            <td>
-                                <small class="text-muted">
-                                    <i class="bi bi-clock-history"></i>
-                                    {{ e.created_at | localtime('%H:%M:%S') }}
-                                </small>
-                            </td>
-                            <td>
-                                <span class="badge bg-info bg-opacity-10 text-info">{{ e.admin_name or 'النظام' }}</span>
-                            </td>
-                            <td>{{ e.action }}</td>
-                            <td>
-                                <small class="text-muted">{{ e.target or '-' }}</small>
-                            </td>
+                            <td class="text-muted small">{{ e.created_at | localtime('%H:%M:%S') }}</td>
+                            <td><span class="badge bg-info bg-opacity-10 text-info">{{ e.admin_name or 'النظام' }}</span></td>
+                            <td class="fw-bold">{{ e.action }}</td>
+                            <td>{{ e.target or '-' }}</td>
+                            <td class="text-muted small">{{ e.details or '-' }}</td>
                         </tr>
                         {% else %}
                         <tr>
-                            <td colspan="4" class="text-center py-4 text-muted">
-                                <i class="bi bi-inbox fs-3"></i><br>
-                                لا توجد أحداث
+                            <td colspan="5" class="text-center py-5 text-muted">
+                                <i class="bi bi-inbox fs-2 d-block mb-2"></i>
+                                لا توجد أحداث مسجلة
                             </td>
                         </tr>
                         {% endfor %}
@@ -251,69 +246,68 @@
 
     <!-- سجل تلجرام -->
     <div class="col-lg-4">
-        <div class="card h-100">
-            <div class="card-header bg-transparent border-bottom d-flex justify-content-between align-items-center" style="border-color: var(--bg-hover) !important;">
-                <h6 class="mb-0 fw-bold text-accent">
-                    <i class="bi bi-telegram"></i> سجل الإشعارات
+        <div class="dashboard-card p-0 overflow-hidden d-flex flex-column">
+            <div class="d-flex justify-content-between align-items-center p-4 border-bottom" style="border-color: var(--bg-hover) !important;">
+                <h6 class="mb-0 fw-bold text-accent d-flex align-items-center gap-2">
+                    <!-- ✅ أيقونة تلجرام الرسمية -->
+                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="#229ED9" viewBox="0 0 16 16">
+                        <path d="M16 8A8 8 0 1 1 0 8a8 8 0 0 1 16 0zM8.287 5.906c-.778.324-2.334.994-4.666 2.01-.378.15-.577.298-.595.442-.03.243.275.339.69.47l.175.055c.408.133.958.288 1.243.294.26.006.549-.1.868-.32 2.179-1.471 3.304-2.214 3.374-2.23.05-.012.12-.026.166.016.047.041.042.12.037.141-.03.129-1.227 1.241-1.846 1.817-.193.18-.33.307-.358.336a8.154 8.154 0 0 1-.188.186c-.38.366-.664.64.015 1.088.327.216.589.393.85.571.284.194.568.387.936.629.093.06.183.125.27.187.331.236.63.448.997.414.214-.02.435-.22.547-.82.265-1.417.786-4.486.906-5.751a1.426 1.426 0 0 0-.013-.315.337.337 0 0 0-.114-.217.526.526 0 0 0-.31-.093c-.3.005-.763.166-2.984 1.09z"/>
+                    </svg>
+                    سجل الإشعارات
                 </h6>
                 {% if telegram_status and telegram_status.enabled %}
                     <span class="badge bg-success bg-opacity-10 text-success border border-success">
-                        <span class="pulse-dot" style="display:inline-block;"></span> مفعل
+                        <span class="pulse-dot" style="width: 6px; height: 6px;"></span> نشط
                     </span>
                 {% else %}
                     <span class="badge bg-secondary">معطل</span>
                 {% endif %}
             </div>
-            <div class="card-body p-0" style="max-height: 400px; overflow-y: auto;">
+            <div class="flex-grow-1" style="max-height: 380px; overflow-y: auto;">
                 {% for log in recent_telegram_logs %}
                 <div class="p-3 border-bottom" style="border-color: var(--bg-hover) !important;">
-                    <div class="d-flex justify-content-between align-items-start">
-                        <div>
+                    <div class="d-flex justify-content-between align-items-center mb-1">
+                        <div class="d-flex align-items-center gap-2">
                             {% if log.status == 'success' %}
                                 <i class="bi bi-check-circle-fill text-success"></i>
                             {% else %}
                                 <i class="bi bi-x-circle-fill text-danger"></i>
                             {% endif %}
-                            <small class="text-muted ms-1">{{ log.message_type }}</small>
+                            <small class="text-muted fw-bold">{{ log.message_type }}</small>
                         </div>
-                        <small class="text-muted">
-                            {{ log.created_at | localtime('%m-%d %H:%M') }}
-                        </small>
+                        <small class="text-muted">{{ log.created_at | localtime('%m-%d %H:%M') }}</small>
                     </div>
-                    <div class="mt-2">
-                        <small class="text-muted" style="font-size: 0.8rem;">{{ log.message[:100] }}{% if log.message|length > 100 %}...{% endif %}</small>
+                    <div class="text-muted small" style="font-size: 0.8rem;">
+                        {{ log.message[:80] }}{% if log.message|length > 80 %}...{% endif %}
                     </div>
                 </div>
                 {% else %}
                 <div class="p-5 text-center text-muted">
-                    <i class="bi bi-bell-slash fs-2"></i><br>
-                    <small>لا توجد إشعارات</small>
+                    <i class="bi bi-bell-slash fs-2 d-block mb-2"></i>
+                    لا توجد إشعارات
                 </div>
                 {% endfor %}
-            </div>
-            <div class="card-footer bg-transparent border-top text-center" style="border-color: var(--bg-hover) !important;">
-                <a href="{{ url_for('admin_settings') }}" class="btn btn-sm btn-outline-info">
-                    <i class="bi bi-gear"></i> إعدادات التلجرام
-                </a>
             </div>
         </div>
     </div>
 </div>
 
-<!-- ✅ الصف الثالث: قائمة الراوترات -->
-<div class="row g-3 mb-4">
-    <div class="col-12">
-        <div class="card">
-            <div class="card-header bg-transparent border-bottom d-flex justify-content-between align-items-center" style="border-color: var(--bg-hover) !important;">
+<!-- ✅ الصف الثالث: قائمة الراوترات وإعدادات المدير -->
+<div class="row g-4">
+    
+    <!-- قائمة الراوترات -->
+    <div class="col-lg-8">
+        <div class="dashboard-card p-0 overflow-hidden">
+            <div class="d-flex justify-content-between align-items-center p-4 border-bottom" style="border-color: var(--bg-hover) !important;">
                 <h6 class="mb-0 fw-bold text-accent">
-                    <i class="bi bi-router"></i> راوترات الشبكة (MikroTik)
+                    <i class="bi bi-router"></i> حالة راوترات الشبكة
                 </h6>
-                <a href="{{ url_for('routers') }}" class="btn btn-sm btn-outline-info">
-                    <i class="bi bi-gear"></i> إدارة الراوترات
+                <a href="{{ url_for('routers') }}" class="btn btn-sm btn-outline-info rounded-pill px-3">
+                    <i class="bi bi-gear"></i> إدارة
                 </a>
             </div>
             <div class="table-responsive">
-                <table class="table table-hover activity-table mb-0">
+                <table class="table table-hover table-clean mb-0 text-center">
                     <thead>
                         <tr>
                             <th>#</th>
@@ -321,7 +315,7 @@
                             <th>عنوان IP</th>
                             <th>المنفذ</th>
                             <th>الحالة</th>
-                            <th>رئيسي</th>
+                            <th>الرئيسي</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -329,12 +323,12 @@
                         <tr>
                             <td class="text-muted">#{{ r.id }}</td>
                             <td class="fw-bold text-accent">{{ r.name }}</td>
-                            <td><span class="font-monospace">{{ r.ip_address }}</span></td>
+                            <td><span class="font-monospace text-muted">{{ r.ip_address }}</span></td>
                             <td>{{ r.port }}</td>
                             <td>
                                 {% if r.is_active %}
                                     <span class="badge bg-success bg-opacity-10 text-success border border-success">
-                                        <span class="pulse-dot" style="display:inline-block;"></span> متصل
+                                        <span class="pulse-dot" style="width: 6px; height: 6px;"></span> متصل
                                     </span>
                                 {% else %}
                                     <span class="badge bg-danger bg-opacity-10 text-danger border border-danger">
@@ -344,7 +338,7 @@
                             </td>
                             <td>
                                 {% if r.is_master %}
-                                    <i class="bi bi-star-fill text-warning"></i> رئيسي
+                                    <i class="bi bi-star-fill text-warning"></i>
                                 {% else %}
                                     <span class="text-muted">—</span>
                                 {% endif %}
@@ -352,8 +346,8 @@
                         </tr>
                         {% else %}
                         <tr>
-                            <td colspan="6" class="text-center py-4 text-muted">
-                                <i class="bi bi-router fs-3"></i><br>
+                            <td colspan="6" class="text-center py-5 text-muted">
+                                <i class="bi bi-router fs-2 d-block mb-2"></i>
                                 لا توجد راوترات مضافة
                             </td>
                         </tr>
@@ -363,22 +357,17 @@
             </div>
         </div>
     </div>
-</div>
 
-<!-- ✅ إعدادات المدير -->
-<div class="row g-3">
-    <div class="col-12">
-        <div class="card">
-            <div class="card-header bg-transparent border-bottom" style="border-color: var(--bg-hover) !important;">
-                <h6 class="mb-0 fw-bold text-accent">
-                    <i class="bi bi-shield-lock"></i> إعدادات حساب المدير
-                </h6>
-            </div>
-            <div class="card-body">
-                <button class="btn btn-outline-warning" data-bs-toggle="modal" data-bs-target="#changeCredentialsModal">
-                    <i class="bi bi-key"></i> تغيير بيانات الدخول
-                </button>
-            </div>
+    <!-- إعدادات المدير -->
+    <div class="col-lg-4">
+        <div class="dashboard-card">
+            <h6 class="fw-bold text-accent mb-4">
+                <i class="bi bi-shield-lock"></i> إعدادات حساب المدير
+            </h6>
+            <p class="text-muted small mb-4">يمكنك تغيير اسم المستخدم أو كلمة المرور الخاصة بحسابك من هنا.</p>
+            <button class="btn btn-outline-warning w-100 py-3 rounded-3" data-bs-toggle="modal" data-bs-target="#changeCredentialsModal">
+                <i class="bi bi-key-fill"></i> تغيير بيانات الدخول
+            </button>
         </div>
     </div>
 </div>
@@ -424,18 +413,17 @@
     </div>
 </div>
 
-<!-- ✅ سكريبت تحديث البيانات (AJAX) -->
+<!-- ✅ سكريبت تحديث البيانات تلقائياً (كل 30 ثانية) -->
 <script>
-    // تحديث بيانات لوحة التحكم كل 30 ثانية
     setInterval(function() {
         fetch('/api/dashboard_data')
             .then(response => response.json())
             .then(data => {
                 if (data.error) return;
-                // يمكنك هنا تحديث العناصر مباشرة إذا أردت
-                console.log('✅ تم تحديث البيانات:', data);
+                console.log('✅ تم تحديث بيانات لوحة التحكم:', data);
+                // يمكنك هنا إضافة كود لتحديث الأرقام مباشرة في الصفحة إذا أردت
             })
-            .catch(err => console.log('⚠️ فشل التحديث:', err));
+            .catch(err => console.log('⚠️ فشل تحديث البيانات:', err));
     }, 30000);
 </script>
 
