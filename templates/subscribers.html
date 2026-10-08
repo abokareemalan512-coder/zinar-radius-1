@@ -86,6 +86,39 @@
         font-weight: 500;
         border-radius: 6px;
     }
+    
+    /* ✅ تصحيح ألوان البحث والفلترة لتتناسب مع الوضع الليلي */
+    .search-group .input-group-text {
+        background-color: var(--bg-main) !important;
+        border: 1px solid var(--bg-hover) !important;
+        border-left: none !important;
+        color: var(--text-muted) !important;
+    }
+    .search-group .form-control {
+        background-color: var(--bg-main) !important;
+        border: 1px solid var(--bg-hover) !important;
+        border-right: none !important;
+        color: var(--text-main) !important;
+    }
+    .search-group .form-control:focus {
+        border-color: var(--accent) !important;
+        box-shadow: none !important;
+    }
+    .filter-btn {
+        background-color: var(--bg-main) !important;
+        border: 1px solid var(--bg-hover) !important;
+        color: var(--text-muted) !important;
+    }
+    .filter-btn:hover {
+        background-color: var(--bg-hover) !important;
+        color: var(--text-main) !important;
+    }
+    .filter-btn.active {
+        background-color: var(--accent) !important;
+        border-color: var(--accent) !important;
+        color: #0f172a !important;
+        font-weight: bold;
+    }
 </style>
 
 <div class="d-flex justify-content-between align-items-center mb-4 flex-wrap gap-3">
@@ -113,14 +146,14 @@
     </div>
 </div>
 
-<!-- البحث والفلاتر -->
+<!-- البحث والفلاتر (تم تصحيح الألوان) -->
 <div class="card mb-4 p-3">
     <div class="row g-3 align-items-center">
         <div class="col-md-5">
             <form method="GET" class="d-flex gap-2">
-                <div class="input-group">
-                    <span class="input-group-text bg-light border-end-0 text-muted"><i class="bi bi-search"></i></span>
-                    <input type="text" name="q" class="form-control bg-light border-start-0" placeholder="ابحث عن اسم، مستخدم، أو باقة..." value="{{ search }}">
+                <div class="input-group search-group">
+                    <span class="input-group-text"><i class="bi bi-search"></i></span>
+                    <input type="text" name="q" class="form-control" placeholder="ابحث عن اسم، مستخدم، أو باقة..." value="{{ search }}">
                 </div>
                 {% if filter_type %}<input type="hidden" name="type" value="{{ filter_type }}">{% endif %}
                 <button class="btn btn-primary px-4 rounded-3" type="submit">بحث</button>
@@ -128,13 +161,13 @@
         </div>
         <div class="col-md-4">
             <div class="btn-group w-100 shadow-sm rounded-3" role="group">
-                <a href="{{ url_for('subscribers', q=search) }}" class="btn {% if not filter_type %}btn-primary{% else %}btn-light text-muted{% endif %}">
+                <a href="{{ url_for('subscribers', q=search) }}" class="btn filter-btn {% if not filter_type %}active{% endif %}">
                     الكل
                 </a>
-                <a href="{{ url_for('subscribers', q=search, type='pppoe') }}" class="btn {% if filter_type == 'pppoe' %}btn-primary{% else %}btn-light text-muted{% endif %}">
+                <a href="{{ url_for('subscribers', q=search, type='pppoe') }}" class="btn filter-btn {% if filter_type == 'pppoe' %}active{% endif %}">
                     🌐 برودباند
                 </a>
-                <a href="{{ url_for('subscribers', q=search, type='hotspot') }}" class="btn {% if filter_type == 'hotspot' %}btn-primary{% else %}btn-light text-muted{% endif %}">
+                <a href="{{ url_for('subscribers', q=search, type='hotspot') }}" class="btn filter-btn {% if filter_type == 'hotspot' %}active{% endif %}">
                     📶 هوت سبوت
                 </a>
             </div>
@@ -182,7 +215,6 @@
                     </th>
                     <th class="text-nowrap">#</th>
                     <th class="text-nowrap">اسم المشترك</th>
-                    <th class="text-nowrap">المستخدم</th>
                     <th class="text-nowrap">المرور</th>
                     <th class="text-nowrap">النوع</th>
                     <th class="text-nowrap">الباقة</th>
@@ -200,8 +232,15 @@
                         <input type="checkbox" class="form-check-input sub-checkbox" value="{{ sub.id }}" onchange="updateBulkBar()">
                     </td>
                     <td class="text-muted fw-bold">#{{ sub.id }}</td>
-                    <td class="fw-bold text-primary">{{ sub.name or sub.username }}</td>
-                    <td class="text-dark">{{ sub.username }}</td>
+                    
+                    <!-- ✅ تعديل: إظهار اسم المستخدم دائماً تحت الاسم -->
+                    <td class="fw-bold text-primary">
+                        {{ sub.name or sub.username }}
+                        {% if sub.name %}
+                            <br><small class="text-muted fw-normal" style="font-size: 0.8em;">{{ sub.username }}</small>
+                        {% endif %}
+                    </td>
+                    
                     <td>
                         <div class="d-flex align-items-center justify-content-center gap-1">
                             <span class="password-field font-monospace" data-id="{{ sub.id }}">••••••</span>
@@ -301,7 +340,7 @@
                 </tr>
                 {% else %}
                 <tr>
-                    <td colspan="12" class="text-center py-5 text-muted">
+                    <td colspan="11" class="text-center py-5 text-muted">
                         <div class="d-flex flex-column align-items-center gap-2">
                             <i class="bi bi-inbox fs-1 text-secondary"></i>
                             <span class="fs-5">لا يوجد مشتركون حالياً</span>
