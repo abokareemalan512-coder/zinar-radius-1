@@ -2,6 +2,7 @@
 {% block title %}المشتركين{% endblock %}
 
 {% block content %}
+<!-- تضمين خط عربي جميل إذا لم يكن مضافاً في base.html -->
 <link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@400;500;700&display=swap" rel="stylesheet">
 <style>
     body {
@@ -337,6 +338,13 @@
                         <label class="form-label fw-bold text-secondary">كلمة المرور</label>
                         <input type="text" name="password" id="sub_password" class="form-control bg-light" placeholder="اتركها فارغة للإبقاء عليها">
                     </div>
+                    
+                    <!-- ✅ الخانة الجديدة: تفعيل الأيام -->
+                    <div class="mb-3">
+                        <label class="form-label fw-bold text-secondary">تفعيل الأيام (تمديد الباقة)</label>
+                        <input type="number" name="days_to_add" id="sub_days" class="form-control bg-light" placeholder="أدخل عدد الأيام (مثال: 30)" min="1">
+                    </div>
+
                     <div class="mb-3">
                         <label class="form-label fw-bold text-secondary">الباقة</label>
                         <select name="package" id="sub_package" class="form-select bg-light">
@@ -381,6 +389,7 @@ function openEditSub(id, name, username, pkg) {
     document.getElementById('sub_name').value = name;
     document.getElementById('sub_username').value = username;
     document.getElementById('sub_password').value = '';
+    document.getElementById('sub_days').value = ''; // تصفير خانة الأيام عند الفتح
     document.getElementById('sub_package').value = pkg || '';
     new bootstrap.Modal(document.getElementById('editSubModal')).show();
 }
