@@ -2,7 +2,6 @@
 {% block title %}المشتركين{% endblock %}
 
 {% block content %}
-<!-- تضمين خط عربي جميل إذا لم يكن مضافاً في base.html -->
 <link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@400;500;700&display=swap" rel="stylesheet">
 <style>
     body {
@@ -31,25 +30,21 @@
         border-radius: 8px;
     }
     
-    /* =========================================
-       تصميم القائمة المنسدلة (نفس تصميم زر استيراد من الميكروتيك)
-       ========================================= */
+    /* تصميم القائمة المنسدلة */
     .dropdown-menu {
-        border: 1px solid #e2e8f0;
-        box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+        border: 1px solid var(--bg-hover);
+        box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.3);
         border-radius: 12px;
         min-width: 200px;
         padding: 10px;
-        background-color: #fff;
+        background-color: var(--bg-card);
     }
-    
-    /* تنسيق الأزرار الداخلية لتشبه زر الميكروتيك */
     .dropdown-item.btn-mikrotik-style {
-        border: 1px dashed #94a3b8; /* إطار متقطع رمادي */
+        border: 1px dashed var(--text-muted);
         border-radius: 8px;
         margin-bottom: 8px;
         padding: 8px 12px;
-        color: #334155;
+        color: var(--text-main);
         font-weight: 500;
         transition: all 0.2s ease;
         display: flex;
@@ -57,37 +52,24 @@
         gap: 10px;
         background-color: transparent;
     }
-    
-    .dropdown-item.btn-mikrotik-style:last-child {
-        margin-bottom: 0;
-    }
-    
-    /* تأثير عند المرور بالماوس */
+    .dropdown-item.btn-mikrotik-style:last-child { margin-bottom: 0; }
     .dropdown-item.btn-mikrotik-style:hover {
-        background-color: rgba(14, 165, 233, 0.05);
-        border-color: #0ea5e9;
-        color: #0ea5e9;
+        background-color: rgba(56, 189, 248, 0.1);
+        border-color: var(--accent);
+        color: var(--accent);
         transform: translateY(-1px);
     }
-    
-    /* تنسيق خاص لزر الحذف ليكون مميزاً باللون الأحمر */
     .dropdown-item.btn-mikrotik-style.delete-style {
-        border-color: rgba(220, 53, 69, 0.5);
-        color: #dc3545;
+        border-color: rgba(239, 68, 68, 0.5);
+        color: #ef4444;
     }
     .dropdown-item.btn-mikrotik-style.delete-style:hover {
-        background-color: rgba(220, 53, 69, 0.05);
-        border-color: #dc3545;
-        color: #dc3545;
+        background-color: rgba(239, 68, 68, 0.1);
+        border-color: #ef4444;
+        color: #ef4444;
     }
     
-    .badge {
-        padding: 0.5em 0.8em;
-        font-weight: 500;
-        border-radius: 6px;
-    }
-    
-    /* ✅ تصحيح ألوان البحث والفلترة لتتناسب مع الوضع الليلي */
+    /* تصحيح ألوان البحث والفلترة */
     .search-group .input-group-text {
         background-color: var(--bg-main) !important;
         border: 1px solid var(--bg-hover) !important;
@@ -119,6 +101,66 @@
         color: #0f172a !important;
         font-weight: bold;
     }
+
+    /* ✅ تصميم شريط الترقيم (Pagination) */
+    .pagination .page-link {
+        background-color: var(--bg-card);
+        border-color: var(--bg-hover);
+        color: var(--text-main);
+        margin: 0 3px;
+        border-radius: 8px !important;
+        transition: all 0.2s;
+    }
+    .pagination .page-link:hover {
+        background-color: var(--bg-hover);
+        color: var(--accent);
+        border-color: var(--accent);
+    }
+    .pagination .page-item.active .page-link {
+        background-color: var(--accent);
+        border-color: var(--accent);
+        color: #0f172a;
+        font-weight: bold;
+    }
+    .pagination .page-item.disabled .page-link {
+        background-color: var(--bg-main);
+        border-color: var(--bg-hover);
+        color: var(--text-muted);
+        opacity: 0.5;
+    }
+
+    /* ✅ تصحيح ألوان النافذة المنبثقة (Modal) */
+    .modal-content {
+        background-color: var(--bg-card) !important;
+        border: 1px solid var(--bg-hover) !important;
+        border-radius: 16px !important;
+        box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.5), 0 10px 10px -5px rgba(0, 0, 0, 0.04) !important;
+    }
+    .modal-header {
+        border-bottom: 1px solid var(--bg-hover) !important;
+        background-color: var(--bg-hover) !important;
+        border-radius: 16px 16px 0 0 !important;
+    }
+    .modal-footer {
+        border-top: 1px solid var(--bg-hover) !important;
+        background-color: var(--bg-hover) !important;
+        border-radius: 0 0 16px 16px !important;
+    }
+    .modal-body {
+        background-color: var(--bg-card) !important;
+    }
+    .modal-body .form-control {
+        background-color: var(--bg-main) !important;
+        border: 1px solid var(--bg-hover) !important;
+        color: var(--text-main) !important;
+    }
+    .modal-body .form-control:focus {
+        border-color: var(--accent) !important;
+        box-shadow: 0 0 0 0.25rem var(--accent-glow) !important;
+    }
+    .modal-body .form-label {
+        color: var(--text-muted) !important;
+    }
 </style>
 
 <div class="d-flex justify-content-between align-items-center mb-4 flex-wrap gap-3">
@@ -146,7 +188,7 @@
     </div>
 </div>
 
-<!-- البحث والفلاتر (تم تصحيح الألوان) -->
+<!-- البحث والفلاتر -->
 <div class="card mb-4 p-3">
     <div class="row g-3 align-items-center">
         <div class="col-md-5">
@@ -233,7 +275,6 @@
                     </td>
                     <td class="text-muted fw-bold">#{{ sub.id }}</td>
                     
-                    <!-- ✅ تعديل: إظهار اسم المستخدم دائماً تحت الاسم -->
                     <td class="fw-bold text-primary">
                         {{ sub.name or sub.username }}
                         {% if sub.name %}
@@ -351,42 +392,77 @@
             </tbody>
         </table>
     </div>
+    
+    <!-- شريط الترقيم (Pagination) -->
+    {% if pagination and pagination.pages > 1 %}
+    <div class="d-flex justify-content-center py-4" style="background-color: var(--bg-card); border-top: 1px solid var(--bg-hover);">
+        <nav aria-label="Page navigation">
+            <ul class="pagination mb-0">
+                <!-- زر السابق -->
+                <li class="page-item {% if not pagination.has_prev %}disabled{% endif %}">
+                    <a class="page-link" href="{{ url_for('subscribers', page=pagination.prev_num, q=search, type=filter_type) if pagination.has_prev else '#' }}">
+                        <i class="bi bi-chevron-right"></i> السابق
+                    </a>
+                </li>
+                
+                <!-- أرقام الصفحات -->
+                {% for page_num in pagination.iter_pages(left_edge=1, right_edge=1, left_current=2, right_current=2) %}
+                    {% if page_num %}
+                        <li class="page-item {% if page_num == pagination.page %}active{% endif %}">
+                            <a class="page-link" href="{{ url_for('subscribers', page=page_num, q=search, type=filter_type) }}">{{ page_num }}</a>
+                        </li>
+                    {% else %}
+                        <li class="page-item disabled"><span class="page-link">...</span></li>
+                    {% endif %}
+                {% endfor %}
+                
+                <!-- زر التالي -->
+                <li class="page-item {% if not pagination.has_next %}disabled{% endif %}">
+                    <a class="page-link" href="{{ url_for('subscribers', page=pagination.next_num, q=search, type=filter_type) if pagination.has_next else '#' }}">
+                        التالي <i class="bi bi-chevron-left"></i>
+                    </a>
+                </li>
+            </ul>
+        </nav>
+    </div>
+    {% endif %}
+    
 </div>
 
-<!-- Modal تعديل -->
+<!-- Modal تعديل (تم تعديل الألوان لتناسب الوضع الليلي) -->
 <div class="modal fade" id="editSubModal" tabindex="-1">
     <div class="modal-dialog modal-dialog-centered">
-        <div class="modal-content border-0 shadow-lg" style="border-radius: 16px;">
+        <div class="modal-content border-0 shadow-lg" style="border-radius: 16px; background-color: var(--bg-card);">
             <form method="POST" id="editSubForm">
-                <div class="modal-header border-bottom-0 bg-light" style="border-radius: 16px 16px 0 0;">
-                    <h5 class="modal-title text-primary fw-bold">
+                <div class="modal-header border-bottom" style="border-color: var(--bg-hover) !important; background-color: var(--bg-hover); border-radius: 16px 16px 0 0;">
+                    <h5 class="modal-title text-accent fw-bold">
                         <i class="bi bi-pencil-square"></i> تعديل بيانات المشترك
                     </h5>
-                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
                 </div>
                 <div class="modal-body p-4">
                     <div class="mb-3">
-                        <label class="form-label fw-bold text-secondary">اسم المشترك</label>
-                        <input type="text" name="name" id="sub_name" class="form-control bg-light">
+                        <label class="form-label fw-bold text-muted">اسم المشترك</label>
+                        <input type="text" name="name" id="sub_name" class="form-control" style="background-color: var(--bg-main); color: var(--text-main); border: 1px solid var(--bg-hover);">
                     </div>
                     <div class="mb-3">
-                        <label class="form-label fw-bold text-secondary">اسم المستخدم</label>
-                        <input type="text" name="username" id="sub_username" class="form-control bg-light" required>
+                        <label class="form-label fw-bold text-muted">اسم المستخدم</label>
+                        <input type="text" name="username" id="sub_username" class="form-control" style="background-color: var(--bg-main); color: var(--text-main); border: 1px solid var(--bg-hover);" required>
                     </div>
                     <div class="mb-3">
-                        <label class="form-label fw-bold text-secondary">كلمة المرور</label>
-                        <input type="text" name="password" id="sub_password" class="form-control bg-light" placeholder="اتركها فارغة للإبقاء عليها">
+                        <label class="form-label fw-bold text-muted">كلمة المرور</label>
+                        <input type="text" name="password" id="sub_password" class="form-control" style="background-color: var(--bg-main); color: var(--text-main); border: 1px solid var(--bg-hover);" placeholder="اتركها فارغة للإبقاء عليها">
                     </div>
                     
                     <!-- ✅ الخانة الجديدة: تفعيل الأيام -->
                     <div class="mb-3">
-                        <label class="form-label fw-bold text-secondary">تفعيل الأيام (تمديد الباقة)</label>
-                        <input type="number" name="days_to_add" id="sub_days" class="form-control bg-light" placeholder="أدخل عدد الأيام (مثال: 30)" min="1">
+                        <label class="form-label fw-bold text-muted">تفعيل الأيام (تمديد الباقة)</label>
+                        <input type="number" name="days_to_add" id="sub_days" class="form-control" style="background-color: var(--bg-main); color: var(--text-main); border: 1px solid var(--bg-hover);" placeholder="أدخل عدد الأيام (مثال: 30)" min="1">
                     </div>
 
                     <div class="mb-3">
-                        <label class="form-label fw-bold text-secondary">الباقة</label>
-                        <select name="package" id="sub_package" class="form-select bg-light">
+                        <label class="form-label fw-bold text-muted">الباقة</label>
+                        <select name="package" id="sub_package" class="form-select" style="background-color: var(--bg-main); color: var(--text-main); border: 1px solid var(--bg-hover);">
                             <option value="">— بلا تغيير —</option>
                             {% for pkg in packages %}
                             <option value="{{ pkg.name }}">{{ pkg.name }}</option>
@@ -394,8 +470,8 @@
                         </select>
                     </div>
                 </div>
-                <div class="modal-footer border-top-0 bg-light" style="border-radius: 0 0 16px 16px;">
-                    <button type="button" class="btn btn-outline-secondary rounded-3" data-bs-dismiss="modal">إلغاء</button>
+                <div class="modal-footer border-top" style="border-color: var(--bg-hover) !important; background-color: var(--bg-hover); border-radius: 0 0 16px 16px;">
+                    <button type="button" class="btn btn-outline-secondary rounded-3" data-bs-dismiss="modal" style="color: var(--text-main); border-color: var(--text-muted);">إلغاء</button>
                     <button type="submit" class="btn btn-primary rounded-3 px-4">
                         <i class="bi bi-save"></i> حفظ التعديلات
                     </button>
