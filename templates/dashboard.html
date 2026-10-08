@@ -26,7 +26,6 @@
         border-color: var(--accent);
     }
 
-    /* ✅ أيقونات مصغّرة */
     .icon-circle {
         width: 38px;
         height: 38px;
@@ -64,7 +63,6 @@
         100% { box-shadow: 0 0 0 0 transparent; opacity: 1; }
     }
 
-    /* شارات بألوان فاتحة */
     .stat-badge {
         display: inline-flex;
         align-items: center;
@@ -77,11 +75,11 @@
         text-shadow: 0 1px 2px rgba(0,0,0,0.2);
         box-shadow: 0 2px 6px rgba(0,0,0,0.15);
     }
-    .stat-badge.success { background: linear-gradient(135deg, #22c55e, #16a34a); color: #fff !important; }
-    .stat-badge.danger { background: linear-gradient(135deg, #ef4444, #dc2626); color: #fff !important; }
-    .stat-badge.warning { background: linear-gradient(135deg, #f59e0b, #d97706); color: #fff !important; }
-    .stat-badge.info { background: linear-gradient(135deg, #0ea5e9, #0284c7); color: #fff !important; }
-    .stat-badge.secondary { background: linear-gradient(135deg, #64748b, #475569); color: #fff !important; }
+    .stat-badge.success { background: linear-gradient(135deg, #22c55e, #16a34a); }
+    .stat-badge.danger { background: linear-gradient(135deg, #ef4444, #dc2626); }
+    .stat-badge.warning { background: linear-gradient(135deg, #f59e0b, #d97706); }
+    .stat-badge.info { background: linear-gradient(135deg, #0ea5e9, #0284c7); }
+    .stat-badge.secondary { background: linear-gradient(135deg, #64748b, #475569); }
 
     .details-hint {
         margin-top: 8px;
@@ -95,10 +93,7 @@
         opacity: 0.85;
         transition: opacity 0.3s;
     }
-    .dashboard-card:hover .details-hint {
-        opacity: 1;
-        color: #7dd3fc;
-    }
+    .dashboard-card:hover .details-hint { opacity: 1; color: #7dd3fc; }
     .details-hint i { font-size: 0.7rem; }
 
     .table-clean th {
@@ -116,12 +111,45 @@
         padding: 7px;
         vertical-align: middle;
     }
+
+    /* ✅ صندوق ترحيب مصغّر */
     .welcome-box {
         background: linear-gradient(135deg, rgba(56, 189, 248, 0.1), rgba(14, 165, 233, 0.02));
         border: 1px solid rgba(56, 189, 248, 0.2);
-        border-radius: 12px;
-        padding: 12px 16px;
+        border-radius: 10px;
+        padding: 10px 14px;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 12px;
+        flex-wrap: wrap;
+        gap: 8px;
     }
+    .welcome-text h5 {
+        font-size: 0.9rem;
+        margin: 0;
+        font-weight: 700;
+        color: var(--accent);
+    }
+    .welcome-text p {
+        font-size: 0.68rem;
+        margin: 0;
+        color: var(--text-muted);
+    }
+    .time-badge {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        background: linear-gradient(135deg, #0ea5e9, #0284c7);
+        color: #ffffff !important;
+        padding: 6px 14px;
+        border-radius: 8px;
+        font-weight: 700;
+        font-size: 0.75rem;
+        box-shadow: 0 3px 10px rgba(14, 165, 233, 0.35);
+        border: 1px solid rgba(255, 255, 255, 0.15);
+    }
+    .time-badge i { font-size: 0.85rem; }
 
     .mikrotik-modal-header { background: linear-gradient(135deg, #38bdf8, #0ea5e9); border-radius: 12px 12px 0 0; color: #0f172a; }
     .subscribers-modal-header { background: linear-gradient(135deg, #22c55e, #16a34a); border-radius: 12px 12px 0 0; color: white; }
@@ -137,28 +165,33 @@
     }
     .revenue-box:hover { border-color: #f59e0b; }
 
-    /* ✅ قسم الإجراءات السريعة */
+    /* ✅ قسم الإجراءات السريعة (بعرض بطاقة واحدة) */
     .quick-actions-card {
         background-color: var(--bg-card);
         border: 1px solid var(--bg-hover);
         border-radius: 12px;
-        padding: 14px;
-        margin-bottom: 16px;
+        padding: 12px;
+        height: 100%;
+        transition: all 0.3s;
+    }
+    .quick-actions-card:hover {
+        border-color: #f59e0b;
+        box-shadow: 0 8px 20px -5px rgba(245, 158, 11, 0.15);
     }
     .quick-actions-header {
         display: flex;
         align-items: center;
-        gap: 8px;
+        gap: 6px;
         font-weight: 700;
-        font-size: 0.95rem;
+        font-size: 0.82rem;
         color: var(--text-main);
-        margin-bottom: 12px;
-        padding-bottom: 10px;
+        margin-bottom: 10px;
+        padding-bottom: 8px;
         border-bottom: 1px solid var(--bg-hover);
     }
     .quick-actions-header .lightning {
         color: #f59e0b;
-        font-size: 1rem;
+        font-size: 0.95rem;
         animation: lightning-pulse 2s infinite;
     }
     @keyframes lightning-pulse {
@@ -170,31 +203,28 @@
         display: flex;
         align-items: center;
         justify-content: center;
-        gap: 8px;
-        padding: 10px 16px;
-        margin-bottom: 8px;
+        gap: 6px;
+        padding: 8px 12px;
+        margin-bottom: 6px;
         background: linear-gradient(135deg, #38bdf8, #0ea5e9);
         color: #0f172a !important;
         border: none;
-        border-radius: 10px;
+        border-radius: 8px;
         font-weight: 700;
-        font-size: 0.85rem;
+        font-size: 0.72rem;
         text-decoration: none;
         transition: all 0.3s ease;
         cursor: pointer;
-        box-shadow: 0 3px 10px rgba(56, 189, 248, 0.25);
+        box-shadow: 0 2px 8px rgba(56, 189, 248, 0.25);
         position: relative;
         overflow: hidden;
     }
     .quick-action-btn:last-child { margin-bottom: 0; }
-
     .quick-action-btn::before {
         content: '';
         position: absolute;
-        top: 50%;
-        left: 50%;
-        width: 0;
-        height: 0;
+        top: 50%; left: 50%;
+        width: 0; height: 0;
         border-radius: 50%;
         background: rgba(255, 255, 255, 0.3);
         transform: translate(-50%, -50%);
@@ -206,11 +236,11 @@
     }
     .quick-action-btn:hover {
         transform: translateY(-2px);
-        box-shadow: 0 6px 18px rgba(56, 189, 248, 0.4);
+        box-shadow: 0 5px 15px rgba(56, 189, 248, 0.4);
         color: #0f172a !important;
     }
     .quick-action-btn i {
-        font-size: 1rem;
+        font-size: 0.85rem;
         position: relative;
         z-index: 1;
     }
@@ -219,15 +249,20 @@
         z-index: 1;
     }
 
-    /* ============ قسم الترافيك ============ */
+    /* ============ قسم الترافيك (مضغوط) ============ */
     .traffic-section {
         background-color: var(--bg-card);
         border: 1px solid var(--bg-hover);
         border-radius: 12px;
-        padding: 14px;
-        margin-bottom: 16px;
+        padding: 12px;
         position: relative;
         overflow: visible;
+        height: 100%;
+        transition: all 0.3s;
+    }
+    .traffic-section:hover {
+        border-color: #a855f7;
+        box-shadow: 0 8px 20px -5px rgba(168, 85, 247, 0.15);
     }
     .traffic-section::before {
         content: '';
@@ -241,30 +276,30 @@
         display: flex;
         justify-content: space-between;
         align-items: center;
-        margin-bottom: 12px;
+        margin-bottom: 10px;
         flex-wrap: wrap;
         gap: 8px;
     }
     .traffic-section-title {
         display: flex;
         align-items: center;
-        gap: 8px;
+        gap: 6px;
         font-weight: 700;
-        font-size: 0.9rem;
+        font-size: 0.82rem;
         color: var(--text-main);
     }
-    .traffic-section-title i { color: var(--accent); font-size: 1rem; }
+    .traffic-section-title i { color: var(--accent); font-size: 0.95rem; }
 
     .live-badge {
         display: inline-flex;
         align-items: center;
-        gap: 5px;
-        padding: 2px 8px;
-        border-radius: 12px;
+        gap: 4px;
+        padding: 2px 7px;
+        border-radius: 10px;
         background: rgba(239, 68, 68, 0.1);
         color: #ef4444;
         border: 1px solid rgba(239, 68, 68, 0.3);
-        font-size: 0.62rem;
+        font-size: 0.58rem;
         font-weight: 700;
     }
     .live-dot {
@@ -282,7 +317,7 @@
 
     .traffic-controls {
         display: flex;
-        gap: 6px;
+        gap: 5px;
         flex-wrap: wrap;
         align-items: center;
     }
@@ -290,11 +325,11 @@
         background-color: var(--bg-main);
         color: var(--text-main);
         border: 1px solid var(--bg-hover);
-        padding: 6px 10px;
-        border-radius: 8px;
+        padding: 5px 9px;
+        border-radius: 7px;
         font-weight: 500;
-        font-size: 0.75rem;
-        max-width: 150px;
+        font-size: 0.72rem;
+        max-width: 140px;
     }
     .traffic-select:focus {
         border-color: var(--accent);
@@ -304,17 +339,17 @@
 
     .traffic-search-wrapper {
         position: relative;
-        width: 170px;
+        width: 150px;
     }
     .traffic-search-wrapper input {
         width: 100%;
-        padding: 6px 26px 6px 10px;
+        padding: 5px 24px 5px 10px;
         background-color: var(--bg-main);
         color: var(--text-main);
         border: 1px solid var(--bg-hover);
-        border-radius: 8px;
+        border-radius: 7px;
         font-weight: 500;
-        font-size: 0.75rem;
+        font-size: 0.72rem;
     }
     .traffic-search-wrapper input:focus {
         border-color: var(--accent);
@@ -324,16 +359,16 @@
     .traffic-search-wrapper input::placeholder { color: var(--text-muted); }
     .traffic-search-wrapper .search-icon {
         position: absolute;
-        right: 8px;
+        right: 7px;
         top: 50%;
         transform: translateY(-50%);
         color: var(--text-muted);
         pointer-events: none;
-        font-size: 0.75rem;
+        font-size: 0.72rem;
     }
     .traffic-search-wrapper .clear-btn {
         position: absolute;
-        left: 6px;
+        left: 5px;
         top: 50%;
         transform: translateY(-50%);
         background: none;
@@ -341,7 +376,7 @@
         color: var(--text-muted);
         cursor: pointer;
         padding: 0;
-        font-size: 0.85rem;
+        font-size: 0.8rem;
         display: none;
     }
     .traffic-search-wrapper .clear-btn:hover { color: #ef4444; }
@@ -354,17 +389,17 @@
         margin-top: 4px;
         background-color: var(--bg-card);
         border: 1px solid var(--bg-hover);
-        border-radius: 8px;
-        max-height: 280px;
+        border-radius: 7px;
+        max-height: 250px;
         overflow-y: auto;
         z-index: 2000;
         box-shadow: 0 8px 20px rgba(0,0,0,0.4);
         display: none;
-        min-width: 250px;
+        min-width: 230px;
     }
     .traffic-dropdown.show { display: block; }
     .traffic-dropdown-item {
-        padding: 7px 10px;
+        padding: 6px 9px;
         cursor: pointer;
         border-bottom: 1px solid var(--bg-hover);
         display: flex;
@@ -372,7 +407,7 @@
         align-items: center;
         gap: 8px;
         transition: all 0.15s;
-        font-size: 0.75rem;
+        font-size: 0.72rem;
         color: var(--text-main);
     }
     .traffic-dropdown-item:last-child { border-bottom: none; }
@@ -390,12 +425,12 @@
         white-space: nowrap;
         overflow: hidden;
         text-overflow: ellipsis;
-        max-width: 170px;
+        max-width: 160px;
     }
     .iface-status-badge {
-        font-size: 0.58rem;
-        padding: 2px 6px;
-        border-radius: 8px;
+        font-size: 0.55rem;
+        padding: 2px 5px;
+        border-radius: 6px;
         font-weight: 700;
         white-space: nowrap;
     }
@@ -405,11 +440,11 @@
     .traffic-direction-btn {
         display: inline-flex;
         align-items: center;
-        gap: 5px;
-        padding: 6px 10px;
-        border-radius: 8px;
+        gap: 4px;
+        padding: 5px 9px;
+        border-radius: 7px;
         font-weight: 600;
-        font-size: 0.7rem;
+        font-size: 0.68rem;
         cursor: pointer;
         border: none;
         color: white;
@@ -429,10 +464,10 @@
         background: linear-gradient(135deg, #22c55e, #16a34a);
         color: white;
         border: none;
-        padding: 6px 12px;
-        border-radius: 8px;
+        padding: 5px 11px;
+        border-radius: 7px;
         font-weight: 700;
-        font-size: 0.75rem;
+        font-size: 0.72rem;
         cursor: pointer;
         display: inline-flex;
         align-items: center;
@@ -448,10 +483,10 @@
         background: linear-gradient(135deg, #ef4444, #dc2626);
         color: white;
         border: none;
-        padding: 6px 12px;
-        border-radius: 8px;
+        padding: 5px 11px;
+        border-radius: 7px;
         font-weight: 700;
-        font-size: 0.75rem;
+        font-size: 0.72rem;
         cursor: pointer;
         display: inline-flex;
         align-items: center;
@@ -461,7 +496,7 @@
     .traffic-mini-card {
         background-color: var(--bg-main);
         border: 1px solid var(--bg-hover);
-        border-radius: 10px;
+        border-radius: 9px;
         padding: 10px;
         height: 100%;
         position: relative;
@@ -474,21 +509,21 @@
         display: flex;
         justify-content: space-between;
         align-items: center;
-        margin-bottom: 5px;
+        margin-bottom: 4px;
     }
     .traffic-mini-label {
         display: flex;
         align-items: center;
-        gap: 5px;
+        gap: 4px;
         font-weight: 700;
-        font-size: 0.75rem;
+        font-size: 0.72rem;
     }
     .traffic-mini-label.upload { color: #f59e0b; }
     .traffic-mini-label.download { color: #22c55e; }
-    .traffic-mini-label i { font-size: 0.85rem; }
+    .traffic-mini-label i { font-size: 0.8rem; }
 
     .traffic-mini-rate {
-        font-size: 1.3rem;
+        font-size: 1.2rem;
         font-weight: 800;
         line-height: 1;
         margin: 4px 0;
@@ -496,7 +531,7 @@
     .traffic-mini-rate.upload { color: #f59e0b; }
     .traffic-mini-rate.download { color: #22c55e; }
     .traffic-mini-rate-unit {
-        font-size: 0.65rem;
+        font-size: 0.6rem;
         font-weight: 500;
         opacity: 0.8;
     }
@@ -519,46 +554,46 @@
     .traffic-mini-total {
         display: flex;
         justify-content: space-between;
-        font-size: 0.65rem;
+        font-size: 0.62rem;
         color: var(--text-muted);
-        margin-bottom: 6px;
+        margin-bottom: 5px;
     }
     .traffic-mini-chart {
         position: relative;
-        height: 65px;
+        height: 60px;
         width: 100%;
     }
 
     .traffic-empty {
         text-align: center;
-        padding: 18px 15px;
+        padding: 15px 10px;
         color: var(--text-muted);
     }
     .traffic-empty i {
-        font-size: 1.8rem;
+        font-size: 1.6rem;
         color: var(--bg-hover);
         display: block;
-        margin-bottom: 6px;
+        margin-bottom: 5px;
     }
     .traffic-empty h6 {
-        font-size: 0.8rem;
+        font-size: 0.75rem;
         margin-bottom: 3px;
     }
     .traffic-empty p {
-        font-size: 0.7rem;
+        font-size: 0.65rem;
         margin: 0;
     }
 
     .traffic-full-link {
         display: inline-flex;
         align-items: center;
-        gap: 5px;
-        padding: 5px 10px;
+        gap: 4px;
+        padding: 4px 9px;
         background-color: rgba(139, 92, 246, 0.1);
         color: #a855f7;
         border: 1px solid rgba(139, 92, 246, 0.3);
-        border-radius: 8px;
-        font-size: 0.68rem;
+        border-radius: 7px;
+        font-size: 0.65rem;
         font-weight: 600;
         text-decoration: none;
         transition: all 0.3s;
@@ -568,25 +603,24 @@
         color: #a855f7;
         transform: translateY(-1px);
     }
-    .traffic-full-link i { font-size: 0.75rem; }
+    .traffic-full-link i { font-size: 0.72rem; }
 </style>
 
-<!-- ترحيب -->
-<div class="welcome-box mb-3 d-flex justify-content-between align-items-center flex-wrap gap-2">
-    <div>
-        <h5 class="fw-bold mb-0 text-accent" style="font-size: 1rem;">
-            <i class="bi bi-speedometer2"></i> مرحباً، {{ admin_name }}
-        </h5>
-        <p class="text-muted mb-0" style="font-size: 0.72rem;">نظرة عامة على أداء النظام والشبكة</p>
+<!-- ✅ صندوق ترحيب مصغّر (الوقت والتاريخ في الزاوية اليسرى) -->
+<div class="welcome-box">
+    <div class="welcome-text">
+        <h5><i class="bi bi-speedometer2"></i> مرحباً، {{ admin_name }}</h5>
+        <p>نظرة عامة على أداء النظام والشبكة</p>
     </div>
     <div>
-        <span class="badge bg-info bg-opacity-10 text-info border border-info px-3 py-2 rounded-3" style="font-size: 0.72rem;">
-            <i class="bi bi-clock-history"></i> {{ current_time }}
+        <span class="time-badge">
+            <i class="bi bi-clock-fill"></i>
+            {{ current_time }}
         </span>
     </div>
 </div>
 
-<!-- ✅ الصف الأول: البطاقات -->
+<!-- ✅ الصف الأول: 4 بطاقات الإحصائيات -->
 <div class="row g-3 mb-3">
     
     <!-- MikroTik -->
@@ -678,145 +712,153 @@
     </div>
 </div>
 
-<!-- ✅ قسم الإجراءات السريعة -->
-<div class="quick-actions-card">
-    <div class="quick-actions-header">
-        <i class="bi bi-lightning-charge-fill lightning"></i>
-        <span>إجراءات سريعة</span>
-    </div>
+<!-- ✅ الصف الثاني: إجراءات سريعة + مراقبة الترافيك -->
+<div class="row g-3 mb-3">
+    
+    <!-- إجراءات سريعة (بعرض بطاقة واحدة) -->
+    <div class="col-xl-3 col-md-6">
+        <div class="quick-actions-card">
+            <div class="quick-actions-header">
+                <i class="bi bi-lightning-charge-fill lightning"></i>
+                <span>إجراءات سريعة</span>
+            </div>
 
-    <a href="{{ url_for('add_subscriber') }}" class="quick-action-btn">
-        <i class="bi bi-plus-circle-fill"></i>
-        <span>إضافة مشترك جديد</span>
-    </a>
+            <a href="{{ url_for('add_subscriber') }}" class="quick-action-btn">
+                <i class="bi bi-plus-circle-fill"></i>
+                <span>إضافة مشترك جديد</span>
+            </a>
 
-    <a href="{{ url_for('routers') }}" class="quick-action-btn">
-        <i class="bi bi-router-fill"></i>
-        <span>إدارة الراوترات</span>
-    </a>
+            <a href="{{ url_for('routers') }}" class="quick-action-btn">
+                <i class="bi bi-router-fill"></i>
+                <span>إدارة الراوترات</span>
+            </a>
 
-    <a href="{{ url_for('payments') }}" class="quick-action-btn">
-        <i class="bi bi-cash-stack"></i>
-        <span>عرض الدفعات</span>
-    </a>
-</div>
-
-<!-- قسم مراقبة الترافيك -->
-<div class="traffic-section">
-    <div class="traffic-section-header">
-        <div class="traffic-section-title">
-            <i class="bi bi-activity"></i>
-            <span>مراقبة الترافيك المباشر</span>
-            <span class="live-badge" id="liveBadge" style="display: none;">
-                <span class="live-dot"></span> LIVE
-            </span>
+            <a href="{{ url_for('payments') }}" class="quick-action-btn">
+                <i class="bi bi-cash-stack"></i>
+                <span>عرض الدفعات</span>
+            </a>
         </div>
-        <a href="{{ url_for('traffic_monitor_page') }}" class="traffic-full-link">
-            <i class="bi bi-arrows-fullscreen"></i> الصفحة الكاملة
-        </a>
     </div>
 
-    <div class="traffic-controls mb-2">
-        <select id="dashRouterSelect" class="traffic-select" onchange="onDashRouterChange()">
-            <option value="">🔌 اختر الراوتر...</option>
-            {% for r in routers %}
-            <option value="{{ r.id }}">{{ r.name }}</option>
-            {% endfor %}
-        </select>
+    <!-- مراقبة الترافيك (بعرض 3 أضعاف) -->
+    <div class="col-xl-9 col-md-6">
+        <div class="traffic-section">
+            <div class="traffic-section-header">
+                <div class="traffic-section-title">
+                    <i class="bi bi-activity"></i>
+                    <span>مراقبة الترافيك المباشر</span>
+                    <span class="live-badge" id="liveBadge" style="display: none;">
+                        <span class="live-dot"></span> LIVE
+                    </span>
+                </div>
+                <a href="{{ url_for('traffic_monitor_page') }}" class="traffic-full-link">
+                    <i class="bi bi-arrows-fullscreen"></i> الصفحة الكاملة
+                </a>
+            </div>
 
-        <div class="traffic-search-wrapper">
-            <input type="text" id="dashInterfaceSearch" placeholder="🔍 ابحث..." 
-                   autocomplete="off" disabled
-                   oninput="dashFilterInterfaces()"
-                   onfocus="dashShowDropdown()">
-            <i class="bi bi-search search-icon"></i>
-            <button class="clear-btn" id="dashClearBtn" onclick="dashClearSearch()" type="button">
-                <i class="bi bi-x-circle-fill"></i>
-            </button>
-            <div class="traffic-dropdown" id="dashInterfaceDropdown"></div>
-        </div>
+            <div class="traffic-controls mb-2">
+                <select id="dashRouterSelect" class="traffic-select" onchange="onDashRouterChange()">
+                    <option value="">🔌 اختر الراوتر...</option>
+                    {% for r in routers %}
+                    <option value="{{ r.id }}">{{ r.name }}</option>
+                    {% endfor %}
+                </select>
 
-        <input type="hidden" id="dashInterfaceSelect" value="">
+                <div class="traffic-search-wrapper">
+                    <input type="text" id="dashInterfaceSearch" placeholder="🔍 ابحث..." 
+                           autocomplete="off" disabled
+                           oninput="dashFilterInterfaces()"
+                           onfocus="dashShowDropdown()">
+                    <i class="bi bi-search search-icon"></i>
+                    <button class="clear-btn" id="dashClearBtn" onclick="dashClearSearch()" type="button">
+                        <i class="bi bi-x-circle-fill"></i>
+                    </button>
+                    <div class="traffic-dropdown" id="dashInterfaceDropdown"></div>
+                </div>
 
-        <button id="dashDirectionBtn" class="traffic-direction-btn" onclick="dashToggleDirection()">
-            <i class="bi bi-arrow-left-right"></i>
-            <span id="dashDirectionText">تلقائي</span>
-        </button>
+                <input type="hidden" id="dashInterfaceSelect" value="">
 
-        <button id="dashStartBtn" class="btn-traffic-start" onclick="dashStartMonitoring()">
-            <i class="bi bi-play-fill"></i> بدء
-        </button>
-        <button id="dashStopBtn" class="btn-traffic-stop" onclick="dashStopMonitoring()" style="display: none;">
-            <i class="bi bi-stop-fill"></i> إيقاف
-        </button>
-    </div>
+                <button id="dashDirectionBtn" class="traffic-direction-btn" onclick="dashToggleDirection()">
+                    <i class="bi bi-arrow-left-right"></i>
+                    <span id="dashDirectionText">تلقائي</span>
+                </button>
 
-    <div id="dashStatus" class="mb-2" style="display: none;">
-        <span class="stat-badge success" style="font-size: 0.68rem; padding: 3px 10px;">
-            <span class="pulse-dot" style="width: 5px; height: 5px;"></span>
-            <span id="dashStatusText">جاري الاتصال...</span>
-        </span>
-    </div>
+                <button id="dashStartBtn" class="btn-traffic-start" onclick="dashStartMonitoring()">
+                    <i class="bi bi-play-fill"></i> بدء
+                </button>
+                <button id="dashStopBtn" class="btn-traffic-stop" onclick="dashStopMonitoring()" style="display: none;">
+                    <i class="bi bi-stop-fill"></i> إيقاف
+                </button>
+            </div>
 
-    <div id="trafficEmptyState" class="traffic-empty">
-        <i class="bi bi-bar-chart-line"></i>
-        <h6>لا توجد مراقبة نشطة</h6>
-        <p>اختر الراوتر والمنفذ ثم اضغط "بدء"</p>
-    </div>
+            <div id="dashStatus" class="mb-2" style="display: none;">
+                <span class="stat-badge success" style="font-size: 0.62rem; padding: 3px 10px;">
+                    <span class="pulse-dot" style="width: 5px; height: 5px;"></span>
+                    <span id="dashStatusText">جاري الاتصال...</span>
+                </span>
+            </div>
 
-    <div id="trafficContent" class="row g-2" style="display: none;">
-        <div class="col-md-6">
-            <div class="traffic-mini-card upload">
-                <div class="traffic-mini-header">
-                    <div class="traffic-mini-label upload">
-                        <i class="bi bi-arrow-up-circle-fill"></i> رفع
+            <div id="trafficEmptyState" class="traffic-empty">
+                <i class="bi bi-bar-chart-line"></i>
+                <h6>لا توجد مراقبة نشطة</h6>
+                <p>اختر الراوتر والمنفذ ثم اضغط "بدء"</p>
+            </div>
+
+            <div id="trafficContent" class="row g-2" style="display: none;">
+                <div class="col-md-6">
+                    <div class="traffic-mini-card upload">
+                        <div class="traffic-mini-header">
+                            <div class="traffic-mini-label upload">
+                                <i class="bi bi-arrow-up-circle-fill"></i> رفع
+                            </div>
+                            <span class="stat-badge warning" id="dashUploadBadge" style="font-size: 0.58rem; padding: 2px 8px;">0 Mbps</span>
+                        </div>
+                        <div class="traffic-mini-rate upload">
+                            <span id="dashUploadRate">0.00</span>
+                            <span class="traffic-mini-rate-unit">Mbps</span>
+                        </div>
+                        <div class="traffic-mini-progress">
+                            <div class="traffic-mini-progress-bar upload" id="dashUploadProgress" style="width: 0%;"></div>
+                        </div>
+                        <div class="traffic-mini-total">
+                            <span><i class="bi bi-hdd-stack"></i> إجمالي:</span>
+                            <span id="dashUploadTotal" class="fw-bold">0 GB</span>
+                        </div>
+                        <div class="traffic-mini-chart">
+                            <canvas id="dashUploadChart"></canvas>
+                        </div>
                     </div>
-                    <span class="stat-badge warning" id="dashUploadBadge" style="font-size: 0.62rem; padding: 3px 9px;">0 Mbps</span>
                 </div>
-                <div class="traffic-mini-rate upload">
-                    <span id="dashUploadRate">0.00</span>
-                    <span class="traffic-mini-rate-unit">Mbps</span>
-                </div>
-                <div class="traffic-mini-progress">
-                    <div class="traffic-mini-progress-bar upload" id="dashUploadProgress" style="width: 0%;"></div>
-                </div>
-                <div class="traffic-mini-total">
-                    <span><i class="bi bi-hdd-stack"></i> إجمالي:</span>
-                    <span id="dashUploadTotal" class="fw-bold">0 GB</span>
-                </div>
-                <div class="traffic-mini-chart">
-                    <canvas id="dashUploadChart"></canvas>
+                <div class="col-md-6">
+                    <div class="traffic-mini-card download">
+                        <div class="traffic-mini-header">
+                            <div class="traffic-mini-label download">
+                                <i class="bi bi-arrow-down-circle-fill"></i> تحميل
+                            </div>
+                            <span class="stat-badge success" id="dashDownloadBadge" style="font-size: 0.58rem; padding: 2px 8px;">0 Mbps</span>
+                        </div>
+                        <div class="traffic-mini-rate download">
+                            <span id="dashDownloadRate">0.00</span>
+                            <span class="traffic-mini-rate-unit">Mbps</span>
+                        </div>
+                        <div class="traffic-mini-progress">
+                            <div class="traffic-mini-progress-bar download" id="dashDownloadProgress" style="width: 0%;"></div>
+                        </div>
+                        <div class="traffic-mini-total">
+                            <span><i class="bi bi-hdd-stack"></i> إجمالي:</span>
+                            <span id="dashDownloadTotal" class="fw-bold">0 GB</span>
+                        </div>
+                        <div class="traffic-mini-chart">
+                            <canvas id="dashDownloadChart"></canvas>
+                        </div>
+                    </div>
                 </div>
             </div>
         </div>
-        <div class="col-md-6">
-            <div class="traffic-mini-card download">
-                <div class="traffic-mini-header">
-                    <div class="traffic-mini-label download">
-                        <i class="bi bi-arrow-down-circle-fill"></i> تحميل
-                    </div>
-                    <span class="stat-badge success" id="dashDownloadBadge" style="font-size: 0.62rem; padding: 3px 9px;">0 Mbps</span>
-                </div>
-                <div class="traffic-mini-rate download">
-                    <span id="dashDownloadRate">0.00</span>
-                    <span class="traffic-mini-rate-unit">Mbps</span>
-                </div>
-                <div class="traffic-mini-progress">
-                    <div class="traffic-mini-progress-bar download" id="dashDownloadProgress" style="width: 0%;"></div>
-                </div>
-                <div class="traffic-mini-total">
-                    <span><i class="bi bi-hdd-stack"></i> إجمالي:</span>
-                    <span id="dashDownloadTotal" class="fw-bold">0 GB</span>
-                </div>
-                <div class="traffic-mini-chart">
-                    <canvas id="dashDownloadChart"></canvas>
-                </div>
-            </div>
-        </div>
     </div>
 </div>
 
-<!-- الصف الثالث: الأحداث + تلجرام -->
+<!-- ✅ الصف الثالث: الأحداث + تلجرام -->
 <div class="row g-3 mb-3">
     <div class="col-lg-8">
         <div class="dashboard-card p-0 overflow-hidden">
