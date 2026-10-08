@@ -22,8 +22,8 @@
         cursor: pointer;
     }
     .dashboard-card.clickable:hover {
-        background-color: rgba(56, 189, 248, 0.05); /* لمسة لون أزرق عند المرور */
-        border-color: var(--accent);
+        background-color: rgba(34, 197, 94, 0.05); /* لمسة لون أخضر عند المرور */
+        border-color: #22c55e;
     }
     .icon-circle {
         width: 64px;
@@ -93,6 +93,11 @@
         border-radius: 16px 16px 0 0;
         color: #0f172a;
     }
+    .subscribers-modal-header {
+        background: linear-gradient(135deg, #22c55e, #16a34a);
+        border-radius: 16px 16px 0 0;
+        color: white;
+    }
 </style>
 
 <!-- ✅ ترحيب ووقت -->
@@ -113,11 +118,10 @@
 <!-- ✅ الصف الأول: بطاقات الإحصائيات -->
 <div class="row g-4 mb-4">
     
-    <!-- ✅ بطاقة سيرفرات MikroTik (قابلة للضغط وتفاعلية) -->
+    <!-- ✅ بطاقة سيرفرات MikroTik (قابلة للضغط) -->
     <div class="col-xl-3 col-md-6">
         <div class="dashboard-card text-center clickable" data-bs-toggle="modal" data-bs-target="#mikrotikDetailsModal">
             <div class="icon-circle mx-auto" style="background: rgba(56, 189, 248, 0.1); border: 1px solid rgba(56, 189, 248, 0.3);">
-                <!-- أيقونة راوتر/سيرفر حقيقية (SVG) -->
                 <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" fill="#38bdf8" viewBox="0 0 16 16">
                     <path d="M5.5 0a.5.5 0 0 1 .5.5V3h4V.5a.5.5 0 0 1 1 0V3h2a2 2 0 0 1 2 2v6a2 2 0 0 1-2 2H2a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h2V.5a.5.5 0 0 1 .5-.5zM2 4a1 1 0 0 0-1 1v6a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1V5a1 1 0 0 0-1-1H2z"/>
                     <circle cx="4" cy="7" r="1.5" fill="#38bdf8"/>
@@ -152,11 +156,15 @@
         </div>
     </div>
 
-    <!-- بطاقة المشتركين -->
+    <!-- ✅ بطاقة المشتركين (قابلة للضغط) -->
     <div class="col-xl-3 col-md-6">
-        <div class="dashboard-card text-center">
+        <div class="dashboard-card text-center clickable" data-bs-toggle="modal" data-bs-target="#subscribersDetailsModal">
             <div class="icon-circle mx-auto" style="background: rgba(34, 197, 94, 0.1); border: 1px solid rgba(34, 197, 94, 0.2);">
-                <i class="bi bi-people-fill text-success"></i>
+                <!-- أيقونة مستخدمين حقيقية (SVG) -->
+                <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" fill="#22c55e" viewBox="0 0 16 16">
+                    <path d="M7 14s-1 0-1-1 1-4 5-4 5 3 5 4-1 1-1 1H7zm4-6a3 3 0 1 0 0-6 3 3 0 0 0 0 6z"/>
+                    <path fill-rule="evenodd" d="M5.216 14A2.238 2.238 0 0 1 5 13c0-1.355.68-2.75 1.936-3.72A6.325 6.325 0 0 0 5 9c-4 0-5 3-5 4s1 1 1 1h4.216zM4.5 8a2.5 2.5 0 1 0 0-5 2.5 2.5 0 0 0 0 5z"/>
+                </svg>
             </div>
             <div class="stat-number">{{ sub_count }}</div>
             <div class="stat-label">إجمالي المشتركين</div>
@@ -170,6 +178,9 @@
             <div class="d-flex justify-content-between text-muted small border-top pt-3" style="border-color: var(--bg-hover) !important;">
                 <span><i class="bi bi-pause-circle text-warning"></i> موقوف: {{ sub_count - active_subs }}</span>
                 <span><i class="bi bi-calendar-check text-info"></i> اليوم: {{ new_users_today }}</span>
+            </div>
+            <div class="text-center mt-2">
+                <small class="text-success"><i class="bi bi-info-circle"></i> اضغط لعرض المنتهين والمتوقفين</small>
             </div>
         </div>
     </div>
@@ -199,7 +210,6 @@
     <div class="col-xl-3 col-md-6">
         <div class="dashboard-card text-center clickable" data-bs-toggle="modal" data-bs-target="#telegramDetailsModal">
             <div class="icon-circle mx-auto" style="background: rgba(34, 158, 217, 0.1); border: 1px solid rgba(34, 158, 217, 0.3);">
-                <!-- أيقونة تلجرام الرسمية (SVG) -->
                 <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" fill="#229ED9" viewBox="0 0 16 16">
                     <path d="M16 8A8 8 0 1 1 0 8a8 8 0 0 1 16 0zM8.287 5.906c-.778.324-2.334.994-4.666 2.01-.378.15-.577.298-.595.442-.03.243.275.339.69.47l.175.055c.408.133.958.288 1.243.294.26.006.549-.1.868-.32 2.179-1.471 3.304-2.214 3.374-2.23.05-.012.12-.026.166.016.047.041.042.12.037.141-.03.129-1.227 1.241-1.846 1.817-.193.18-.33.307-.358.336a8.154 8.154 0 0 1-.188.186c-.38.366-.664.64.015 1.088.327.216.589.393.85.571.284.194.568.387.936.629.093.06.183.125.27.187.331.236.63.448.997.414.214-.02.435-.22.547-.82.265-1.417.786-4.486.906-5.751a1.426 1.426 0 0 0-.013-.315.337.337 0 0 0-.114-.217.526.526 0 0 0-.31-.093c-.3.005-.763.166-2.984 1.09z"/>
                 </svg>
@@ -228,8 +238,6 @@
 
 <!-- ✅ الصف الثاني: الأحداث + سجل التلجرام -->
 <div class="row g-4 mb-4">
-    
-    <!-- آخر الأحداث -->
     <div class="col-lg-8">
         <div class="dashboard-card p-0 overflow-hidden">
             <div class="d-flex justify-content-between align-items-center p-4 border-bottom" style="border-color: var(--bg-hover) !important;">
@@ -272,7 +280,6 @@
         </div>
     </div>
 
-    <!-- سجل تلجرام (مختصر) -->
     <div class="col-lg-4">
         <div class="dashboard-card p-0 overflow-hidden d-flex flex-column">
             <div class="d-flex justify-content-between align-items-center p-4 border-bottom" style="border-color: var(--bg-hover) !important;">
@@ -334,7 +341,7 @@
     </div>
 </div>
 
-<!-- ✅ نافذة تفاصيل سيرفرات MikroTik (جديدة) -->
+<!-- ✅ نافذة تفاصيل سيرفرات MikroTik -->
 <div class="modal fade" id="mikrotikDetailsModal" tabindex="-1">
     <div class="modal-dialog modal-dialog-centered modal-lg">
         <div class="modal-content border-0 shadow-lg" style="border-radius: 16px; background-color: var(--bg-card);">
@@ -351,8 +358,6 @@
                 <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
             </div>
             <div class="modal-body p-4">
-                
-                <!-- إحصائيات سريعة -->
                 <div class="row g-3 mb-4 text-center">
                     <div class="col-4">
                         <div class="p-3 rounded-3" style="background-color: var(--bg-main); border: 1px solid var(--bg-hover);">
@@ -374,7 +379,6 @@
                     </div>
                 </div>
 
-                <!-- جدول السيرفرات -->
                 <div class="d-flex justify-content-between align-items-center mb-3">
                     <h6 class="fw-bold text-accent mb-0"><i class="bi bi-list-ul"></i> قائمة السيرفرات</h6>
                     <a href="{{ url_for('routers') }}" class="btn btn-sm btn-primary rounded-pill px-3">
@@ -414,11 +418,9 @@
                                 </td>
                                 <td>
                                     <div class="d-flex justify-content-center gap-1">
-                                        <!-- زر تعديل: يذهب لصفحة الراوترات -->
                                         <a href="{{ url_for('routers') }}" class="btn btn-sm btn-outline-info" title="تعديل">
                                             <i class="bi bi-pencil"></i>
                                         </a>
-                                        <!-- زر حذف: يذهب لرابط الحذف -->
                                         <a href="{{ url_for('delete_router', router_id=r.id) }}" class="btn btn-sm btn-outline-danger" title="حذف" onclick="return confirm('تأكيد حذف السيرفر {{ r.name }}؟')">
                                             <i class="bi bi-trash"></i>
                                         </a>
@@ -444,7 +446,107 @@
     </div>
 </div>
 
-<!-- ✅ نافذة تفاصيل التلجرام المنبثقة -->
+<!-- ✅ نافذة تفاصيل المشتركين (المنتهين والمتوقفين) -->
+<div class="modal fade" id="subscribersDetailsModal" tabindex="-1">
+    <div class="modal-dialog modal-dialog-centered modal-lg">
+        <div class="modal-content border-0 shadow-lg" style="border-radius: 16px; background-color: var(--bg-card);">
+            <div class="modal-header subscribers-modal-header">
+                <h5 class="modal-title fw-bold d-flex align-items-center gap-2">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" fill="white" viewBox="0 0 16 16">
+                        <path d="M7 14s-1 0-1-1 1-4 5-4 5 3 5 4-1 1-1 1H7zm4-6a3 3 0 1 0 0-6 3 3 0 0 0 0 6z"/>
+                        <path fill-rule="evenodd" d="M5.216 14A2.238 2.238 0 0 1 5 13c0-1.355.68-2.75 1.936-3.72A6.325 6.325 0 0 0 5 9c-4 0-5 3-5 4s1 1 1 1h4.216zM4.5 8a2.5 2.5 0 1 0 0-5 2.5 2.5 0 0 0 0 5z"/>
+                    </svg>
+                    الحسابات المنتهية والمتوقفة
+                </h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body p-4">
+                
+                <!-- إحصائيات سريعة -->
+                <div class="row g-3 mb-4 text-center">
+                    <div class="col-4">
+                        <div class="p-3 rounded-3" style="background-color: var(--bg-main); border: 1px solid var(--bg-hover);">
+                            <h4 class="fw-bold text-danger mb-0">{{ sub_count - active_subs }}</h4>
+                            <small class="text-muted">إجمالي غير النشطين</small>
+                        </div>
+                    </div>
+                    <div class="col-4">
+                        <div class="p-3 rounded-3" style="background-color: var(--bg-main); border: 1px solid var(--bg-hover);">
+                            <h4 class="fw-bold text-warning mb-0">-</small></h4>
+                            <small class="text-muted">المنتهين</small>
+                        </div>
+                    </div>
+                    <div class="col-4">
+                        <div class="p-3 rounded-3" style="background-color: var(--bg-main); border: 1px solid var(--bg-hover);">
+                            <h4 class="fw-bold text-secondary mb-0">-</small></h4>
+                            <small class="text-muted">المتوقفين</small>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="table-responsive" style="max-height: 350px; overflow-y: auto; border: 1px solid var(--bg-hover); border-radius: 10px;">
+                    <table class="table table-hover table-clean mb-0 text-center">
+                        <thead>
+                            <tr>
+                                <th>#</th>
+                                <th>الاسم</th>
+                                <th>المستخدم</th>
+                                <th>الحالة</th>
+                                <th>ينتهي</th>
+                                <th>إجراءات</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for sub in inactive_subs %}
+                            <tr>
+                                <td class="text-muted">#{{ sub.id }}</td>
+                                <td class="fw-bold text-primary">{{ sub.name or '-' }}</td>
+                                <td class="text-muted">{{ sub.username }}</td>
+                                <td>
+                                    {% if sub.status == 'expired' %}
+                                        <span class="badge bg-danger bg-opacity-10 text-danger border border-danger">🔴 منتهي</span>
+                                    {% elif sub.status == 'paused' %}
+                                        <span class="badge bg-warning bg-opacity-10 text-warning border border-warning">⏸ موقوف</span>
+                                    {% endif %}
+                                </td>
+                                <td class="text-muted small">
+                                    {% if sub.expires_at %}
+                                        {{ sub.expires_at.strftime('%Y-%m-%d') }}
+                                    {% else %}
+                                        -
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    <div class="d-flex justify-content-center gap-1">
+                                        <a href="{{ url_for('subscribers') }}" class="btn btn-sm btn-outline-info" title="عرض">
+                                            <i class="bi bi-eye"></i>
+                                        </a>
+                                        <a href="{{ url_for('toggle_subscriber', sub_id=sub.id) }}" class="btn btn-sm btn-outline-success" title="تفعيل">
+                                            <i class="bi bi-play-fill"></i>
+                                        </a>
+                                    </div>
+                                </td>
+                            </tr>
+                            {% else %}
+                            <tr>
+                                <td colspan="6" class="text-center py-4 text-muted">لا توجد حسابات منتهية أو متوقفة</td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+            <div class="modal-footer border-top" style="border-color: var(--bg-hover) !important; background-color: var(--bg-hover); border-radius: 0 0 16px 16px;">
+                <a href="{{ url_for('subscribers') }}" class="btn btn-outline-info rounded-3">
+                    <i class="bi bi-people"></i> الإدارة الكاملة
+                </a>
+                <button type="button" class="btn btn-secondary rounded-3" data-bs-dismiss="modal">إغلاق</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- ✅ نافذة تفاصيل التلجرام -->
 <div class="modal fade" id="telegramDetailsModal" tabindex="-1">
     <div class="modal-dialog modal-dialog-centered modal-lg">
         <div class="modal-content border-0 shadow-lg" style="border-radius: 16px; background-color: var(--bg-card);">
@@ -458,8 +560,6 @@
                 <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
             </div>
             <div class="modal-body p-4">
-                
-                <!-- حالة التلجرام -->
                 <div class="d-flex justify-content-between align-items-center p-3 mb-4 rounded-3" style="background-color: var(--bg-main); border: 1px solid var(--bg-hover);">
                     <div class="d-flex align-items-center gap-3">
                         <i class="bi bi-info-circle-fill fs-4 text-info"></i>
@@ -481,7 +581,6 @@
                     </div>
                 </div>
 
-                <!-- إحصائيات سريعة -->
                 <div class="row g-3 mb-4 text-center">
                     <div class="col-4">
                         <div class="p-3 rounded-3" style="background-color: var(--bg-main); border: 1px solid var(--bg-hover);">
@@ -503,7 +602,6 @@
                     </div>
                 </div>
 
-                <!-- سجل الرسائل -->
                 <h6 class="fw-bold text-accent mb-3"><i class="bi bi-list-ul"></i> آخر الإشعارات المرسلة</h6>
                 <div class="table-responsive" style="max-height: 250px; overflow-y: auto; border: 1px solid var(--bg-hover); border-radius: 10px;">
                     <table class="table table-hover table-clean mb-0">
