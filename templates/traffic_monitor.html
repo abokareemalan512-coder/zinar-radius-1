@@ -1,0 +1,416 @@
+{% extends "base.html" %}
+{% block title %}مراقبة حركة المرور{% endblock %}
+
+{% block content %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@400;500;700;800&display=swap" rel="stylesheet">
+
+<style>
+    body { font-family: 'Tajawal', sans-serif; }
+    
+    .traffic-card {
+        background-color: var(--bg-card);
+        border: 1px solid var(--bg-hover);
+        border-radius: 16px;
+        padding: 24px;
+        height: 100%;
+        transition: all 0.3s ease;
+    }
+    .traffic-card:hover {
+        border-color: var(--accent);
+        box-shadow: 0 10px 25px -5px rgba(56, 189, 248, 0.1);
+    }
+    .traffic-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 15px;
+    }
+    .traffic-value {
+        font-size: 2.5rem;
+        font-weight: 800;
+        margin: 10px 0;
+        font-family: 'Tajawal', sans-serif;
+    }
+    .traffic-unit {
+        font-size: 1.1rem;
+        font-weight: 500;
+        opacity: 0.8;
+    }
+    .traffic-progress {
+        height: 10px;
+        background-color: var(--bg-main);
+        border-radius: 5px;
+        overflow: hidden;
+        margin: 15px 0;
+    }
+    .traffic-progress-bar {
+        height: 100%;
+        border-radius: 5px;
+        transition: width 0.5s ease;
+    }
+    .chart-container {
+        position: relative;
+        height: 220px;
+        width: 100%;
+        margin-top: 15px;
+    }
+    .upload-color { color: #f59e0b; }
+    .download-color { color: #22c55e; }
+    .bg-upload { background: linear-gradient(90deg, #f59e0b, #fbbf24); }
+    .bg-download { background: linear-gradient(90deg, #22c55e, #4ade80); }
+    
+    .status-indicator {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        font-size: 0.85rem;
+        padding: 6px 14px;
+        border-radius: 20px;
+        background-color: rgba(34, 197, 94, 0.1);
+        color: #22c55e;
+        border: 1px solid rgba(34, 197, 94, 0.3);
+    }
+    .pulse-dot {
+        width: 8px;
+        height: 8px;
+        border-radius: 50%;
+        background-color: currentColor;
+        animation: pulse-animation 1.5s infinite;
+    }
+    @keyframes pulse-animation {
+        0% { box-shadow: 0 0 0 0 currentColor; opacity: 1; }
+        70% { box-shadow: 0 0 0 8px transparent; opacity: 0.7; }
+        100% { box-shadow: 0 0 0 0 transparent; opacity: 1; }
+    }
+    .api-badge {
+        display: inline-flex;
+        align-items: center;
+        gap: 5px;
+        font-size: 0.7rem;
+        padding: 3px 10px;
+        border-radius: 12px;
+        background: linear-gradient(135deg, #38bdf8, #0ea5e9);
+        color: #0f172a;
+        font-weight: 700;
+    }
+    .control-select {
+        width: 220px;
+        background-color: var(--bg-card);
+        color: var(--text-main);
+        border: 1px solid var(--bg-hover);
+        padding: 10px 14px;
+        border-radius: 10px;
+        font-weight: 500;
+    }
+    .control-select:focus {
+        background-color: var(--bg-card);
+        color: var(--text-main);
+        border-color: var(--accent);
+        box-shadow: 0 0 0 0.2rem var(--accent-glow);
+    }
+</style>
+
+<!-- العنوان والتحكم -->
+<div class="d-flex justify-content-between align-items-center mb-4 flex-wrap gap-3">
+    <div>
+        <h2 class="fw-bold mb-1">
+            <i class="bi bi-graph-up-arrow text-accent"></i>
+            مراقبة حركة المرور
+            <span class="api-badge ms-2">
+                <i class="bi bi-lightning-charge-fill"></i> MikroTik API
+            </span>
+        </h2>
+        <small class="text-muted">مراقبة مباشرة (Live) عبر المنفذ المحدد للـ API</small>
+    </div>
+    
+    <div class="d-flex gap-2 flex-wrap align-items-center">
+        <select id="routerSelect" class="control-select">
+            <option value="">🔌 اختر الراوتر...</option>
+            {% for r in routers %}
+            <option value="{{ r.id }}">{{ r.name }} — {{ r.ip_address }}:{{ r.port }}</option>
+            {% endfor %}
+        </select>
+        
+        <select id="interfaceSelect" class="control-select" disabled>
+            <option value="">📡 اختر الواجهة...</option>
+        </select>
+        
+        <button id="startBtn" class="btn btn-primary px-4 py-2 rounded-3" onclick="startMonitoring()">
+            <i class="bi bi-play-fill"></i> بدء المراقبة
+        </button>
+        <button id="stopBtn" class="btn btn-danger px-4 py-2 rounded-3" onclick="stopMonitoring()" style="display: none;">
+            <i class="bi bi-stop-fill"></i> إيقاف
+        </button>
+    </div>
+</div>
+
+<!-- حالة الاتصال -->
+<div id="connectionStatus" class="mb-3" style="display: none;">
+    <span class="status-indicator">
+        <span class="pulse-dot"></span>
+        <span id="statusText">جاري الاتصال...</span>
+    </span>
+</div>
+
+<!-- منطقة المراقبة -->
+<div class="row g-4" id="monitoringArea" style="display: none;">
+    
+    <!-- بطاقة الرفع -->
+    <div class="col-md-6">
+        <div class="traffic-card">
+            <div class="traffic-header">
+                <h5 class="fw-bold mb-0 upload-color">
+                    <i class="bi bi-arrow-up-circle-fill"></i> رفع (Upload)
+                </h5>
+                <span class="badge px-3 py-2" id="uploadRateBadge" style="background: rgba(245, 158, 11, 0.1); color: #f59e0b; border: 1px solid rgba(245, 158, 11, 0.3); font-size: 0.85rem;">0 Mbps</span>
+            </div>
+            
+            <div class="text-center">
+                <div class="traffic-value upload-color">
+                    <span id="uploadRate">0.00</span> <span class="traffic-unit">Mbps</span>
+                </div>
+            </div>
+            
+            <div class="traffic-progress">
+                <div class="traffic-progress-bar bg-upload" id="uploadProgress" style="width: 0%;"></div>
+            </div>
+            
+            <div class="d-flex justify-content-between text-muted small">
+                <span><i class="bi bi-hdd-stack"></i> إجمالي الرفع:</span>
+                <span id="uploadTotal" class="fw-bold">0 GB</span>
+            </div>
+            
+            <div class="chart-container">
+                <canvas id="uploadChart"></canvas>
+            </div>
+        </div>
+    </div>
+
+    <!-- بطاقة التحميل -->
+    <div class="col-md-6">
+        <div class="traffic-card">
+            <div class="traffic-header">
+                <h5 class="fw-bold mb-0 download-color">
+                    <i class="bi bi-arrow-down-circle-fill"></i> تحميل (Download)
+                </h5>
+                <span class="badge px-3 py-2" id="downloadRateBadge" style="background: rgba(34, 197, 94, 0.1); color: #22c55e; border: 1px solid rgba(34, 197, 94, 0.3); font-size: 0.85rem;">0 Mbps</span>
+            </div>
+            
+            <div class="text-center">
+                <div class="traffic-value download-color">
+                    <span id="downloadRate">0.00</span> <span class="traffic-unit">Mbps</span>
+                </div>
+            </div>
+            
+            <div class="traffic-progress">
+                <div class="traffic-progress-bar bg-download" id="downloadProgress" style="width: 0%;"></div>
+            </div>
+            
+            <div class="d-flex justify-content-between text-muted small">
+                <span><i class="bi bi-hdd-stack"></i> إجمالي التحميل:</span>
+                <span id="downloadTotal" class="fw-bold">0 GB</span>
+            </div>
+            
+            <div class="chart-container">
+                <canvas id="downloadChart"></canvas>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- ملاحظة معلومات -->
+<div class="alert alert-info border-0 rounded-4 small mt-4 d-flex align-items-center gap-2">
+    <i class="bi bi-info-circle-fill fs-5"></i>
+    <div>
+        <strong>ملاحظة:</strong> يجب تفعيل خدمة <code>api</code> على الراوتر من <code>IP → Services</code> واستخدام نفس المنفذ المحدد في بيانات الراوتر.
+    </div>
+</div>
+
+<script>
+    let uploadChart, downloadChart;
+    let monitoringInterval = null;
+    
+    const MAX_DATA_POINTS = 30;
+    const UPDATE_INTERVAL = 2000;
+    
+    let uploadData = [];
+    let downloadData = [];
+    let labels = [];
+
+    function initCharts() {
+        const ctxUpload = document.getElementById('uploadChart').getContext('2d');
+        const ctxDownload = document.getElementById('downloadChart').getContext('2d');
+
+        const commonOptions = {
+            responsive: true,
+            maintainAspectRatio: false,
+            animation: { duration: 200 },
+            plugins: { legend: { display: false } },
+            scales: {
+                x: { display: false },
+                y: {
+                    beginAtZero: true,
+                    grid: { color: 'rgba(255, 255, 255, 0.05)' },
+                    ticks: { color: '#94a3b8', font: { size: 10 } }
+                }
+            },
+            elements: {
+                point: { radius: 0, hitRadius: 10 },
+                line: { tension: 0.4, borderWidth: 2.5 }
+            }
+        };
+
+        uploadChart = new Chart(ctxUpload, {
+            type: 'line',
+            data: {
+                labels: labels,
+                datasets: [{
+                    data: uploadData,
+                    borderColor: '#f59e0b',
+                    backgroundColor: 'rgba(245, 158, 11, 0.15)',
+                    fill: true
+                }]
+            },
+            options: commonOptions
+        });
+
+        downloadChart = new Chart(ctxDownload, {
+            type: 'line',
+            data: {
+                labels: labels,
+                datasets: [{
+                    data: downloadData,
+                    borderColor: '#22c55e',
+                    backgroundColor: 'rgba(34, 197, 94, 0.15)',
+                    fill: true
+                }]
+            },
+            options: commonOptions
+        });
+    }
+
+    document.getElementById('routerSelect').addEventListener('change', function() {
+        const routerId = this.value;
+        const interfaceSelect = document.getElementById('interfaceSelect');
+        const statusDiv = document.getElementById('connectionStatus');
+        
+        if (!routerId) {
+            interfaceSelect.innerHTML = '<option value="">📡 اختر الواجهة...</option>';
+            interfaceSelect.disabled = true;
+            statusDiv.style.display = 'none';
+            return;
+        }
+
+        interfaceSelect.innerHTML = '<option value="">⏳ جاري الجلب...</option>';
+        interfaceSelect.disabled = true;
+        statusDiv.style.display = 'block';
+        document.getElementById('statusText').textContent = 'جاري الاتصال بالـ API...';
+
+        fetch(`/api/traffic/interfaces/${routerId}`)
+            .then(res => res.json())
+            .then(data => {
+                if (data.ok) {
+                    interfaceSelect.innerHTML = '<option value="">📡 اختر الواجهة...</option>';
+                    data.interfaces.forEach(iface => {
+                        interfaceSelect.innerHTML += `<option value="${iface}">${iface}</option>`;
+                    });
+                    interfaceSelect.disabled = false;
+                    document.getElementById('statusText').textContent = `✅ تم جلب ${data.interfaces.length} واجهة عبر API`;
+                } else {
+                    interfaceSelect.innerHTML = '<option value="">❌ خطأ</option>';
+                    document.getElementById('statusText').textContent = '❌ ' + (data.error || 'فشل الاتصال');
+                }
+            })
+            .catch(err => {
+                interfaceSelect.innerHTML = '<option value="">❌ فشل</option>';
+                document.getElementById('statusText').textContent = '❌ فشل الاتصال بالسيرفر';
+            });
+    });
+
+    function startMonitoring() {
+        const routerId = document.getElementById('routerSelect').value;
+        const interfaceName = document.getElementById('interfaceSelect').value;
+
+        if (!routerId || !interfaceName) {
+            alert('⚠️ الرجاء اختيار الراوتر والواجهة أولاً');
+            return;
+        }
+
+        document.getElementById('monitoringArea').style.display = 'flex';
+        document.getElementById('connectionStatus').style.display = 'block';
+        document.getElementById('startBtn').style.display = 'none';
+        document.getElementById('stopBtn').style.display = 'inline-block';
+        document.getElementById('statusText').textContent = `📡 مراقبة الواجهة: ${interfaceName}`;
+
+        uploadData.length = 0;
+        downloadData.length = 0;
+        labels.length = 0;
+
+        if (!uploadChart) initCharts();
+
+        fetchTrafficData(routerId, interfaceName);
+        monitoringInterval = setInterval(() => fetchTrafficData(routerId, interfaceName), UPDATE_INTERVAL);
+    }
+
+    function stopMonitoring() {
+        clearInterval(monitoringInterval);
+        document.getElementById('startBtn').style.display = 'inline-block';
+        document.getElementById('stopBtn').style.display = 'none';
+        document.getElementById('connectionStatus').style.display = 'none';
+    }
+
+    function fetchTrafficData(routerId, interfaceName) {
+        fetch(`/api/traffic/stats/${routerId}/${interfaceName}`)
+            .then(res => res.json())
+            .then(data => {
+                if (!data.ok) {
+                    console.warn('خطأ:', data.error);
+                    return;
+                }
+                
+                const stats = data.stats;
+                const rxRate = parseSpeedToMbps(stats.rx_rate);
+                const txRate = parseSpeedToMbps(stats.tx_rate);
+                const rxGB = (parseInt(stats.rx_byte) / (1024 * 1024 * 1024)).toFixed(2);
+                const txGB = (parseInt(stats.tx_byte) / (1024 * 1024 * 1024)).toFixed(2);
+
+                document.getElementById('uploadRate').textContent = txRate.toFixed(2);
+                document.getElementById('downloadRate').textContent = rxRate.toFixed(2);
+                document.getElementById('uploadTotal').textContent = txGB + ' GB';
+                document.getElementById('downloadTotal').textContent = rxGB + ' GB';
+
+                document.getElementById('uploadRateBadge').textContent = txRate.toFixed(2) + ' Mbps';
+                document.getElementById('downloadRateBadge').textContent = rxRate.toFixed(2) + ' Mbps';
+
+                document.getElementById('uploadProgress').style.width = Math.min((txRate / 100) * 100, 100) + '%';
+                document.getElementById('downloadProgress').style.width = Math.min((rxRate / 100) * 100, 100) + '%';
+
+                const now = new Date().toLocaleTimeString('ar-EG', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+                labels.push(now);
+                uploadData.push(txRate);
+                downloadData.push(rxRate);
+
+                if (labels.length > MAX_DATA_POINTS) {
+                    labels.shift();
+                    uploadData.shift();
+                    downloadData.shift();
+                }
+
+                uploadChart.update('none');
+                downloadChart.update('none');
+            })
+            .catch(err => console.error('Error:', err));
+    }
+
+    function parseSpeedToMbps(speedStr) {
+        if (!speedStr) return 0;
+        const s = String(speedStr);
+        if (s.includes('Gbps')) return parseFloat(s) * 1000;
+        if (s.includes('Mbps')) return parseFloat(s);
+        if (s.includes('kbps')) return parseFloat(s) / 1000;
+        const num = parseFloat(s);
+        return isNaN(num) ? 0 : num / 1000000;
+    }
+</script>
+{% endblock %}
