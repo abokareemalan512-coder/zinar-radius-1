@@ -110,7 +110,8 @@ class Router(db.Model):
     ip_address = db.Column(db.String(50), nullable=False)
     username = db.Column(db.String(50), nullable=False)
     password = db.Column(db.String(150), nullable=False)
-    port = db.Column(db.Integer, default=22)
+    port = db.Column(db.Integer, default=22)              # منفذ SSH للـ Kick
+    api_port = db.Column(db.Integer, default=8728)        # ✅ منفذ API للمراقبة
     is_master = db.Column(db.Boolean, default=False)
     is_active = db.Column(db.Boolean, default=True)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
@@ -816,6 +817,8 @@ def ensure_columns():
                     cols = [c['name'] for c in insp.get_columns('routers')]
                     if 'is_active' not in cols:
                         conn.execute(text("ALTER TABLE routers ADD COLUMN is_active BOOLEAN DEFAULT TRUE"))
+                    if 'api_port' not in cols:
+                        conn.execute(text("ALTER TABLE routers ADD COLUMN api_port INTEGER DEFAULT 8728"))
 
                 if 'telegram_settings' in tables:
                     cols = [c['name'] for c in insp.get_columns('telegram_settings')]
@@ -1104,7 +1107,7 @@ def get_mikrotik_api(router):
         raise Exception("مكتبة librouteros غير مثبتة. قم بتثبيتها عبر: pip install librouteros")
     
     try:
-        api_port = router.port or 8728
+        api_port = router.api_port or 8728
         logger.info(f"🔌 اتصال API: {router.ip_address}:{api_port} (user={router.username})")
         api = connect(
             username=router.username,
@@ -1115,7 +1118,7 @@ def get_mikrotik_api(router):
         )
         return api
     except Exception as e:
-        raise Exception(f"فشل الاتصال بالـ API على المنفذ {router.port}: {str(e)}")
+        raise Exception(f"فشل الاتصال بالـ API على المنفذ {router.api_port}: {str(e)}")
 
 
 @app.route('/api/traffic/interfaces/<int:router_id>')
@@ -1130,8 +1133,6 @@ def api_get_interfaces(router_id):
         for iface in interfaces_data:
             name = iface.get('name')
             if name:
-                iface_type = iface.get('type', '')
-                running = iface.get('running', False)
                 disabled = iface.get('disabled', False)
                 if not disabled:
                     interfaces.append(name)
@@ -1169,10 +1170,9 @@ def api_get_traffic_stats(router_id, interface):
             'tx_byte': str(data.get('tx-byte', 0)),
         }
 
-        # معالجة القيم إذا كانت مجرد أرقام (bps)
         for key in ['rx_rate', 'tx_rate']:
             val = str(stats[key])
-            if not any(x in val for x in ['bps', 'bps']):
+            if not any(x in val for x in ['bps']):
                 try:
                     num = float(val)
                     stats[key] = f"{num}bps"
@@ -1461,7 +1461,6 @@ def dashboard():
             Payment.created_at < end
         ).scalar() or 0
 
-        # ✅ الإيرادات الشهرية والسنوية
         now = datetime.utcnow()
         start_month = datetime(now.year, now.month, 1)
         start_year = datetime(now.year, 1, 1)
@@ -1476,7 +1475,6 @@ def dashboard():
             Payment.created_at >= start_year
         ).scalar() or 0
 
-        # ✅ المشتركون المنتهون والمتوقفون
         inactive_subs = Subscriber.query.filter(
             Subscriber.status.in_(['expired', 'paused'])
         ).all()
@@ -1574,6 +1572,7 @@ def routers():
         un = request.form.get('username', '').strip()
         pw = request.form.get('password', '').strip()
         port = request.form.get('port', '22').strip()
+        api_port = request.form.get('api_port', '8728').strip()
         is_master = request.form.get('is_master') == 'on'
 
         if not name or not ip:
@@ -1589,16 +1588,21 @@ def routers():
             port = 22
 
         try:
+            api_port = int(api_port)
+        except ValueError:
+            api_port = 8728
+
+        try:
             if is_master:
                 Router.query.update({Router.is_master: False}, synchronize_session=False)
             db.session.add(Router(
                 name=name, ip_address=ip, username=un, password=pw,
-                port=port, is_master=is_master, is_active=True
+                port=port, api_port=api_port, is_master=is_master, is_active=True
             ))
             db.session.commit()
-            log_event('إضافة راوتر', name, f'IP: {ip}:{port}')
+            log_event('إضافة راوتر', name, f'IP: {ip} | SSH: {port} | API: {api_port}')
             try:
-                notify_admin_action(f"🖥️ إضافة راوتر: `{name}` - IP: `{ip}:{port}`")
+                notify_admin_action(f"🖥️ إضافة راوتر: `{name}` - IP: `{ip}` (SSH: {port} | API: {api_port})")
             except Exception:
                 pass
             flash(f'✅ الراوتر "{name}" أُضيف', 'success')
@@ -1638,6 +1642,7 @@ def update_router(router_id):
         un = request.form.get('username', '').strip()
         pw = request.form.get('password', '').strip()
         port = request.form.get('port', '22').strip()
+        api_port = request.form.get('api_port', '8728').strip()
 
         if not name or not ip:
             flash('❌ الاسم و IP مطلوبان', 'danger')
@@ -1657,8 +1662,13 @@ def update_router(router_id):
         except ValueError:
             r.port = 22
 
+        try:
+            r.api_port = int(api_port)
+        except ValueError:
+            r.api_port = 8728
+
         db.session.commit()
-        log_event('تعديل راوتر', name, f'IP: {ip}:{r.port}')
+        log_event('تعديل راوتر', name, f'IP: {ip} | SSH: {r.port} | API: {r.api_port}')
         try:
             notify_admin_action(f"✏️ تعديل راوتر: `{name}` - IP: `{ip}`")
         except Exception:
