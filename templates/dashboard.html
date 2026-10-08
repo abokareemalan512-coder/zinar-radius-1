@@ -96,6 +96,7 @@
     .dashboard-card:hover .details-hint { opacity: 1; color: #7dd3fc; }
     .details-hint i { font-size: 0.7rem; }
 
+    /* قائمة آخر عناصر */
     .mini-events-list {
         display: flex;
         flex-direction: column;
@@ -145,6 +146,7 @@
         flex-shrink: 0;
         opacity: 0.75;
         font-weight: 600;
+        font-family: monospace;
     }
 
     .table-clean th {
@@ -203,6 +205,7 @@
 
     .mikrotik-modal-header { background: linear-gradient(135deg, #38bdf8, #0ea5e9); border-radius: 12px 12px 0 0; color: #0f172a; }
     .subscribers-modal-header { background: linear-gradient(135deg, #22c55e, #16a34a); border-radius: 12px 12px 0 0; color: white; }
+    .online-modal-header { background: linear-gradient(135deg, #22c55e, #16a34a); border-radius: 12px 12px 0 0; color: white; }
     .revenue-modal-header { background: linear-gradient(135deg, #f59e0b, #d97706); border-radius: 12px 12px 0 0; color: white; }
     .telegram-modal-header { background: linear-gradient(135deg, #229ED9, #1c7fb0); border-radius: 12px 12px 0 0; color: white; }
 
@@ -619,9 +622,63 @@
         transform: translateY(-1px);
     }
     .traffic-full-link i { font-size: 0.72rem; }
+
+    /* ✅ IP Badge */
+    .ip-badge {
+        display: inline-flex;
+        align-items: center;
+        gap: 4px;
+        padding: 4px 8px;
+        border-radius: 6px;
+        font-size: 0.7rem;
+        font-weight: 700;
+        font-family: 'Courier New', monospace;
+    }
+    .ip-online { background: rgba(34, 197, 94, 0.12); color: #22c55e; border: 1px solid rgba(34, 197, 94, 0.35); }
+    .ip-offline { background: rgba(148, 163, 184, 0.1); color: #94a3b8; border: 1px solid rgba(148, 163, 184, 0.3); }
+
+    /* ✅ زر الدفعات الصغير */
+    .payments-quick-btn {
+        display: inline-flex;
+        align-items: center;
+        gap: 5px;
+        padding: 6px 12px;
+        background: linear-gradient(135deg, #f59e0b, #d97706);
+        color: #ffffff !important;
+        border: none;
+        border-radius: 8px;
+        font-weight: 700;
+        font-size: 0.7rem;
+        text-decoration: none;
+        transition: all 0.3s;
+        box-shadow: 0 2px 8px rgba(245, 158, 11, 0.3);
+        margin-top: 8px;
+        width: 100%;
+        justify-content: center;
+    }
+    .payments-quick-btn:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 5px 15px rgba(245, 158, 11, 0.5);
+        color: #ffffff !important;
+    }
+    .payments-quick-btn i { font-size: 0.8rem; }
+
+    /* ✅ Badge للتحميل والرفع */
+    .speed-badge {
+        display: inline-flex;
+        align-items: center;
+        gap: 4px;
+        padding: 4px 9px;
+        border-radius: 6px;
+        font-size: 0.68rem;
+        font-weight: 700;
+        font-family: monospace;
+    }
+    .speed-down { background: rgba(34, 197, 94, 0.12); color: #22c55e; border: 1px solid rgba(34, 197, 94, 0.35); }
+    .speed-up { background: rgba(245, 158, 11, 0.12); color: #f59e0b; border: 1px solid rgba(245, 158, 11, 0.35); }
 </style>
 
-<!-- صندوق ترحيب مصغّر -->
+<!-- صندوق ترحيب -->
 <div class="welcome-box">
     <div class="welcome-text">
         <h5><i class="bi bi-speedometer2"></i> مرحباً، {{ admin_name }}</h5>
@@ -635,8 +692,10 @@
     </div>
 </div>
 
-<!-- الصف الأول: البطاقات -->
+<!-- ✅ الصف الأول: بطاقات الإحصائيات -->
 <div class="row g-3 mb-3">
+    
+    <!-- 1. MikroTik -->
     <div class="col-xl-3 col-md-6">
         <div class="dashboard-card text-center clickable" data-bs-toggle="modal" data-bs-target="#mikrotikDetailsModal">
             <div class="icon-circle mx-auto" style="background: rgba(56, 189, 248, 0.1); border: 1px solid rgba(56, 189, 248, 0.3);">
@@ -660,7 +719,7 @@
                         {% else %}
                             <i class="bi bi-x-circle-fill text-danger mini-event-icon"></i>
                         {% endif %}
-                        <span class="mini-event-text" title="{{ r.name }} - {{ r.ip_address }}">{{ r.name }}</span>
+                        <span class="mini-event-text" title="{{ r.name }}">{{ r.name }}</span>
                         <span class="mini-event-meta">{{ r.ip_address }}</span>
                     </div>
                     {% endfor %}
@@ -670,6 +729,7 @@
         </div>
     </div>
 
+    <!-- 2. المشتركين -->
     <div class="col-xl-3 col-md-6">
         <div class="dashboard-card text-center clickable" data-bs-toggle="modal" data-bs-target="#subscribersDetailsModal">
             <div class="icon-circle mx-auto" style="background: rgba(34, 197, 94, 0.1); border: 1px solid rgba(34, 197, 94, 0.2);">
@@ -695,31 +755,46 @@
         </div>
     </div>
 
+    <!-- 3. ✅ المتصلون الآن (بدلاً من الإيرادات) -->
     <div class="col-xl-3 col-md-6">
-        <div class="dashboard-card text-center clickable" data-bs-toggle="modal" data-bs-target="#revenueDetailsModal">
-            <div class="icon-circle mx-auto" style="background: rgba(245, 158, 11, 0.1); border: 1px solid rgba(245, 158, 11, 0.3);">
-                <i class="bi bi-cash-coin text-warning"></i>
-            </div>
-            <div class="stat-number">{{ today_revenue }}</div>
-            <div class="stat-label">إيرادات اليوم (ل.س)</div>
-            <div class="d-flex justify-content-center mb-2">
-                <span class="stat-badge warning"><i class="bi bi-graph-up-arrow"></i> إيراد يومي</span>
-            </div>
-            {% if recent_payments %}
-                <div class="mini-events-list">
-                    {% for p in recent_payments[:5] %}
-                    <div class="mini-event-item">
-                        <i class="bi bi-cash-stack text-warning mini-event-icon"></i>
-                        <span class="mini-event-text" title="دفعة #{{ p.id }}">دفعة #{{ p.id }}</span>
-                        <span class="mini-event-meta" style="color: #f59e0b;">{{ p.amount|int }}</span>
-                    </div>
-                    {% endfor %}
+        <div class="dashboard-card text-center">
+            <div class="clickable" data-bs-toggle="modal" data-bs-target="#onlineSubsModal">
+                <div class="icon-circle mx-auto" style="background: rgba(34, 197, 94, 0.1); border: 1px solid rgba(34, 197, 94, 0.3);">
+                    <i class="bi bi-wifi" style="color: #22c55e;"></i>
                 </div>
-            {% endif %}
-            <div class="details-hint"><i class="bi bi-info-circle"></i> اضغط لعرض التفاصيل</div>
+                <div class="stat-number" style="color: #22c55e;">{{ online_subs|length }}</div>
+                <div class="stat-label">المتصلون الآن</div>
+                <div class="d-flex justify-content-center mb-2">
+                    {% if online_subs|length > 0 %}
+                        <span class="stat-badge success"><span class="pulse-dot"></span> مباشر</span>
+                    {% else %}
+                        <span class="stat-badge secondary"><i class="bi bi-wifi-off"></i> لا يوجد</span>
+                    {% endif %}
+                </div>
+                {% if top_online_subs %}
+                    <div class="mini-events-list">
+                        {% for sub in top_online_subs[:10] %}
+                        <div class="mini-event-item">
+                            <i class="bi bi-person-fill text-success mini-event-icon"></i>
+                            <span class="mini-event-text" title="{{ sub.name or sub.username }}">
+                                {{ sub.name or sub.username }}
+                            </span>
+                            <span class="mini-event-meta">{{ sub.current_ip }}</span>
+                        </div>
+                        {% endfor %}
+                    </div>
+                {% endif %}
+                <div class="details-hint"><i class="bi bi-info-circle"></i> اضغط لعرض التفاصيل</div>
+            </div>
+            
+            <!-- ✅ زر الدفعات داخل البطاقة -->
+            <button class="payments-quick-btn" data-bs-toggle="modal" data-bs-target="#revenueDetailsModal">
+                <i class="bi bi-cash-stack"></i> عرض الإيرادات والدفعات
+            </button>
         </div>
     </div>
 
+    <!-- 4. التلجرام -->
     <div class="col-xl-3 col-md-6">
         <div class="dashboard-card text-center clickable" data-bs-toggle="modal" data-bs-target="#telegramDetailsModal">
             <div class="icon-circle mx-auto" style="background: rgba(34, 158, 217, 0.1); border: 1px solid rgba(34, 158, 217, 0.3);">
@@ -753,7 +828,7 @@
     </div>
 </div>
 
-<!-- الصف الثاني: إجراءات سريعة + الترافيك -->
+<!-- ✅ الصف الثاني: إجراءات سريعة + مراقبة الترافيك -->
 <div class="row g-3 mb-3">
     <div class="col-xl-3 col-md-6">
         <div class="quick-actions-card">
@@ -885,7 +960,7 @@
     </div>
 </div>
 
-<!-- الصف الثالث: الأحداث + تلجرام -->
+<!-- ✅ الصف الثالث: الأحداث + تلجرام -->
 <div class="row g-3 mb-3">
     <div class="col-lg-8">
         <div class="dashboard-card p-0 overflow-hidden">
@@ -967,6 +1042,7 @@
 
 <!-- ==================== النوافذ ==================== -->
 
+<!-- ✅ MikroTik Modal -->
 <div class="modal fade" id="mikrotikDetailsModal" tabindex="-1">
     <div class="modal-dialog modal-dialog-centered modal-lg">
         <div class="modal-content border-0 shadow-lg" style="border-radius: 12px; background-color: var(--bg-card);">
@@ -1014,6 +1090,7 @@
     </div>
 </div>
 
+<!-- ✅ Subscribers Modal -->
 <div class="modal fade" id="subscribersDetailsModal" tabindex="-1">
     <div class="modal-dialog modal-dialog-centered modal-lg">
         <div class="modal-content border-0 shadow-lg" style="border-radius: 12px; background-color: var(--bg-card);">
@@ -1055,6 +1132,125 @@
     </div>
 </div>
 
+<!-- ✅ Online Subscribers Modal (نافذة المتصلين الكبيرة) -->
+<div class="modal fade" id="onlineSubsModal" tabindex="-1">
+    <div class="modal-dialog modal-dialog-centered modal-xl">
+        <div class="modal-content border-0 shadow-lg" style="border-radius: 12px; background-color: var(--bg-card);">
+            <div class="modal-header online-modal-header">
+                <h5 class="modal-title fw-bold" style="font-size: 1rem;">
+                    <i class="bi bi-wifi"></i> المشتركون المتصلون الآن
+                    <span class="badge bg-white text-success ms-2" style="font-size: 0.75rem;">{{ online_subs|length }}</span>
+                </h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body p-3">
+                {% if online_subs %}
+                <div class="table-responsive" style="max-height: 500px; overflow-y: auto; border: 1px solid var(--bg-hover); border-radius: 8px;">
+                    <table class="table table-hover table-clean mb-0 text-center">
+                        <thead style="position: sticky; top: 0; background-color: var(--bg-hover); z-index: 10;">
+                            <tr>
+                                <th>#</th>
+                                <th>اسم المستخدم</th>
+                                <th>الاسم</th>
+                                <th>IP المشترك</th>
+                                <th>IP الراوتر</th>
+                                <th>وقت الاتصال</th>
+                                <th>المدة</th>
+                                <th style="color: #22c55e;">⬇ تحميل</th>
+                                <th style="color: #f59e0b;">⬆ رفع</th>
+                                <th>النوع</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for sub in online_subs %}
+                            <tr>
+                                <td class="text-muted">#{{ sub.id }}</td>
+                                <td>
+                                    <span style="font-family: monospace; font-weight: 600; color: var(--accent);">
+                                        {{ sub.username }}
+                                    </span>
+                                </td>
+                                <td class="fw-bold text-primary">{{ sub.name or '-' }}</td>
+                                <td>
+                                    <span class="ip-badge ip-online">
+                                        <i class="bi bi-wifi"></i> {{ sub.current_ip }}
+                                    </span>
+                                </td>
+                                <td>
+                                    {% if sub.router_id and sub.router_id in routers %}
+                                        <span class="badge bg-secondary bg-opacity-10 text-secondary border border-secondary" style="font-family: monospace; font-size: 0.72rem;">
+                                            <i class="bi bi-router"></i> {{ routers[sub.router_id].ip_address }}
+                                        </span>
+                                    {% else %}
+                                        <span class="text-muted">-</span>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    {% if sub.connected_at %}
+                                        <span style="font-size: 0.72rem; color: var(--text-muted);">
+                                            {{ sub.connected_at | localtime('%m-%d %H:%M') }}
+                                        </span>
+                                    {% else %}
+                                        <span class="text-muted">-</span>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    {% if sub.session_uptime %}
+                                        <span class="stat-badge info" style="font-size: 0.68rem; padding: 3px 8px; font-family: monospace;">
+                                            <i class="bi bi-clock"></i> {{ sub.session_uptime }}
+                                        </span>
+                                    {% else %}
+                                        <span class="text-muted">-</span>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    <span class="speed-badge speed-down">
+                                        <i class="bi bi-arrow-down-circle-fill"></i> {{ (sub.session_rx_bytes or 0) | filesizeformat }}
+                                    </span>
+                                </td>
+                                <td>
+                                    <span class="speed-badge speed-up">
+                                        <i class="bi bi-arrow-up-circle-fill"></i> {{ (sub.session_tx_bytes or 0) | filesizeformat }}
+                                    </span>
+                                </td>
+                                <td>
+                                    {% if sub.user_type == 'hotspot' %}
+                                        <span class="stat-badge warning" style="font-size: 0.62rem; padding: 3px 8px;">📶 هوت سبوت</span>
+                                    {% else %}
+                                        <span class="stat-badge info" style="font-size: 0.62rem; padding: 3px 8px;">🌐 برودباند</span>
+                                    {% endif %}
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+                <div class="mt-2 text-center text-muted" style="font-size: 0.68rem;">
+                    <i class="bi bi-info-circle"></i>
+                    يتم التحديث تلقائياً كل دقيقتين من الراوترات | آخر تحديث: {{ current_time }}
+                </div>
+                {% else %}
+                <div class="p-5 text-center text-muted">
+                    <i class="bi bi-wifi-off" style="font-size: 3rem; color: var(--bg-hover);"></i>
+                    <h5 class="mt-3 mb-1">لا يوجد مشتركون متصلون حالياً</h5>
+                    <small style="font-size: 0.75rem;">سيظهر المتصلون هنا تلقائياً عند دخولهم</small>
+                </div>
+                {% endif %}
+            </div>
+            <div class="modal-footer border-top" style="border-color: var(--bg-hover) !important; background-color: var(--bg-hover); border-radius: 0 0 12px 12px;">
+                <button type="button" class="btn btn-outline-success btn-sm rounded-3" style="font-size: 0.75rem;" onclick="refreshOnlineSubs()">
+                    <i class="bi bi-arrow-clockwise"></i> تحديث فوري
+                </button>
+                <a href="{{ url_for('subscribers') }}" class="btn btn-outline-info btn-sm rounded-3" style="font-size: 0.75rem;">
+                    <i class="bi bi-people"></i> الإدارة الكاملة
+                </a>
+                <button type="button" class="btn btn-secondary btn-sm rounded-3" style="font-size: 0.75rem;" data-bs-dismiss="modal">إغلاق</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- ✅ Revenue Modal (الدفعات والإيرادات) -->
 <div class="modal fade" id="revenueDetailsModal" tabindex="-1">
     <div class="modal-dialog modal-dialog-centered modal-lg">
         <div class="modal-content border-0 shadow-lg" style="border-radius: 12px; background-color: var(--bg-card);">
@@ -1063,20 +1259,42 @@
                 <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
             </div>
             <div class="modal-body p-3">
-                <div class="row g-2">
+                <div class="row g-2 mb-3">
                     <div class="col-md-4"><div class="revenue-box"><h6 class="text-muted mb-1" style="font-size: 0.72rem;">مبيعات اليوم</h6><h4 class="fw-bold text-warning mb-0">{{ today_revenue }}</h4><small class="text-muted" style="font-size: 0.68rem;">ل.س</small></div></div>
                     <div class="col-md-4"><div class="revenue-box"><h6 class="text-muted mb-1" style="font-size: 0.72rem;">مبيعات الشهر</h6><h4 class="fw-bold text-info mb-0">{{ monthly_revenue|default(0) }}</h4><small class="text-muted" style="font-size: 0.68rem;">ل.س</small></div></div>
                     <div class="col-md-4"><div class="revenue-box"><h6 class="text-muted mb-1" style="font-size: 0.72rem;">مبيعات السنة</h6><h4 class="fw-bold mb-0" style="color: #a855f7;">{{ yearly_revenue|default(0) }}</h4><small class="text-muted" style="font-size: 0.68rem;">ل.س</small></div></div>
                 </div>
+
+                {% if recent_payments %}
+                <h6 class="fw-bold text-accent mb-2" style="font-size: 0.85rem;"><i class="bi bi-list-ul"></i> آخر 5 دفعات</h6>
+                <div class="table-responsive" style="max-height: 250px; overflow-y: auto; border: 1px solid var(--bg-hover); border-radius: 8px;">
+                    <table class="table table-hover table-clean mb-0 text-center">
+                        <thead><tr><th>#</th><th>المبلغ</th><th>الحالة</th><th>التاريخ</th></tr></thead>
+                        <tbody>
+                            {% for p in recent_payments %}
+                            <tr>
+                                <td class="text-muted">#{{ p.id }}</td>
+                                <td class="fw-bold text-warning">{{ p.amount|int }} ل.س</td>
+                                <td><span class="stat-badge success" style="font-size: 0.62rem; padding: 3px 8px;">✅ مكتملة</span></td>
+                                <td class="text-muted" style="font-size: 0.72rem;">{{ p.created_at | localtime('%m-%d %H:%M') }}</td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+                {% endif %}
             </div>
             <div class="modal-footer border-top" style="border-color: var(--bg-hover) !important; background-color: var(--bg-hover); border-radius: 0 0 12px 12px;">
-                <a href="{{ url_for('payments') }}" class="btn btn-outline-warning btn-sm rounded-3" style="font-size: 0.72rem;">سجل الدفعات</a>
+                <a href="{{ url_for('payments') }}" class="btn btn-outline-warning btn-sm rounded-3" style="font-size: 0.72rem;">
+                    <i class="bi bi-cash-stack"></i> سجل الدفعات الكامل
+                </a>
                 <button type="button" class="btn btn-secondary btn-sm rounded-3" style="font-size: 0.72rem;" data-bs-dismiss="modal">إغلاق</button>
             </div>
         </div>
     </div>
 </div>
 
+<!-- ✅ Telegram Modal -->
 <div class="modal fade" id="telegramDetailsModal" tabindex="-1">
     <div class="modal-dialog modal-dialog-centered modal-lg">
         <div class="modal-content border-0 shadow-lg" style="border-radius: 12px; background-color: var(--bg-card);">
@@ -1111,6 +1329,7 @@
     </div>
 </div>
 
+<!-- ✅ Change Credentials Modal -->
 <div class="modal fade" id="changeCredentialsModal" tabindex="-1">
     <div class="modal-dialog modal-dialog-centered">
         <div class="modal-content border-0 shadow-lg" style="border-radius: 12px; background-color: var(--bg-card);">
@@ -1152,6 +1371,31 @@
     let dashDownloadData = [];
     let dashLabels = [];
 
+    // ✅ تحديث فوري للمتصلين
+    function refreshOnlineSubs() {
+        if (!confirm('سيتم مزامنة جميع الراوترات لجلب المتصلين. متابعة؟')) return;
+        const btn = event.target.closest('button');
+        const orig = btn.innerHTML;
+        btn.disabled = true;
+        btn.innerHTML = '<span class="spinner-border spinner-border-sm"></span> جاري...';
+        fetch('/subscribers/sync-now', { method: 'POST' })
+            .then(r => r.json())
+            .then(d => {
+                if (d.ok) {
+                    location.reload();
+                } else {
+                    alert('❌ فشل: ' + (d.error || 'خطأ'));
+                    btn.disabled = false;
+                    btn.innerHTML = orig;
+                }
+            })
+            .catch(e => {
+                alert('❌ خطأ: ' + e.message);
+                btn.disabled = false;
+                btn.innerHTML = orig;
+            });
+    }
+
     function escapeHtml(str) {
         if (str === null || str === undefined) return '';
         return String(str).replace(/[&<>"']/g, function(m) {
@@ -1168,6 +1412,7 @@
     function dashUpdateDirectionUI() {
         const btn = document.getElementById('dashDirectionBtn');
         const text = document.getElementById('dashDirectionText');
+        if (!btn || !text) return;
         if (dashIsDirectionReversed) {
             btn.classList.add('reversed');
             text.textContent = 'معكوس';
@@ -1192,7 +1437,7 @@
             dashDownloadChart.data.datasets[0].data = dashDownloadData;
             dashDownloadChart.update();
         }
-        const routerId = document.getElementById('dashRouterSelect').value;
+        const routerId = document.getElementById('dashRouterSelect')?.value;
         if (routerId && dashSelectedInterface && dashMonitoringInterval) {
             dashFetchTraffic(routerId, dashSelectedInterface);
         }
@@ -1208,8 +1453,11 @@
     }
 
     function dashInitCharts() {
-        const ctxU = document.getElementById('dashUploadChart').getContext('2d');
-        const ctxD = document.getElementById('dashDownloadChart').getContext('2d');
+        const uEl = document.getElementById('dashUploadChart');
+        const dEl = document.getElementById('dashDownloadChart');
+        if (!uEl || !dEl) return;
+        const ctxU = uEl.getContext('2d');
+        const ctxD = dEl.getContext('2d');
         const opts = {
             responsive: true, maintainAspectRatio: false, animation: { duration: 200 },
             plugins: { legend: { display: false } },
@@ -1409,6 +1657,7 @@
         const state = dashLoadState();
         if (!state || !state.routerId) return;
         const rs = document.getElementById('dashRouterSelect');
+        if (!rs) return;
         rs.value = state.routerId;
         if (rs.value !== state.routerId) return;
         dashFetchInterfaces(state.routerId, function() {
