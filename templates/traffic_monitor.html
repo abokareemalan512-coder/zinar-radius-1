@@ -108,6 +108,48 @@
         border-color: var(--accent);
         box-shadow: 0 0 0 0.2rem var(--accent-glow);
     }
+
+    /* ✅ زر تبديل الاتجاه */
+    .direction-toggle {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        background: linear-gradient(135deg, #a855f7, #9333ea);
+        color: white;
+        border: none;
+        padding: 10px 18px;
+        border-radius: 10px;
+        font-weight: 600;
+        font-size: 0.9rem;
+        cursor: pointer;
+        transition: all 0.3s;
+        box-shadow: 0 4px 12px rgba(168, 85, 247, 0.3);
+    }
+    .direction-toggle:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 6px 18px rgba(168, 85, 247, 0.5);
+        color: white;
+    }
+    .direction-toggle.reversed {
+        background: linear-gradient(135deg, #f59e0b, #d97706);
+        box-shadow: 0 4px 12px rgba(245, 158, 11, 0.3);
+    }
+    .direction-toggle.reversed:hover {
+        box-shadow: 0 6px 18px rgba(245, 158, 11, 0.5);
+    }
+
+    .direction-info {
+        background: rgba(56, 189, 248, 0.08);
+        border: 1px solid rgba(56, 189, 248, 0.2);
+        padding: 10px 15px;
+        border-radius: 10px;
+        font-size: 0.85rem;
+        color: var(--text-muted);
+        margin-bottom: 15px;
+    }
+    .direction-info strong {
+        color: var(--accent);
+    }
 </style>
 
 <!-- العنوان والتحكم -->
@@ -135,6 +177,12 @@
             <option value="">📡 اختر المنفذ...</option>
         </select>
 
+        <!-- ✅ زر تبديل الاتجاه -->
+        <button id="directionBtn" class="direction-toggle" onclick="toggleDirection()" title="تبديل اتجاه الرفع والتحميل">
+            <i class="bi bi-arrow-left-right" id="directionIcon"></i>
+            <span id="directionText">الاتجاه: تلقائي</span>
+        </button>
+
         <button id="startBtn" class="btn btn-primary px-4 py-2 rounded-3" onclick="startMonitoring()">
             <i class="bi bi-play-fill"></i> بدء المراقبة
         </button>
@@ -142,6 +190,12 @@
             <i class="bi bi-stop-fill"></i> إيقاف
         </button>
     </div>
+</div>
+
+<!-- تنبيه الاتجاه -->
+<div class="direction-info" id="directionInfo" style="display: none;">
+    <i class="bi bi-info-circle-fill text-info"></i>
+    <span id="directionInfoText">الاتجاه التلقائي: <strong>WAN</strong> (منفذ الإنترنت)</span>
 </div>
 
 <!-- حالة الاتصال -->
@@ -154,32 +208,7 @@
 
 <!-- منطقة المراقبة -->
 <div class="row g-4" id="monitoringArea" style="display: none;">
-    <div class="col-md-6">
-        <div class="traffic-card">
-            <div class="traffic-header">
-                <h5 class="fw-bold mb-0 upload-color">
-                    <i class="bi bi-arrow-up-circle-fill"></i> رفع (Upload)
-                </h5>
-                <span class="badge px-3 py-2" id="uploadRateBadge" style="background: rgba(245, 158, 11, 0.1); color: #f59e0b; border: 1px solid rgba(245, 158, 11, 0.3); font-size: 0.85rem;">0 Mbps</span>
-            </div>
-            <div class="text-center">
-                <div class="traffic-value upload-color">
-                    <span id="uploadRate">0.00</span> <span class="traffic-unit">Mbps</span>
-                </div>
-            </div>
-            <div class="traffic-progress">
-                <div class="traffic-progress-bar bg-upload" id="uploadProgress" style="width: 0%;"></div>
-            </div>
-            <div class="d-flex justify-content-between text-muted small">
-                <span><i class="bi bi-hdd-stack"></i> إجمالي الرفع:</span>
-                <span id="uploadTotal" class="fw-bold">0 GB</span>
-            </div>
-            <div class="chart-container">
-                <canvas id="uploadChart"></canvas>
-            </div>
-        </div>
-    </div>
-
+    <!-- التحميل -->
     <div class="col-md-6">
         <div class="traffic-card">
             <div class="traffic-header">
@@ -205,13 +234,44 @@
             </div>
         </div>
     </div>
+
+    <!-- الرفع -->
+    <div class="col-md-6">
+        <div class="traffic-card">
+            <div class="traffic-header">
+                <h5 class="fw-bold mb-0 upload-color">
+                    <i class="bi bi-arrow-up-circle-fill"></i> رفع (Upload)
+                </h5>
+                <span class="badge px-3 py-2" id="uploadRateBadge" style="background: rgba(245, 158, 11, 0.1); color: #f59e0b; border: 1px solid rgba(245, 158, 11, 0.3); font-size: 0.85rem;">0 Mbps</span>
+            </div>
+            <div class="text-center">
+                <div class="traffic-value upload-color">
+                    <span id="uploadRate">0.00</span> <span class="traffic-unit">Mbps</span>
+                </div>
+            </div>
+            <div class="traffic-progress">
+                <div class="traffic-progress-bar bg-upload" id="uploadProgress" style="width: 0%;"></div>
+            </div>
+            <div class="d-flex justify-content-between text-muted small">
+                <span><i class="bi bi-hdd-stack"></i> إجمالي الرفع:</span>
+                <span id="uploadTotal" class="fw-bold">0 GB</span>
+            </div>
+            <div class="chart-container">
+                <canvas id="uploadChart"></canvas>
+            </div>
+        </div>
+    </div>
 </div>
 
 <!-- ملاحظة -->
 <div class="alert alert-info border-0 rounded-4 small mt-4 d-flex align-items-center gap-2">
     <i class="bi bi-info-circle-fill fs-5"></i>
     <div>
-        <strong>ملاحظة:</strong> يجب تفعيل خدمة <code>api</code> على الراوتر من <code>IP → Services</code> واستخدام نفس المنفذ المحدد في بيانات الراوتر.
+        <strong>كيف تستخدم زر الاتجاه؟</strong>
+        <ul class="mb-0 mt-1" style="padding-right: 20px;">
+            <li>إذا كان <strong>التحميل أعلى من الرفع</strong> (يوجد تحميل للفيديوهات والملفات) — الاتجاه صحيح ✅</li>
+            <li>إذا كان <strong>الرفع أعلى من التحميل</strong> (وهذا غير منطقي لمستخدمي الإنترنت) — اضغط زر <strong>الاتجاه</strong> لتبديله 🔄</li>
+        </ul>
     </div>
 </div>
 
@@ -220,14 +280,79 @@
     let monitoringInterval = null;
 
     const MAX_DATA_POINTS = 30;
-    const UPDATE_INTERVAL = 3000; // 3 ثواني
+    const UPDATE_INTERVAL = 3000;
     const STORAGE_KEY = 'traffic_monitor_state';
+    const DIRECTION_KEY = 'traffic_direction_reversed';
 
     let uploadData = [];
     let downloadData = [];
     let labels = [];
 
-    // ✅ حفظ الحالة في localStorage
+    // ✅ حالة الاتجاه: false = طبيعي (rx=download)، true = معكوس (rx=upload)
+    let isDirectionReversed = false;
+
+    // ✅ تحميل حالة الاتجاه من localStorage
+    function loadDirection() {
+        try {
+            const saved = localStorage.getItem(DIRECTION_KEY);
+            isDirectionReversed = saved === 'true';
+        } catch(e) {
+            isDirectionReversed = false;
+        }
+        updateDirectionUI();
+    }
+
+    function saveDirection() {
+        try {
+            localStorage.setItem(DIRECTION_KEY, String(isDirectionReversed));
+        } catch(e) {}
+    }
+
+    function updateDirectionUI() {
+        const btn = document.getElementById('directionBtn');
+        const text = document.getElementById('directionText');
+        const info = document.getElementById('directionInfoText');
+
+        if (isDirectionReversed) {
+            btn.classList.add('reversed');
+            text.textContent = 'الاتجاه: معكوس (LAN)';
+            if (info) info.innerHTML = 'الاتجاه الحالي: <strong style="color:#f59e0b;">معكوس</strong> — مناسب لمنافذ LAN';
+        } else {
+            btn.classList.remove('reversed');
+            text.textContent = 'الاتجاه: تلقائي (WAN)';
+            if (info) info.innerHTML = 'الاتجاه الحالي: <strong>تلقائي</strong> — مناسب لمنافذ WAN';
+        }
+    }
+
+    function toggleDirection() {
+        isDirectionReversed = !isDirectionReversed;
+        saveDirection();
+        updateDirectionUI();
+
+        // مسح البيانات الحالية وإعادة الرسم
+        uploadData.length = 0;
+        downloadData.length = 0;
+        labels.length = 0;
+
+        if (uploadChart) {
+            uploadChart.data.labels = labels;
+            uploadChart.data.datasets[0].data = uploadData;
+            uploadChart.update();
+        }
+        if (downloadChart) {
+            downloadChart.data.labels = labels;
+            downloadChart.data.datasets[0].data = downloadData;
+            downloadChart.update();
+        }
+
+        // إعادة جلب البيانات فوراً
+        const routerId = document.getElementById('routerSelect').value;
+        const interfaceName = document.getElementById('interfaceSelect').value;
+        if (routerId && interfaceName && monitoringInterval) {
+            fetchTrafficData(routerId, interfaceName);
+        }
+    }
+
     function saveState(routerId, interfaceName, isMonitoring) {
         try {
             localStorage.setItem(STORAGE_KEY, JSON.stringify({
@@ -235,7 +360,7 @@
                 interfaceName: interfaceName,
                 isMonitoring: isMonitoring
             }));
-        } catch(e) { console.warn('localStorage error:', e); }
+        } catch(e) {}
     }
 
     function loadState() {
@@ -249,7 +374,6 @@
         try { localStorage.removeItem(STORAGE_KEY); } catch(e) {}
     }
 
-    // ✅ تهيئة الرسوم البيانية
     function initCharts() {
         const ctxUpload = document.getElementById('uploadChart').getContext('2d');
         const ctxDownload = document.getElementById('downloadChart').getContext('2d');
@@ -302,7 +426,6 @@
         });
     }
 
-    // ✅ جلب المنافذ عند تغيير الراوتر
     function fetchInterfaces(routerId, callback) {
         const interfaceSelect = document.getElementById('interfaceSelect');
         const statusDiv = document.getElementById('connectionStatus');
@@ -318,10 +441,8 @@
                 if (data.ok) {
                     interfaceSelect.innerHTML = '<option value="">📡 اختر المنفذ...</option>';
                     data.interfaces.forEach(iface => {
-                        // ✅ الإصلاح: استخدام iface.name بدلاً من iface
                         const opt = document.createElement('option');
                         opt.value = iface.name;
-                        // عرض اسم المنفذ + النوع + الحالة
                         let label = iface.name;
                         if (iface.running) {
                             label += ' 🟢';
@@ -336,7 +457,6 @@
                     });
                     interfaceSelect.disabled = false;
                     document.getElementById('statusText').textContent = `✅ تم جلب ${data.interfaces.length} منفذ عبر API`;
-
                     if (callback) callback();
                 } else {
                     interfaceSelect.innerHTML = '<option value="">❌ خطأ</option>';
@@ -355,9 +475,11 @@
             document.getElementById('interfaceSelect').innerHTML = '<option value="">📡 اختر المنفذ...</option>';
             document.getElementById('interfaceSelect').disabled = true;
             document.getElementById('connectionStatus').style.display = 'none';
+            document.getElementById('directionInfo').style.display = 'none';
             clearState();
             return;
         }
+        document.getElementById('directionInfo').style.display = 'block';
         saveState(routerId, '', false);
         fetchInterfaces(routerId, null);
     }
@@ -368,7 +490,6 @@
         saveState(routerId, iface, false);
     }
 
-    // ✅ بدء المراقبة
     function startMonitoring() {
         const routerId = document.getElementById('routerSelect').value;
         const interfaceName = document.getElementById('interfaceSelect').value;
@@ -380,6 +501,7 @@
 
         document.getElementById('monitoringArea').style.display = 'flex';
         document.getElementById('connectionStatus').style.display = 'block';
+        document.getElementById('directionInfo').style.display = 'block';
         document.getElementById('startBtn').style.display = 'none';
         document.getElementById('stopBtn').style.display = 'inline-block';
         document.getElementById('statusText').textContent = `📡 مراقبة المنفذ: ${interfaceName}`;
@@ -390,7 +512,6 @@
 
         if (!uploadChart) initCharts();
 
-        // ✅ حفظ الحالة
         saveState(routerId, interfaceName, true);
 
         fetchTrafficData(routerId, interfaceName);
@@ -407,7 +528,7 @@
         saveState(routerId, iface, false);
     }
 
-    // ✅ جلب بيانات الترافيك
+    // ✅ جلب البيانات مع تطبيق الاتجاه
     function fetchTrafficData(routerId, interfaceName) {
         fetch(`/api/traffic/stats/${routerId}/${interfaceName}`)
             .then(res => res.json())
@@ -418,26 +539,54 @@
                 }
 
                 const stats = data.stats;
-                const rxRate = parseSpeedToMbps(stats.rx_rate);
-                const txRate = parseSpeedToMbps(stats.tx_rate);
-                const rxGB = (parseInt(stats.rx_byte) / (1024 * 1024 * 1024)).toFixed(2);
-                const txGB = (parseInt(stats.tx_byte) / (1024 * 1024 * 1024)).toFixed(2);
 
-                document.getElementById('uploadRate').textContent = txRate.toFixed(2);
-                document.getElementById('downloadRate').textContent = rxRate.toFixed(2);
-                document.getElementById('uploadTotal').textContent = txGB + ' GB';
-                document.getElementById('downloadTotal').textContent = rxGB + ' GB';
+                // القيم الأصلية من الراوتر
+                const rx_rate_val = parseSpeedToMbps(stats.rx_rate);   // من الراوتر (rx)
+                const tx_rate_val = parseSpeedToMbps(stats.tx_rate);   // إلى الراوتر (tx)
+                const rx_byte_val = parseInt(stats.rx_byte);            // إجمالي مستلم
+                const tx_byte_val = parseInt(stats.tx_byte);            // إجمالي مرسل
 
-                document.getElementById('uploadRateBadge').textContent = txRate.toFixed(2) + ' Mbps';
-                document.getElementById('downloadRateBadge').textContent = rxRate.toFixed(2) + ' Mbps';
+                // ✅ تطبيق الاتجاه
+                let uploadRateVal, downloadRateVal, uploadByteVal, downloadByteVal;
 
-                document.getElementById('uploadProgress').style.width = Math.min((txRate / 100) * 100, 100) + '%';
-                document.getElementById('downloadProgress').style.width = Math.min((rxRate / 100) * 100, 100) + '%';
+                if (isDirectionReversed) {
+                    // الاتجاه المعكوس (LAN):
+                    // rx = رفع (من المستخدمين)، tx = تحميل (للمستخدمين)
+                    uploadRateVal = rx_rate_val;
+                    downloadRateVal = tx_rate_val;
+                    uploadByteVal = rx_byte_val;
+                    downloadByteVal = tx_byte_val;
+                } else {
+                    // الاتجاه الطبيعي (WAN):
+                    // rx = تحميل (من الإنترنت)، tx = رفع (للإنترنت)
+                    uploadRateVal = tx_rate_val;
+                    downloadRateVal = rx_rate_val;
+                    uploadByteVal = tx_byte_val;
+                    downloadByteVal = rx_byte_val;
+                }
 
+                const uploadGB = (uploadByteVal / (1024 * 1024 * 1024)).toFixed(2);
+                const downloadGB = (downloadByteVal / (1024 * 1024 * 1024)).toFixed(2);
+
+                // تحديث الأرقام الرئيسية
+                document.getElementById('uploadRate').textContent = uploadRateVal.toFixed(2);
+                document.getElementById('downloadRate').textContent = downloadRateVal.toFixed(2);
+                document.getElementById('uploadTotal').textContent = uploadGB + ' GB';
+                document.getElementById('downloadTotal').textContent = downloadGB + ' GB';
+
+                // تحديث الشارات
+                document.getElementById('uploadRateBadge').textContent = uploadRateVal.toFixed(2) + ' Mbps';
+                document.getElementById('downloadRateBadge').textContent = downloadRateVal.toFixed(2) + ' Mbps';
+
+                // أشرطة التقدم
+                document.getElementById('uploadProgress').style.width = Math.min((uploadRateVal / 100) * 100, 100) + '%';
+                document.getElementById('downloadProgress').style.width = Math.min((downloadRateVal / 100) * 100, 100) + '%';
+
+                // تحديث الرسوم البيانية
                 const now = new Date().toLocaleTimeString('ar-EG', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
                 labels.push(now);
-                uploadData.push(txRate);
-                downloadData.push(rxRate);
+                uploadData.push(uploadRateVal);
+                downloadData.push(downloadRateVal);
 
                 if (labels.length > MAX_DATA_POINTS) {
                     labels.shift();
@@ -461,23 +610,23 @@
         return isNaN(num) ? 0 : num / 1000000;
     }
 
-    // ✅ استعادة الحالة عند تحميل الصفحة
+    // ✅ استعادة الحالة عند التحميل
     window.addEventListener('DOMContentLoaded', function() {
+        loadDirection();
+
         const state = loadState();
         if (!state || !state.routerId) return;
 
         const routerSelect = document.getElementById('routerSelect');
         routerSelect.value = state.routerId;
 
-        if (routerSelect.value !== state.routerId) return; // الراوتر غير موجود
+        if (routerSelect.value !== state.routerId) return;
 
-        // جلب المنافذ ثم اختيار المنفذ المحفوظ
         fetchInterfaces(state.routerId, function() {
             if (state.interfaceName) {
                 const ifaceSelect = document.getElementById('interfaceSelect');
                 ifaceSelect.value = state.interfaceName;
 
-                // إذا كانت المراقبة مفعلة سابقاً، استعدها تلقائياً
                 if (state.isMonitoring && ifaceSelect.value === state.interfaceName) {
                     setTimeout(() => startMonitoring(), 500);
                 }
