@@ -293,7 +293,6 @@ def _safe_int(value, default=0):
 
 
 def _calculate_connected_at(uptime_str):
-    """تحويل uptime مثل '1h30m25s' إلى datetime"""
     try:
         if not uptime_str:
             return None
@@ -726,21 +725,16 @@ def get_mikrotik_api(router):
         raise Exception(f"فشل الاتصال بالـ API على المنفذ {router.api_port}: {str(e)}")
 
 
-# ============ Background IP + Session Updater ============
+# ============ Fetch Active IPs + Traffic ============
 
 def fetch_active_ips_from_router(router):
-    """
-    جلب المستخدمين النشطين مع حجم البيانات الحقيقي (تحميل/رفع)
-    يتم قراءة البيانات من الواجهات الديناميكية <pppoe-username>
-    """
     if not LIBROUTEROS_AVAILABLE:
         return {}
     result = {}
     api = None
     try:
         api = get_mikrotik_api(router)
-        
-        # ✅ الخطوة 1: جلب كل الواجهات وبناء خريطة (name → stats)
+
         interfaces_map = {}
         try:
             for iface in api.path('interface'):
@@ -751,32 +745,25 @@ def fetch_active_ips_from_router(router):
                     'rx_byte': _safe_int(iface.get('rx-byte', 0), 0),
                     'tx_byte': _safe_int(iface.get('tx-byte', 0), 0),
                 }
-            logger.info(f"📊 {router.name}: تم قراءة {len(interfaces_map)} واجهة")
         except Exception as e:
             logger.warning(f"⚠️ فشل جلب الواجهات من {router.name}: {e}")
-        
-        # ✅ الخطوة 2: جلب جلسات PPPoE النشطة
+
         try:
             for ppp in api.path('ppp', 'active'):
                 uname = _safe_str(ppp.get('name'))
                 addr = _safe_str(ppp.get('address'))
                 if not uname or not addr or addr == '0.0.0.0':
                     continue
-                
-                # ✅ اسم الواجهة الديناميكية في MikroTik
                 iface_name = f"<pppoe-{uname}>"
                 iface_stats = interfaces_map.get(iface_name, {})
                 rx_bytes = iface_stats.get('rx_byte', 0)
                 tx_bytes = iface_stats.get('tx_byte', 0)
-                
-                # إذا لم نجد الواجهة، جرّب البحث الجزئي
                 if not iface_stats:
                     for k, v in interfaces_map.items():
                         if uname in k and 'pppoe' in k.lower():
                             rx_bytes = v.get('rx_byte', 0)
                             tx_bytes = v.get('tx_byte', 0)
                             break
-                
                 result[uname] = {
                     'ip': addr,
                     'uptime': _safe_str(ppp.get('uptime', '')),
@@ -787,8 +774,7 @@ def fetch_active_ips_from_router(router):
                 }
         except Exception as e:
             logger.warning(f"⚠️ فشل جلب PPP active من {router.name}: {e}")
-        
-        # ✅ الخطوة 3: جلب جلسات Hotspot النشطة
+
         try:
             for hs in api.path('ip', 'hotspot', 'active'):
                 uname = _safe_str(hs.get('user'))
@@ -809,7 +795,7 @@ def fetch_active_ips_from_router(router):
                 }
         except Exception as e:
             logger.warning(f"⚠️ فشل جلب Hotspot active من {router.name}: {e}")
-        
+
         logger.info(f"✅ {router.name}: تم جلب {len(result)} مشترك نشط")
         return result
     except Exception as e:
@@ -1366,12 +1352,143 @@ def check_admin_login():
         'sync.get_subscribers', 'sync.mark_first_use',
         'api_auth', 'api_log', 'api_router_notify',
         'api_import_subscribers', 'api_import_packages',
-        'api_get_interfaces', 'api_get_traffic_stats'
+        'api_get_interfaces', 'api_get_traffic_stats',
+        # ✅ بوابة المشتركين
+        'my_account_login', 'my_account_dashboard',
+        'my_account_logout', 'my_account_refresh'
     )
     if request.endpoint in public:
         return
     if not session.get('admin_id'):
         return redirect(url_for('login'))
+
+
+# ============ ✅ بوابة المشتركين ============
+
+@app.route('/my-account', methods=['GET', 'POST'])
+def my_account_login():
+    if session.get('subscriber_id'):
+        return redirect(url_for('my_account_dashboard'))
+
+    if request.method == 'POST':
+        username = request.form.get('username', '').strip()
+        password = request.form.get('password', '').strip()
+
+        if not username or not password:
+            flash('❌ الرجاء إدخال اسم المستخدم وكلمة المرور', 'danger')
+            return redirect(url_for('my_account_login'))
+
+        sub = Subscriber.query.filter_by(username=username).first()
+        if not sub or sub.password != password:
+            flash('❌ اسم المستخدم أو كلمة المرور غير صحيحة', 'danger')
+            return redirect(url_for('my_account_login'))
+
+        session['subscriber_id'] = sub.id
+        session['subscriber_username'] = sub.username
+        log_event('دخول مشترك', sub.username, 'دخول بوابة المشتركين', admin_name=sub.username)
+        return redirect(url_for('my_account_dashboard'))
+
+    return render_template('my_account_login.html')
+
+
+@app.route('/my-account/dashboard')
+def my_account_dashboard():
+    if not session.get('subscriber_id'):
+        return redirect(url_for('my_account_login'))
+
+    sub = Subscriber.query.get(session['subscriber_id'])
+    if not sub:
+        session.pop('subscriber_id', None)
+        session.pop('subscriber_username', None)
+        return redirect(url_for('my_account_login'))
+
+    router = None
+    if sub.router_id:
+        router = Router.query.get(sub.router_id)
+
+    days_left = None
+    if sub.expires_at:
+        delta = sub.expires_at - datetime.utcnow()
+        days_left = delta.days
+
+    return render_template(
+        'my_account.html',
+        sub=sub,
+        router=router,
+        days_left=days_left
+    )
+
+
+@app.route('/my-account/refresh', methods=['POST'])
+def my_account_refresh():
+    if not session.get('subscriber_id'):
+        return jsonify({'ok': False, 'error': 'Unauthorized'}), 401
+
+    sub = Subscriber.query.get(session['subscriber_id'])
+    if not sub:
+        return jsonify({'ok': False, 'error': 'Not found'}), 404
+
+    if not sub.router_id:
+        return jsonify({'ok': False, 'error': 'No router assigned'})
+
+    router = Router.query.get(sub.router_id)
+    if not router:
+        return jsonify({'ok': False, 'error': 'Router not found'})
+
+    try:
+        active_ips = fetch_active_ips_from_router(router)
+        info = active_ips.get(sub.username)
+
+        if info:
+            sub.current_ip = info['ip']
+            sub.session_uptime = info.get('uptime', '')
+            sub.session_rx_bytes = info.get('rx_bytes', 0)
+            sub.session_tx_bytes = info.get('tx_bytes', 0)
+            if info.get('uptime'):
+                sub.connected_at = _calculate_connected_at(info['uptime'])
+            sub.ip_updated_at = datetime.utcnow()
+            sub.last_seen_at = datetime.utcnow()
+            db.session.commit()
+
+            return jsonify({
+                'ok': True,
+                'online': True,
+                'ip': sub.current_ip,
+                'uptime': sub.session_uptime,
+                'rx_bytes': sub.session_rx_bytes,
+                'tx_bytes': sub.session_tx_bytes,
+                'connected_at': sub.connected_at.strftime('%Y-%m-%d %H:%M:%S') if sub.connected_at else '-',
+                'router_ip': router.ip_address,
+                'router_name': router.name
+            })
+        else:
+            return jsonify({
+                'ok': True,
+                'online': False,
+                'ip': sub.current_ip or '-',
+                'uptime': '-',
+                'rx_bytes': 0,
+                'tx_bytes': 0,
+                'connected_at': '-',
+                'router_ip': router.ip_address if router else '-',
+                'router_name': router.name if router else '-'
+            })
+    except Exception as e:
+        logger.error(f"❌ Refresh error: {e}")
+        return jsonify({'ok': False, 'error': str(e)}), 500
+
+
+@app.route('/my-account/logout')
+def my_account_logout():
+    sub_id = session.get('subscriber_id')
+    if sub_id:
+        sub = Subscriber.query.get(sub_id)
+        if sub:
+            log_event('خروج مشترك', sub.username, 'خروج من بوابة المشتركين', admin_name=sub.username)
+    session.pop('subscriber_id', None)
+    session.pop('subscriber_username', None)
+    flash('✅ تم تسجيل الخروج', 'success')
+    return redirect(url_for('my_account_login'))
 
 
 # ============ Main Routes ============
