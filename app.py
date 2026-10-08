@@ -293,7 +293,7 @@ def _safe_int(value, default=0):
 
 
 def _calculate_connected_at(uptime_str):
-    """تحويل uptime من MikroTik مثل '1h30m25s' إلى datetime"""
+    """تحويل uptime مثل '1h30m25s' إلى datetime"""
     try:
         if not uptime_str:
             return None
@@ -729,44 +729,87 @@ def get_mikrotik_api(router):
 # ============ Background IP + Session Updater ============
 
 def fetch_active_ips_from_router(router):
+    """
+    جلب المستخدمين النشطين مع حجم البيانات الحقيقي (تحميل/رفع)
+    يتم قراءة البيانات من الواجهات الديناميكية <pppoe-username>
+    """
     if not LIBROUTEROS_AVAILABLE:
         return {}
     result = {}
     api = None
     try:
         api = get_mikrotik_api(router)
+        
+        # ✅ الخطوة 1: جلب كل الواجهات وبناء خريطة (name → stats)
+        interfaces_map = {}
+        try:
+            for iface in api.path('interface'):
+                name = _safe_str(iface.get('name'))
+                if not name:
+                    continue
+                interfaces_map[name] = {
+                    'rx_byte': _safe_int(iface.get('rx-byte', 0), 0),
+                    'tx_byte': _safe_int(iface.get('tx-byte', 0), 0),
+                }
+            logger.info(f"📊 {router.name}: تم قراءة {len(interfaces_map)} واجهة")
+        except Exception as e:
+            logger.warning(f"⚠️ فشل جلب الواجهات من {router.name}: {e}")
+        
+        # ✅ الخطوة 2: جلب جلسات PPPoE النشطة
         try:
             for ppp in api.path('ppp', 'active'):
                 uname = _safe_str(ppp.get('name'))
                 addr = _safe_str(ppp.get('address'))
-                if uname and addr and addr != '0.0.0.0':
-                    result[uname] = {
-                        'ip': addr,
-                        'uptime': _safe_str(ppp.get('uptime', '')),
-                        'rx_bytes': _safe_int(ppp.get('bytes-in', 0), 0),
-                        'tx_bytes': _safe_int(ppp.get('bytes-out', 0), 0),
-                        'type': 'pppoe',
-                        'router_id': router.id
-                    }
+                if not uname or not addr or addr == '0.0.0.0':
+                    continue
+                
+                # ✅ اسم الواجهة الديناميكية في MikroTik
+                iface_name = f"<pppoe-{uname}>"
+                iface_stats = interfaces_map.get(iface_name, {})
+                rx_bytes = iface_stats.get('rx_byte', 0)
+                tx_bytes = iface_stats.get('tx_byte', 0)
+                
+                # إذا لم نجد الواجهة، جرّب البحث الجزئي
+                if not iface_stats:
+                    for k, v in interfaces_map.items():
+                        if uname in k and 'pppoe' in k.lower():
+                            rx_bytes = v.get('rx_byte', 0)
+                            tx_bytes = v.get('tx_byte', 0)
+                            break
+                
+                result[uname] = {
+                    'ip': addr,
+                    'uptime': _safe_str(ppp.get('uptime', '')),
+                    'rx_bytes': rx_bytes,
+                    'tx_bytes': tx_bytes,
+                    'type': 'pppoe',
+                    'router_id': router.id
+                }
         except Exception as e:
             logger.warning(f"⚠️ فشل جلب PPP active من {router.name}: {e}")
+        
+        # ✅ الخطوة 3: جلب جلسات Hotspot النشطة
         try:
             for hs in api.path('ip', 'hotspot', 'active'):
                 uname = _safe_str(hs.get('user'))
                 addr = _safe_str(hs.get('address'))
-                if uname and addr:
-                    if ':' in addr:
-                        addr = addr.split(':')[0]
-                    result[uname] = {
-                        'ip': addr,
-                        'uptime': _safe_str(hs.get('uptime', '')),
-                        'rx_bytes': _safe_int(hs.get('bytes-in', 0), 0),
-                        'tx_bytes': _safe_int(hs.get('bytes-out', 0), 0),
-                        'type': 'hotspot',
-                        'router_id': router.id
-                    }
+                if not uname or not addr:
+                    continue
+                if ':' in addr:
+                    addr = addr.split(':')[0]
+                rx_bytes = _safe_int(hs.get('bytes-in', 0), 0)
+                tx_bytes = _safe_int(hs.get('bytes-out', 0), 0)
+                result[uname] = {
+                    'ip': addr,
+                    'uptime': _safe_str(hs.get('uptime', '')),
+                    'rx_bytes': rx_bytes,
+                    'tx_bytes': tx_bytes,
+                    'type': 'hotspot',
+                    'router_id': router.id
+                }
         except Exception as e:
             logger.warning(f"⚠️ فشل جلب Hotspot active من {router.name}: {e}")
+        
         logger.info(f"✅ {router.name}: تم جلب {len(result)} مشترك نشط")
         return result
     except Exception as e:
