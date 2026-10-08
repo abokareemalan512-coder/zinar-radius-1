@@ -725,21 +725,9 @@ def get_mikrotik_api(router):
         raise Exception(f"فشل الاتصال بالـ API على المنفذ {router.api_port}: {str(e)}")
 
 
-# ============ ✅ Fetch Active IPs + Traffic (مُصحّح) ============
+# ============ Fetch Active IPs + Traffic ============
 
 def fetch_active_ips_from_router(router):
-    """
-    جلب المستخدمين النشطين مع حجم البيانات الحقيقي (تحميل/رفع).
-    
-    ملاحظة مهمة:
-    - في MikroTik PPPoE dynamic interface (<pppoe-username>):
-      * rx-byte = البيانات المستلمة من العميل (رفع العميل للإنترنت)
-      * tx-byte = البيانات المرسلة إلى العميل (تحميل العميل من الإنترنت)
-    
-    - نخزّن في DB:
-      * session_rx_bytes = رفع العميل (rx-byte من الراوتر)
-      * session_tx_bytes = تحميل العميل (tx-byte من الراوتر)
-    """
     if not LIBROUTEROS_AVAILABLE:
         return {}
     result = {}
@@ -747,7 +735,6 @@ def fetch_active_ips_from_router(router):
     try:
         api = get_mikrotik_api(router)
 
-        # 1. جلب كل الواجهات لبناء خريطة
         interfaces_map = {}
         try:
             for iface in api.path('interface'):
@@ -758,32 +745,25 @@ def fetch_active_ips_from_router(router):
                     'rx_byte': _safe_int(iface.get('rx-byte', 0), 0),
                     'tx_byte': _safe_int(iface.get('tx-byte', 0), 0),
                 }
-            logger.info(f"📊 {router.name}: تم قراءة {len(interfaces_map)} واجهة")
         except Exception as e:
             logger.warning(f"⚠️ فشل جلب الواجهات من {router.name}: {e}")
 
-        # 2. جلب جلسات PPPoE النشطة
         try:
             for ppp in api.path('ppp', 'active'):
                 uname = _safe_str(ppp.get('name'))
                 addr = _safe_str(ppp.get('address'))
                 if not uname or not addr or addr == '0.0.0.0':
                     continue
-
                 iface_name = f"<pppoe-{uname}>"
                 iface_stats = interfaces_map.get(iface_name, {})
                 rx_bytes = iface_stats.get('rx_byte', 0)
                 tx_bytes = iface_stats.get('tx_byte', 0)
-
                 if not iface_stats:
                     for k, v in interfaces_map.items():
                         if uname in k and 'pppoe' in k.lower():
                             rx_bytes = v.get('rx_byte', 0)
                             tx_bytes = v.get('tx_byte', 0)
                             break
-
-                # rx_bytes = رفع العميل (بيانات خرجت من العميل للإنترنت)
-                # tx_bytes = تحميل العميل (بيانات دخلت للعميل من الإنترنت)
                 result[uname] = {
                     'ip': addr,
                     'uptime': _safe_str(ppp.get('uptime', '')),
@@ -795,7 +775,6 @@ def fetch_active_ips_from_router(router):
         except Exception as e:
             logger.warning(f"⚠️ فشل جلب PPP active من {router.name}: {e}")
 
-        # 3. جلب جلسات Hotspot النشطة
         try:
             for hs in api.path('ip', 'hotspot', 'active'):
                 uname = _safe_str(hs.get('user'))
@@ -804,9 +783,8 @@ def fetch_active_ips_from_router(router):
                     continue
                 if ':' in addr:
                     addr = addr.split(':')[0]
-                # في Hotspot: bytes-in = تحميل (دخلت للعميل)، bytes-out = رفع
-                bytes_in = _safe_int(hs.get('bytes-in', 0), 0)   # تحميل العميل
-                bytes_out = _safe_int(hs.get('bytes-out', 0), 0) # رفع العميل
+                bytes_in = _safe_int(hs.get('bytes-in', 0), 0)   # تحميل
+                bytes_out = _safe_int(hs.get('bytes-out', 0), 0) # رفع
                 result[uname] = {
                     'ip': addr,
                     'uptime': _safe_str(hs.get('uptime', '')),
@@ -854,8 +832,8 @@ def background_ip_updater():
                                     sub.router_id = router.id
                                     changed = True
                                 sub.session_uptime = info.get('uptime', '')
-                                sub.session_rx_bytes = info.get('rx_bytes', 0)  # رفع
-                                sub.session_tx_bytes = info.get('tx_bytes', 0)  # تحميل
+                                sub.session_rx_bytes = info.get('rx_bytes', 0)
+                                sub.session_tx_bytes = info.get('tx_bytes', 0)
                                 if info.get('uptime'):
                                     sub.connected_at = _calculate_connected_at(info['uptime'])
                                 sub.ip_updated_at = datetime.utcnow()
@@ -1376,7 +1354,8 @@ def check_admin_login():
         'api_import_subscribers', 'api_import_packages',
         'api_get_interfaces', 'api_get_traffic_stats',
         'my_account_login', 'my_account_dashboard',
-        'my_account_logout', 'my_account_refresh'
+        'my_account_logout', 'my_account_refresh',
+        'my_account_live_speed'
     )
     if request.endpoint in public:
         return
@@ -1463,8 +1442,8 @@ def my_account_refresh():
         if info:
             sub.current_ip = info['ip']
             sub.session_uptime = info.get('uptime', '')
-            sub.session_rx_bytes = info.get('rx_bytes', 0)  # رفع
-            sub.session_tx_bytes = info.get('tx_bytes', 0)  # تحميل
+            sub.session_rx_bytes = info.get('rx_bytes', 0)
+            sub.session_tx_bytes = info.get('tx_bytes', 0)
             if info.get('uptime'):
                 sub.connected_at = _calculate_connected_at(info['uptime'])
             sub.ip_updated_at = datetime.utcnow()
@@ -1476,8 +1455,8 @@ def my_account_refresh():
                 'online': True,
                 'ip': sub.current_ip,
                 'uptime': sub.session_uptime,
-                'rx_bytes': sub.session_rx_bytes,  # رفع
-                'tx_bytes': sub.session_tx_bytes,  # تحميل
+                'rx_bytes': sub.session_rx_bytes,
+                'tx_bytes': sub.session_tx_bytes,
                 'connected_at': sub.connected_at.strftime('%Y-%m-%d %H:%M:%S') if sub.connected_at else '-',
                 'router_ip': router.ip_address,
                 'router_name': router.name
@@ -1497,6 +1476,102 @@ def my_account_refresh():
     except Exception as e:
         logger.error(f"❌ Refresh error: {e}")
         return jsonify({'ok': False, 'error': str(e)}), 500
+
+
+@app.route('/my-account/live-speed', methods=['POST'])
+def my_account_live_speed():
+    """جلب السرعة اللحظية الحقيقية (Mbps) مثل MikroTik"""
+    if not session.get('subscriber_id'):
+        return jsonify({'ok': False, 'error': 'Unauthorized'}), 401
+
+    sub = Subscriber.query.get(session['subscriber_id'])
+    if not sub or not sub.router_id:
+        return jsonify({'ok': False, 'error': 'No router'})
+
+    router = Router.query.get(sub.router_id)
+    if not router:
+        return jsonify({'ok': False, 'error': 'Router not found'})
+
+    api = None
+    try:
+        api = get_mikrotik_api(router)
+        iface_name = f"<pppoe-{sub.username}>"
+        rx_byte = 0
+        tx_byte = 0
+        found = False
+
+        for iface in api.path('interface'):
+            name = _safe_str(iface.get('name'))
+            if name == iface_name or (sub.username in name and 'pppoe' in name.lower()):
+                rx_byte = _safe_int(iface.get('rx-byte', 0), 0)
+                tx_byte = _safe_int(iface.get('tx-byte', 0), 0)
+                found = True
+                break
+
+        api.close()
+        api = None
+
+        cache_key = f"live_speed_{sub.id}"
+        now = time.time()
+        rx_rate_bps = 0
+        tx_rate_bps = 0
+
+        if cache_key in _traffic_cache:
+            prev = _traffic_cache[cache_key]
+            elapsed = now - prev['time']
+            if elapsed > 0.5:
+                rx_diff = max(0, rx_byte - prev['rx_byte'])
+                tx_diff = max(0, tx_byte - prev['tx_byte'])
+                rx_rate_bps = (rx_diff / elapsed) * 8
+                tx_rate_bps = (tx_diff / elapsed) * 8
+
+        _traffic_cache[cache_key] = {
+            'time': now,
+            'rx_byte': rx_byte,
+            'tx_byte': tx_byte,
+        }
+
+        if found:
+            sub.session_rx_bytes = rx_byte
+            sub.session_tx_bytes = tx_byte
+            sub.ip_updated_at = datetime.utcnow()
+            try:
+                db.session.commit()
+            except Exception:
+                db.session.rollback()
+
+        def format_speed(bps):
+            if bps >= 1_000_000_000:
+                return round(bps / 1_000_000_000, 2), 'Gbps'
+            elif bps >= 1_000_000:
+                return round(bps / 1_000_000, 2), 'Mbps'
+            elif bps >= 1_000:
+                return round(bps / 1_000, 1), 'kbps'
+            else:
+                return round(bps, 0), 'bps'
+
+        up_val, up_unit = format_speed(rx_rate_bps)
+        down_val, down_unit = format_speed(tx_rate_bps)
+
+        return jsonify({
+            'ok': True,
+            'online': found,
+            'upload_speed': up_val,
+            'upload_unit': up_unit,
+            'download_speed': down_val,
+            'download_unit': down_unit,
+            'upload_total': rx_byte,
+            'download_total': tx_byte,
+        })
+    except Exception as e:
+        logger.error(f"❌ Live speed error: {e}")
+        return jsonify({'ok': False, 'error': str(e)}), 500
+    finally:
+        if api:
+            try:
+                api.close()
+            except Exception:
+                pass
 
 
 @app.route('/my-account/logout')
@@ -1970,8 +2045,8 @@ def sync_subscribers_now():
                             sub.router_id = router.id
                             changed = True
                         sub.session_uptime = info.get('uptime', '')
-                        sub.session_rx_bytes = info.get('rx_bytes', 0)  # رفع
-                        sub.session_tx_bytes = info.get('tx_bytes', 0)  # تحميل
+                        sub.session_rx_bytes = info.get('rx_bytes', 0)
+                        sub.session_tx_bytes = info.get('tx_bytes', 0)
                         if info.get('uptime'):
                             sub.connected_at = _calculate_connected_at(info['uptime'])
                         sub.ip_updated_at = datetime.utcnow()
