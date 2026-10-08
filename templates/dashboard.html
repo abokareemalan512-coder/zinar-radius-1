@@ -96,7 +96,6 @@
     .dashboard-card:hover .details-hint { opacity: 1; color: #7dd3fc; }
     .details-hint i { font-size: 0.7rem; }
 
-    /* قائمة آخر عناصر */
     .mini-events-list {
         display: flex;
         flex-direction: column;
@@ -623,7 +622,7 @@
     }
     .traffic-full-link i { font-size: 0.72rem; }
 
-    /* ✅ IP Badge */
+    /* IP Badge */
     .ip-badge {
         display: inline-flex;
         align-items: center;
@@ -637,7 +636,7 @@
     .ip-online { background: rgba(34, 197, 94, 0.12); color: #22c55e; border: 1px solid rgba(34, 197, 94, 0.35); }
     .ip-offline { background: rgba(148, 163, 184, 0.1); color: #94a3b8; border: 1px solid rgba(148, 163, 184, 0.3); }
 
-    /* ✅ زر الدفعات الصغير */
+    /* زر الدفعات الصغير */
     .payments-quick-btn {
         display: inline-flex;
         align-items: center;
@@ -663,7 +662,7 @@
     }
     .payments-quick-btn i { font-size: 0.8rem; }
 
-    /* ✅ Badge للتحميل والرفع */
+    /* Badge للتحميل والرفع */
     .speed-badge {
         display: inline-flex;
         align-items: center;
@@ -676,6 +675,18 @@
     }
     .speed-down { background: rgba(34, 197, 94, 0.12); color: #22c55e; border: 1px solid rgba(34, 197, 94, 0.35); }
     .speed-up { background: rgba(245, 158, 11, 0.12); color: #f59e0b; border: 1px solid rgba(245, 158, 11, 0.35); }
+
+    /* صفوف قابلة للضغط */
+    #onlineSubsModal tbody tr {
+        cursor: pointer;
+        transition: all 0.2s;
+    }
+    #onlineSubsModal tbody tr:hover {
+        background-color: rgba(34, 197, 94, 0.1) !important;
+    }
+    #onlineSubsModal tbody tr:hover td {
+        color: #22c55e !important;
+    }
 </style>
 
 <!-- صندوق ترحيب -->
@@ -755,7 +766,7 @@
         </div>
     </div>
 
-    <!-- 3. ✅ المتصلون الآن (بدلاً من الإيرادات) -->
+    <!-- 3. المتصلون الآن -->
     <div class="col-xl-3 col-md-6">
         <div class="dashboard-card text-center">
             <div class="clickable" data-bs-toggle="modal" data-bs-target="#onlineSubsModal">
@@ -786,8 +797,6 @@
                 {% endif %}
                 <div class="details-hint"><i class="bi bi-info-circle"></i> اضغط لعرض التفاصيل</div>
             </div>
-            
-            <!-- ✅ زر الدفعات داخل البطاقة -->
             <button class="payments-quick-btn" data-bs-toggle="modal" data-bs-target="#revenueDetailsModal">
                 <i class="bi bi-cash-stack"></i> عرض الإيرادات والدفعات
             </button>
@@ -1042,7 +1051,7 @@
 
 <!-- ==================== النوافذ ==================== -->
 
-<!-- ✅ MikroTik Modal -->
+<!-- MikroTik Modal -->
 <div class="modal fade" id="mikrotikDetailsModal" tabindex="-1">
     <div class="modal-dialog modal-dialog-centered modal-lg">
         <div class="modal-content border-0 shadow-lg" style="border-radius: 12px; background-color: var(--bg-card);">
@@ -1090,7 +1099,7 @@
     </div>
 </div>
 
-<!-- ✅ Subscribers Modal -->
+<!-- Subscribers Modal -->
 <div class="modal fade" id="subscribersDetailsModal" tabindex="-1">
     <div class="modal-dialog modal-dialog-centered modal-lg">
         <div class="modal-content border-0 shadow-lg" style="border-radius: 12px; background-color: var(--bg-card);">
@@ -1132,7 +1141,7 @@
     </div>
 </div>
 
-<!-- ✅ Online Subscribers Modal (نافذة المتصلين الكبيرة) -->
+<!-- ✅ Online Subscribers Modal -->
 <div class="modal fade" id="onlineSubsModal" tabindex="-1">
     <div class="modal-dialog modal-dialog-centered modal-xl">
         <div class="modal-content border-0 shadow-lg" style="border-radius: 12px; background-color: var(--bg-card);">
@@ -1145,6 +1154,9 @@
             </div>
             <div class="modal-body p-3">
                 {% if online_subs %}
+                <div class="text-center mb-2" style="font-size: 0.7rem; color: var(--text-muted);">
+                    <i class="bi bi-info-circle"></i> اضغط على أي مشترك لعرض تفاصيله الكاملة
+                </div>
                 <div class="table-responsive" style="max-height: 500px; overflow-y: auto; border: 1px solid var(--bg-hover); border-radius: 8px;">
                     <table class="table table-hover table-clean mb-0 text-center">
                         <thead style="position: sticky; top: 0; background-color: var(--bg-hover); z-index: 10;">
@@ -1163,7 +1175,23 @@
                         </thead>
                         <tbody>
                             {% for sub in online_subs %}
-                            <tr>
+                            <tr onclick='openSubDetail(
+                                {{ sub.id }},
+                                "{{ (sub.name or '')|e }}",
+                                "{{ sub.username|e }}",
+                                "{{ sub.current_ip or '' }}",
+                                "{{ routers[sub.router_id].ip_address if sub.router_id and sub.router_id in routers else '' }}",
+                                "{{ routers[sub.router_id].name if sub.router_id and sub.router_id in routers else '' }}",
+                                "{{ sub.connected_at | localtime('%Y-%m-%d %H:%M:%S') if sub.connected_at else '-' }}",
+                                "{{ sub.session_uptime or '-' }}",
+                                {{ sub.session_rx_bytes or 0 }},
+                                {{ sub.session_tx_bytes or 0 }},
+                                "{{ sub.package or '-' }}",
+                                "{{ sub.user_type or 'pppoe' }}",
+                                "{{ sub.status or 'active' }}",
+                                "{{ sub.expires_at.strftime('%Y-%m-%d') if sub.expires_at else '-' }}",
+                                "{{ sub.ip_updated_at | localtime('%H:%M:%S') if sub.ip_updated_at else '-' }}"
+                            )'>
                                 <td class="text-muted">#{{ sub.id }}</td>
                                 <td>
                                     <span style="font-family: monospace; font-weight: 600; color: var(--accent);">
@@ -1250,7 +1278,151 @@
     </div>
 </div>
 
-<!-- ✅ Revenue Modal (الدفعات والإيرادات) -->
+<!-- ✅ Modal تفاصيل المشترك -->
+<div class="modal fade" id="subDetailModal" tabindex="-1">
+    <div class="modal-dialog modal-dialog-centered modal-lg">
+        <div class="modal-content border-0 shadow-lg" style="border-radius: 12px; background-color: var(--bg-card);">
+            <div class="modal-header" style="background: linear-gradient(135deg, #0ea5e9, #0284c7); border-radius: 12px 12px 0 0; color: white;">
+                <h5 class="modal-title fw-bold" style="font-size: 1rem;">
+                    <i class="bi bi-person-badge-fill"></i>
+                    تفاصيل المشترك المتصل
+                </h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body p-4">
+                <div class="text-center mb-4">
+                    <div style="width: 70px; height: 70px; margin: 0 auto 10px; background: linear-gradient(135deg, #22c55e, #16a34a); border-radius: 50%; display: flex; align-items: center; justify-content: center;">
+                        <i class="bi bi-person-fill" style="font-size: 2.2rem; color: white;"></i>
+                    </div>
+                    <h4 class="fw-bold mb-1" id="det_name" style="color: var(--text-main);">-</h4>
+                    <div class="mb-2">
+                        <span class="ip-badge ip-online" style="font-size: 0.85rem; padding: 6px 14px;">
+                            <i class="bi bi-wifi"></i> <span id="det_ip">-</span>
+                        </span>
+                    </div>
+                    <div class="d-flex justify-content-center gap-2">
+                        <span class="stat-badge success" style="font-size: 0.72rem;">
+                            <span class="pulse-dot"></span> متصل الآن
+                        </span>
+                        <span id="det_type_badge" class="stat-badge info" style="font-size: 0.72rem;">-</span>
+                    </div>
+                </div>
+
+                <div class="row g-3 mb-3">
+                    <div class="col-md-6">
+                        <div class="p-3 rounded-3" style="background-color: var(--bg-main); border: 1px solid var(--bg-hover);">
+                            <div class="d-flex justify-content-between align-items-center mb-2">
+                                <span class="text-muted" style="font-size: 0.75rem;">
+                                    <i class="bi bi-arrow-down-circle-fill" style="color: #22c55e;"></i> التحميل
+                                </span>
+                                <i class="bi bi-download" style="color: #22c55e; font-size: 1.2rem;"></i>
+                            </div>
+                            <h4 class="fw-bold mb-0" id="det_download" style="color: #22c55e; font-family: monospace;">0 B</h4>
+                            <small class="text-muted" style="font-size: 0.7rem;">إجمالي التحميل الحالي</small>
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <div class="p-3 rounded-3" style="background-color: var(--bg-main); border: 1px solid var(--bg-hover);">
+                            <div class="d-flex justify-content-between align-items-center mb-2">
+                                <span class="text-muted" style="font-size: 0.75rem;">
+                                    <i class="bi bi-arrow-up-circle-fill" style="color: #f59e0b;"></i> الرفع
+                                </span>
+                                <i class="bi bi-upload" style="color: #f59e0b; font-size: 1.2rem;"></i>
+                            </div>
+                            <h4 class="fw-bold mb-0" id="det_upload" style="color: #f59e0b; font-family: monospace;">0 B</h4>
+                            <small class="text-muted" style="font-size: 0.7rem;">إجمالي الرفع الحالي</small>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="table-responsive" style="border: 1px solid var(--bg-hover); border-radius: 8px;">
+                    <table class="table table-clean mb-0" style="font-size: 0.82rem;">
+                        <tbody>
+                            <tr>
+                                <td style="background-color: var(--bg-main); width: 40%; color: var(--text-muted); font-weight: 600;">
+                                    <i class="bi bi-hash"></i> رقم المشترك
+                                </td>
+                                <td style="background-color: var(--bg-card); color: var(--text-main); font-family: monospace;" id="det_id">-</td>
+                            </tr>
+                            <tr>
+                                <td style="background-color: var(--bg-main); color: var(--text-muted); font-weight: 600;">
+                                    <i class="bi bi-person"></i> اسم المستخدم
+                                </td>
+                                <td style="background-color: var(--bg-card); color: var(--accent); font-family: monospace; font-weight: 600;" id="det_username">-</td>
+                            </tr>
+                            <tr>
+                                <td style="background-color: var(--bg-main); color: var(--text-muted); font-weight: 600;">
+                                    <i class="bi bi-wifi"></i> عنوان IP
+                                </td>
+                                <td style="background-color: var(--bg-card); color: var(--text-main); font-family: monospace;" id="det_ip2">-</td>
+                            </tr>
+                            <tr>
+                                <td style="background-color: var(--bg-main); color: var(--text-muted); font-weight: 600;">
+                                    <i class="bi bi-router"></i> الراوتر المتصل به
+                                </td>
+                                <td style="background-color: var(--bg-card); color: var(--text-main);" id="det_router">-</td>
+                            </tr>
+                            <tr>
+                                <td style="background-color: var(--bg-main); color: var(--text-muted); font-weight: 600;">
+                                    <i class="bi bi-box-seam"></i> الباقة
+                                </td>
+                                <td style="background-color: var(--bg-card); color: var(--text-main); font-weight: 600;" id="det_package">-</td>
+                            </tr>
+                            <tr>
+                                <td style="background-color: var(--bg-main); color: var(--text-muted); font-weight: 600;">
+                                    <i class="bi bi-clock-history"></i> وقت الاتصال
+                                </td>
+                                <td style="background-color: var(--bg-card); color: var(--text-main); font-family: monospace;" id="det_connected_at">-</td>
+                            </tr>
+                            <tr>
+                                <td style="background-color: var(--bg-main); color: var(--text-muted); font-weight: 600;">
+                                    <i class="bi bi-hourglass-split"></i> مدة الاتصال
+                                </td>
+                                <td style="background-color: var(--bg-card);">
+                                    <span class="stat-badge info" style="font-size: 0.72rem; padding: 4px 10px; font-family: monospace;" id="det_uptime">-</span>
+                                </td>
+                            </tr>
+                            <tr>
+                                <td style="background-color: var(--bg-main); color: var(--text-muted); font-weight: 600;">
+                                    <i class="bi bi-calendar-check"></i> تاريخ انتهاء الاشتراك
+                                </td>
+                                <td style="background-color: var(--bg-card); color: var(--text-main);" id="det_expires">-</td>
+                            </tr>
+                            <tr>
+                                <td style="background-color: var(--bg-main); color: var(--text-muted); font-weight: 600;">
+                                    <i class="bi bi-arrow-clockwise"></i> آخر تحديث للبيانات
+                                </td>
+                                <td style="background-color: var(--bg-card); color: var(--text-main); font-family: monospace;" id="det_updated">-</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+
+                <div class="mt-3">
+                    <div class="d-flex justify-content-between mb-1" style="font-size: 0.72rem;">
+                        <span style="color: #22c55e;"><i class="bi bi-arrow-down"></i> التحميل</span>
+                        <span style="color: #f59e0b;"><i class="bi bi-arrow-up"></i> الرفع</span>
+                    </div>
+                    <div style="height: 10px; background-color: var(--bg-main); border-radius: 5px; overflow: hidden; display: flex;">
+                        <div id="det_bar_down" style="background: linear-gradient(90deg, #22c55e, #4ade80); height: 100%; transition: width 0.5s;"></div>
+                        <div id="det_bar_up" style="background: linear-gradient(90deg, #f59e0b, #fbbf24); height: 100%; transition: width 0.5s;"></div>
+                    </div>
+                    <div class="text-center mt-2" style="font-size: 0.68rem; color: var(--text-muted);">
+                        نسبة التحميل والرفع من إجمالي البيانات المستخدمة
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer border-top" style="border-color: var(--bg-hover) !important; background-color: var(--bg-hover); border-radius: 0 0 12px 12px;">
+                <a href="{{ url_for('subscribers') }}" class="btn btn-outline-info btn-sm rounded-3" style="font-size: 0.75rem;">
+                    <i class="bi bi-pencil"></i> تعديل المشترك
+                </a>
+                <button type="button" class="btn btn-secondary btn-sm rounded-3" style="font-size: 0.75rem;" data-bs-dismiss="modal">إغلاق</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Revenue Modal -->
 <div class="modal fade" id="revenueDetailsModal" tabindex="-1">
     <div class="modal-dialog modal-dialog-centered modal-lg">
         <div class="modal-content border-0 shadow-lg" style="border-radius: 12px; background-color: var(--bg-card);">
@@ -1264,7 +1436,6 @@
                     <div class="col-md-4"><div class="revenue-box"><h6 class="text-muted mb-1" style="font-size: 0.72rem;">مبيعات الشهر</h6><h4 class="fw-bold text-info mb-0">{{ monthly_revenue|default(0) }}</h4><small class="text-muted" style="font-size: 0.68rem;">ل.س</small></div></div>
                     <div class="col-md-4"><div class="revenue-box"><h6 class="text-muted mb-1" style="font-size: 0.72rem;">مبيعات السنة</h6><h4 class="fw-bold mb-0" style="color: #a855f7;">{{ yearly_revenue|default(0) }}</h4><small class="text-muted" style="font-size: 0.68rem;">ل.س</small></div></div>
                 </div>
-
                 {% if recent_payments %}
                 <h6 class="fw-bold text-accent mb-2" style="font-size: 0.85rem;"><i class="bi bi-list-ul"></i> آخر 5 دفعات</h6>
                 <div class="table-responsive" style="max-height: 250px; overflow-y: auto; border: 1px solid var(--bg-hover); border-radius: 8px;">
@@ -1294,7 +1465,7 @@
     </div>
 </div>
 
-<!-- ✅ Telegram Modal -->
+<!-- Telegram Modal -->
 <div class="modal fade" id="telegramDetailsModal" tabindex="-1">
     <div class="modal-dialog modal-dialog-centered modal-lg">
         <div class="modal-content border-0 shadow-lg" style="border-radius: 12px; background-color: var(--bg-card);">
@@ -1329,7 +1500,7 @@
     </div>
 </div>
 
-<!-- ✅ Change Credentials Modal -->
+<!-- Change Credentials Modal -->
 <div class="modal fade" id="changeCredentialsModal" tabindex="-1">
     <div class="modal-dialog modal-dialog-centered">
         <div class="modal-content border-0 shadow-lg" style="border-radius: 12px; background-color: var(--bg-card);">
@@ -1370,6 +1541,51 @@
     let dashUploadData = [];
     let dashDownloadData = [];
     let dashLabels = [];
+
+    // ✅ فتح تفاصيل مشترك
+    function openSubDetail(id, name, username, ip, routerIp, routerName, connectedAt, uptime, rxBytes, txBytes, pkg, userType, status, expires, updatedAt) {
+        document.getElementById('det_id').textContent = '#' + id;
+        document.getElementById('det_name').textContent = name || username;
+        document.getElementById('det_username').textContent = username;
+        document.getElementById('det_ip').textContent = ip || '-';
+        document.getElementById('det_ip2').textContent = ip || '-';
+        document.getElementById('det_router').textContent = routerName ? (routerName + ' — ' + routerIp) : '-';
+        document.getElementById('det_package').textContent = pkg || '-';
+        document.getElementById('det_connected_at').textContent = connectedAt || '-';
+        document.getElementById('det_uptime').innerHTML = '<i class="bi bi-clock"></i> ' + (uptime || '-');
+        document.getElementById('det_expires').textContent = expires || '-';
+        document.getElementById('det_updated').textContent = updatedAt || '-';
+
+        const typeBadge = document.getElementById('det_type_badge');
+        if (userType === 'hotspot') {
+            typeBadge.textContent = '📶 هوت سبوت';
+            typeBadge.className = 'stat-badge warning';
+            typeBadge.style.fontSize = '0.72rem';
+        } else {
+            typeBadge.textContent = '🌐 برودباند';
+            typeBadge.className = 'stat-badge info';
+            typeBadge.style.fontSize = '0.72rem';
+        }
+
+        const fmt = (bytes) => {
+            bytes = Number(bytes) || 0;
+            if (bytes === 0) return '0 B';
+            const units = ['B', 'KB', 'MB', 'GB', 'TB'];
+            const i = Math.floor(Math.log(bytes) / Math.log(1024));
+            return (bytes / Math.pow(1024, i)).toFixed(2) + ' ' + units[i];
+        };
+
+        document.getElementById('det_download').textContent = fmt(txBytes);
+        document.getElementById('det_upload').textContent = fmt(rxBytes);
+
+        const total = Number(rxBytes) + Number(txBytes);
+        const downPct = total > 0 ? (Number(txBytes) / total) * 100 : 50;
+        const upPct = total > 0 ? (Number(rxBytes) / total) * 100 : 50;
+        document.getElementById('det_bar_down').style.width = downPct + '%';
+        document.getElementById('det_bar_up').style.width = upPct + '%';
+
+        new bootstrap.Modal(document.getElementById('subDetailModal')).show();
+    }
 
     // ✅ تحديث فوري للمتصلين
     function refreshOnlineSubs() {
