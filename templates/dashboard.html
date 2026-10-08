@@ -22,8 +22,8 @@
         cursor: pointer;
     }
     .dashboard-card.clickable:hover {
-        background-color: rgba(34, 197, 94, 0.05); /* لمسة لون أخضر عند المرور */
-        border-color: #22c55e;
+        background-color: rgba(245, 158, 11, 0.05); /* لمسة لون ذهبي عند المرور */
+        border-color: #f59e0b;
     }
     .icon-circle {
         width: 64px;
@@ -98,6 +98,23 @@
         border-radius: 16px 16px 0 0;
         color: white;
     }
+    .revenue-modal-header {
+        background: linear-gradient(135deg, #f59e0b, #d97706);
+        border-radius: 16px 16px 0 0;
+        color: white;
+    }
+    .revenue-box {
+        background-color: var(--bg-main);
+        border: 1px solid var(--bg-hover);
+        border-radius: 12px;
+        padding: 20px;
+        text-align: center;
+        transition: transform 0.2s;
+    }
+    .revenue-box:hover {
+        transform: scale(1.02);
+        border-color: #f59e0b;
+    }
 </style>
 
 <!-- ✅ ترحيب ووقت -->
@@ -118,7 +135,7 @@
 <!-- ✅ الصف الأول: بطاقات الإحصائيات -->
 <div class="row g-4 mb-4">
     
-    <!-- ✅ بطاقة سيرفرات MikroTik (قابلة للضغط) -->
+    <!-- بطاقة سيرفرات MikroTik -->
     <div class="col-xl-3 col-md-6">
         <div class="dashboard-card text-center clickable" data-bs-toggle="modal" data-bs-target="#mikrotikDetailsModal">
             <div class="icon-circle mx-auto" style="background: rgba(56, 189, 248, 0.1); border: 1px solid rgba(56, 189, 248, 0.3);">
@@ -156,11 +173,10 @@
         </div>
     </div>
 
-    <!-- ✅ بطاقة المشتركين (قابلة للضغط) -->
+    <!-- بطاقة المشتركين -->
     <div class="col-xl-3 col-md-6">
         <div class="dashboard-card text-center clickable" data-bs-toggle="modal" data-bs-target="#subscribersDetailsModal">
             <div class="icon-circle mx-auto" style="background: rgba(34, 197, 94, 0.1); border: 1px solid rgba(34, 197, 94, 0.2);">
-                <!-- أيقونة مستخدمين حقيقية (SVG) -->
                 <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" fill="#22c55e" viewBox="0 0 16 16">
                     <path d="M7 14s-1 0-1-1 1-4 5-4 5 3 5 4-1 1-1 1H7zm4-6a3 3 0 1 0 0-6 3 3 0 0 0 0 6z"/>
                     <path fill-rule="evenodd" d="M5.216 14A2.238 2.238 0 0 1 5 13c0-1.355.68-2.75 1.936-3.72A6.325 6.325 0 0 0 5 9c-4 0-5 3-5 4s1 1 1 1h4.216zM4.5 8a2.5 2.5 0 1 0 0-5 2.5 2.5 0 0 0 0 5z"/>
@@ -185,11 +201,15 @@
         </div>
     </div>
 
-    <!-- بطاقة إيرادات اليوم -->
+    <!-- ✅ بطاقة إيرادات اليوم (قابلة للضغط) -->
     <div class="col-xl-3 col-md-6">
-        <div class="dashboard-card text-center">
-            <div class="icon-circle mx-auto" style="background: rgba(245, 158, 11, 0.1); border: 1px solid rgba(245, 158, 11, 0.2);">
-                <i class="bi bi-cash-coin text-warning"></i>
+        <div class="dashboard-card text-center clickable" data-bs-toggle="modal" data-bs-target="#revenueDetailsModal">
+            <div class="icon-circle mx-auto" style="background: rgba(245, 158, 11, 0.1); border: 1px solid rgba(245, 158, 11, 0.3);">
+                <!-- ✅ أيقونة محفظة ونقود حقيقية (SVG) -->
+                <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" fill="#f59e0b" viewBox="0 0 16 16">
+                    <path d="M12.136.326A1.5 1.5 0 0 1 14 1.78V3h.5A1.5 1.5 0 0 1 16 4.5v9a1.5 1.5 0 0 1-1.5 1.5h-13A1.5 1.5 0 0 1 0 13.5v-9a1.5 1.5 0 0 1 1.432-1.499L12.136.326zM5.562 3a.5.5 0 0 0 0 .5V5h2V3.5a.5.5 0 0 0-.5-.5H5.562zM4 4.5V3.5A1.5 1.5 0 0 1 5.5 2h2A1.5 1.5 0 0 1 9 3.5V5h2.5A1.5 1.5 0 0 1 13 6.5v9a.5.5 0 0 1-.5.5h-13a.5.5 0 0 1-.5-.5v-9A1.5 1.5 0 0 1 1.5 5H4v-.5z"/>
+                    <circle cx="12.5" cy="9.5" r="1.5" fill="#0f172a"/>
+                </svg>
             </div>
             <div class="stat-number">{{ today_revenue }}</div>
             <div class="stat-label">إيرادات اليوم (ل.س)</div>
@@ -203,10 +223,13 @@
             <div class="d-flex justify-content-between text-muted small border-top pt-3" style="border-color: var(--bg-hover) !important;">
                 <span><i class="bi bi-hourglass-split text-info"></i> معلقة: {{ pending_pays }}</span>
             </div>
+            <div class="text-center mt-2">
+                <small class="text-warning"><i class="bi bi-info-circle"></i> اضغط لعرض المبيعات اليومية والشهرية والسنوية</small>
+            </div>
         </div>
     </div>
 
-    <!-- بطاقة إعدادات التلجرام (قابلة للضغط) -->
+    <!-- بطاقة إعدادات التلجرام -->
     <div class="col-xl-3 col-md-6">
         <div class="dashboard-card text-center clickable" data-bs-toggle="modal" data-bs-target="#telegramDetailsModal">
             <div class="icon-circle mx-auto" style="background: rgba(34, 158, 217, 0.1); border: 1px solid rgba(34, 158, 217, 0.3);">
@@ -341,6 +364,73 @@
     </div>
 </div>
 
+<!-- ✅ نافذة تفاصيل إيرادات اليوم (جديدة) -->
+<div class="modal fade" id="revenueDetailsModal" tabindex="-1">
+    <div class="modal-dialog modal-dialog-centered modal-lg">
+        <div class="modal-content border-0 shadow-lg" style="border-radius: 16px; background-color: var(--bg-card);">
+            <div class="modal-header revenue-modal-header">
+                <h5 class="modal-title fw-bold d-flex align-items-center gap-2">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" fill="white" viewBox="0 0 16 16">
+                        <path d="M12.136.326A1.5 1.5 0 0 1 14 1.78V3h.5A1.5 1.5 0 0 1 16 4.5v9a1.5 1.5 0 0 1-1.5 1.5h-13A1.5 1.5 0 0 1 0 13.5v-9a1.5 1.5 0 0 1 1.432-1.499L12.136.326zM5.562 3a.5.5 0 0 0 0 .5V5h2V3.5a.5.5 0 0 0-.5-.5H5.562zM4 4.5V3.5A1.5 1.5 0 0 1 5.5 2h2A1.5 1.5 0 0 1 9 3.5V5h2.5A1.5 1.5 0 0 1 13 6.5v9a.5.5 0 0 1-.5.5h-13a.5.5 0 0 1-.5-.5v-9A1.5 1.5 0 0 1 1.5 5H4v-.5z"/>
+                    </svg>
+                    تفاصيل الإيرادات والمبيعات
+                </h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body p-4">
+                
+                <!-- ✅ بطاقات المبيعات (يومي / شهري / سنوي) -->
+                <div class="row g-3 mb-4">
+                    <div class="col-md-4">
+                        <div class="revenue-box">
+                            <div class="icon-circle mx-auto mb-2" style="width: 40px; height: 40px; background: rgba(245, 158, 11, 0.1); border: 1px solid rgba(245, 158, 11, 0.3);">
+                                <i class="bi bi-calendar-day text-warning" style="font-size: 18px;"></i>
+                            </div>
+                            <h6 class="text-muted mb-1">مبيعات اليوم</h6>
+                            <h3 class="fw-bold text-warning mb-0">{{ today_revenue }}</h3>
+                            <small class="text-muted">ل.س</small>
+                        </div>
+                    </div>
+                    <div class="col-md-4">
+                        <div class="revenue-box">
+                            <div class="icon-circle mx-auto mb-2" style="width: 40px; height: 40px; background: rgba(56, 189, 248, 0.1); border: 1px solid rgba(56, 189, 248, 0.3);">
+                                <i class="bi bi-calendar-month text-info" style="font-size: 18px;"></i>
+                            </div>
+                            <h6 class="text-muted mb-1">مبيعات الشهر</h6>
+                            <h3 class="fw-bold text-info mb-0">{{ monthly_revenue|default(0) }}</h3>
+                            <small class="text-muted">ل.س</small>
+                        </div>
+                    </div>
+                    <div class="col-md-4">
+                        <div class="revenue-box">
+                            <div class="icon-circle mx-auto mb-2" style="width: 40px; height: 40px; background: rgba(168, 85, 247, 0.1); border: 1px solid rgba(168, 85, 247, 0.3);">
+                                <i class="bi bi-calendar-check text-purple" style="color: #a855f7; font-size: 18px;"></i>
+                            </div>
+                            <h6 class="text-muted mb-1">مبيعات السنة</h6>
+                            <h3 class="fw-bold mb-0" style="color: #a855f7;">{{ yearly_revenue|default(0) }}</h3>
+                            <small class="text-muted">ل.س</small>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- ملاحظة إضافية -->
+                <div class="alert alert-info bg-opacity-10 border-info small d-flex align-items-center gap-2">
+                    <i class="bi bi-info-circle-fill fs-5"></i>
+                    <div>
+                        يتم احتساب هذه الإيرادات بناءً على الدفعات المكتملة (Completed) فقط.
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer border-top" style="border-color: var(--bg-hover) !important; background-color: var(--bg-hover); border-radius: 0 0 16px 16px;">
+                <a href="{{ url_for('payments') }}" class="btn btn-outline-warning rounded-3">
+                    <i class="bi bi-cash-stack"></i> سجل الدفعات الكامل
+                </a>
+                <button type="button" class="btn btn-secondary rounded-3" data-bs-dismiss="modal">إغلاق</button>
+            </div>
+        </div>
+    </div>
+</div>
+
 <!-- ✅ نافذة تفاصيل سيرفرات MikroTik -->
 <div class="modal fade" id="mikrotikDetailsModal" tabindex="-1">
     <div class="modal-dialog modal-dialog-centered modal-lg">
@@ -466,19 +556,19 @@
                 <div class="row g-3 mb-4 text-center">
                     <div class="col-4">
                         <div class="p-3 rounded-3" style="background-color: var(--bg-main); border: 1px solid var(--bg-hover);">
-                            <h4 class="fw-bold text-danger mb-0">{{ sub_count - active_subs }}</h4>
+                            <h4 class="fw-bold text-danger mb-0">{{ inactive_subs|length }}</h4>
                             <small class="text-muted">إجمالي غير النشطين</small>
                         </div>
                     </div>
                     <div class="col-4">
                         <div class="p-3 rounded-3" style="background-color: var(--bg-main); border: 1px solid var(--bg-hover);">
-                            <h4 class="fw-bold text-warning mb-0">-</small></h4>
+                            <h4 class="fw-bold text-warning mb-0">{{ inactive_subs|selectattr('status', 'equalto', 'expired')|list|length }}</h4>
                             <small class="text-muted">المنتهين</small>
                         </div>
                     </div>
                     <div class="col-4">
                         <div class="p-3 rounded-3" style="background-color: var(--bg-main); border: 1px solid var(--bg-hover);">
-                            <h4 class="fw-bold text-secondary mb-0">-</small></h4>
+                            <h4 class="fw-bold text-secondary mb-0">{{ inactive_subs|selectattr('status', 'equalto', 'paused')|list|length }}</h4>
                             <small class="text-muted">المتوقفين</small>
                         </div>
                     </div>
