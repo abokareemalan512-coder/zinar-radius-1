@@ -26,9 +26,7 @@
         }
         .layout { display: flex; min-height: 100vh; }
         
-        /* =========================================
-           تصميم الشريط الجانبي (Sidebar)
-           ========================================= */
+        /* الشريط الجانبي */
         .sidebar {
             width: 250px;
             background-color: var(--bg-card);
@@ -82,7 +80,7 @@
             letter-spacing: 1px;
         }
         
-        /* ✅ تصميم أزرار التنقل الجديد */
+        /* أزرار التنقل */
         .sidebar .nav-item {
             display: flex;
             align-items: center;
@@ -93,15 +91,13 @@
             border-radius: 10px;
             margin-bottom: 6px;
             transition: all 0.3s ease;
-            border-right: 3px solid transparent; /* المؤشر الجانبي */
+            border-right: 3px solid transparent;
             position: relative;
         }
         .sidebar .nav-item i {
             font-size: 18px;
             transition: transform 0.3s ease;
         }
-        
-        /* تأثير عند المرور بالماوس */
         .sidebar .nav-item:hover {
             background-color: rgba(56, 189, 248, 0.08);
             color: var(--accent);
@@ -110,8 +106,6 @@
         .sidebar .nav-item:hover i {
             transform: scale(1.1);
         }
-        
-        /* الزر النشط (الصفحة الحالية) */
         .sidebar .nav-item.active {
             background: linear-gradient(90deg, rgba(56, 189, 248, 0.15) 0%, transparent 100%);
             color: var(--accent);
@@ -119,7 +113,7 @@
             font-weight: 600;
         }
         
-        /* ✅ تمييز خاص لرابط الاستيراد (مع الحفاظ على التصميم المتقطع) */
+        /* رابط الاستيراد المميز */
         .sidebar .nav-item.import-link {
             border: 1px dashed rgba(56, 189, 248, 0.4);
             background: rgba(56, 189, 248, 0.05);
@@ -141,7 +135,7 @@
             border-radius: 10px;
             text-decoration: none;
             display: block;
-            margin-top: auto; /* يجعله في أسفل الشريط */
+            margin-top: auto;
             transition: all 0.3s ease;
             box-shadow: 0 4px 15px rgba(56, 189, 248, 0.3);
             border: none;
@@ -231,7 +225,6 @@
             </div>
         </div>
         
-        <!-- أزرار التنقل -->
         <a href="{{ url_for('dashboard') }}" class="nav-item {% if request.endpoint == 'dashboard' %}active{% endif %}">
             <i class="bi bi-speedometer2"></i> لوحة التحكم
         </a>
@@ -239,11 +232,14 @@
             <i class="bi bi-people"></i> المشتركين
         </a>
         
-        <!-- رابط استيراد من الميكروتيك -->
+        <!-- ✅ رابط مراقبة الترافيك (جديد) -->
+        <a href="{{ url_for('traffic_monitor_page') }}" class="nav-item {% if request.endpoint == 'traffic_monitor_page' %}active{% endif %}">
+            <i class="bi bi-graph-up-arrow"></i> مراقبة الترافيك
+        </a>
+        
         <a href="{{ url_for('import_backup') }}" class="nav-item import-link {% if request.endpoint == 'import_backup' %}active{% endif %}">
             <i class="bi bi-cloud-upload"></i> استيراد من الميكروتيك
         </a>
-        
         <a href="{{ url_for('packages') }}" class="nav-item {% if request.endpoint == 'packages' %}active{% endif %}">
             <i class="bi bi-box-seam"></i> الباقات
         </a>
@@ -257,7 +253,6 @@
             <i class="bi bi-box-arrow-right"></i> خروج
         </a>
         
-        <!-- زر إضافة مشترك -->
         <a href="{{ url_for('add_subscriber') }}" class="btn-add">
             <i class="bi bi-person-plus"></i> إضافة مشترك
         </a>
