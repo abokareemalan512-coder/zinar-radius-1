@@ -142,7 +142,6 @@ class Subscriber(db.Model):
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     expires_at = db.Column(db.DateTime)
     first_used_at = db.Column(db.DateTime)
-    # ✅ حقول جديدة لتتبع IP
     current_ip = db.Column(db.String(50))
     ip_updated_at = db.Column(db.DateTime)
     last_seen_at = db.Column(db.DateTime)
@@ -253,6 +252,42 @@ def _day_bounds(day=None):
         day = datetime.utcnow()
     start = day.replace(hour=0, minute=0, second=0, microsecond=0)
     return start, start + timedelta(days=1)
+
+
+# ✅ دوال مساعدة لتحويل القيم من bytes إلى string آمن للـ JSON
+def _safe_str(value, default=''):
+    """تحويل أي قيمة إلى string آمن للـ JSON"""
+    if value is None:
+        return default
+    if isinstance(value, bytes):
+        try:
+            return value.decode('utf-8', errors='ignore')
+        except Exception:
+            return str(value)
+    return str(value)
+
+
+def _safe_bool(value, default=False):
+    """تحويل القيمة إلى Boolean"""
+    if value is None:
+        return default
+    if isinstance(value, bool):
+        return value
+    if isinstance(value, bytes):
+        try:
+            value = value.decode('utf-8', errors='ignore')
+        except Exception:
+            return default
+    s = str(value).lower()
+    return s in ('true', 'yes', '1')
+
+
+def _safe_int(value, default=0):
+    """تحويل القيمة إلى int بأمان"""
+    try:
+        return int(_safe_str(value, str(default)))
+    except (ValueError, TypeError):
+        return default
 
 
 # ============ فك ترميز MikroTik ============
@@ -729,7 +764,6 @@ def background_router_monitor():
 def fetch_active_ips_from_router(router):
     """
     جلب جميع المستخدمين النشطين (PPPoE + Hotspot) من راوتر MikroTik مع IP الحقيقي
-    Returns: dict {username: {'ip': '...', 'uptime': '...', 'type': 'pppoe'|'hotspot', 'router_id': id}}
     """
     if not LIBROUTEROS_AVAILABLE:
         return {}
@@ -739,33 +773,32 @@ def fetch_active_ips_from_router(router):
     try:
         api = get_mikrotik_api(router)
         
-        # ✅ جلب مستخدمي PPPoE النشطين
+        # جلب مستخدمي PPPoE النشطين
         try:
             for ppp in api.path('ppp', 'active'):
-                uname = ppp.get('name')
-                addr = ppp.get('address')
+                uname = _safe_str(ppp.get('name'))
+                addr = _safe_str(ppp.get('address'))
                 if uname and addr and addr != '0.0.0.0':
                     result[uname] = {
                         'ip': addr,
-                        'uptime': ppp.get('uptime', ''),
+                        'uptime': _safe_str(ppp.get('uptime', '')),
                         'type': 'pppoe',
                         'router_id': router.id
                     }
         except Exception as e:
             logger.warning(f"⚠️ فشل جلب PPP active من {router.name}: {e}")
         
-        # ✅ جلب مستخدمي Hotspot النشطين
+        # جلب مستخدمي Hotspot النشطين
         try:
             for hs in api.path('ip', 'hotspot', 'active'):
-                uname = hs.get('user')
-                addr = hs.get('address')
+                uname = _safe_str(hs.get('user'))
+                addr = _safe_str(hs.get('address'))
                 if uname and addr:
-                    # تنظيف IP إذا كان يحتوي على بورت
                     if ':' in addr:
                         addr = addr.split(':')[0]
                     result[uname] = {
                         'ip': addr,
-                        'uptime': hs.get('uptime', ''),
+                        'uptime': _safe_str(hs.get('uptime', '')),
                         'type': 'hotspot',
                         'router_id': router.id
                     }
@@ -796,7 +829,6 @@ def background_ip_updater():
             with app.app_context():
                 routers = Router.query.all()
                 total_updated = 0
-                all_active_usernames = set()
                 
                 for router in routers:
                     try:
@@ -806,7 +838,6 @@ def background_ip_updater():
                             continue
                         
                         for username, info in active_ips.items():
-                            all_active_usernames.add(username)
                             sub = Subscriber.query.filter_by(username=username).first()
                             if sub:
                                 changed = False
@@ -1261,18 +1292,29 @@ def api_get_interfaces(router_id):
         api = get_mikrotik_api(router)
         interfaces_data = list(api.path('interface'))
         interfaces = []
+        
         for iface in interfaces_data:
-            name = iface.get('name')
-            if name:
-                disabled = iface.get('disabled', False)
-                if not disabled:
-                    iface_type = iface.get('type', '')
-                    running = iface.get('running', False)
-                    interfaces.append({
-                        'name': name,
-                        'type': iface_type,
-                        'running': running
-                    })
+            # ✅ تحويل آمن لكل القيم
+            name = _safe_str(iface.get('name'))
+            if not name:
+                continue
+            
+            disabled = _safe_bool(iface.get('disabled'), False)
+            if disabled:
+                continue
+            
+            iface_type = _safe_str(iface.get('type'), 'unknown')
+            running = _safe_bool(iface.get('running'), False)
+            
+            interfaces.append({
+                'name': name,
+                'type': iface_type,
+                'running': running
+            })
+        
+        # ترتيب حسب الاسم
+        interfaces.sort(key=lambda x: x['name'])
+        
         return jsonify({
             'ok': True,
             'interfaces': interfaces,
@@ -1281,6 +1323,7 @@ def api_get_interfaces(router_id):
         })
     except Exception as e:
         logger.error(f"❌ خطأ جلب المنافذ: {e}")
+        logger.error(traceback.format_exc())
         return jsonify({'ok': False, 'error': str(e)}), 500
     finally:
         if api:
@@ -1301,15 +1344,16 @@ def api_get_traffic_stats(router_id, interface):
         interfaces = list(api.path('interface'))
         target = None
         for iface in interfaces:
-            if iface.get('name') == interface:
+            if _safe_str(iface.get('name')) == interface:
                 target = iface
                 break
         
         if not target:
             return jsonify({'ok': False, 'error': f'المنفذ {interface} غير موجود'}), 404
         
-        rx_byte = int(target.get('rx-byte', 0))
-        tx_byte = int(target.get('tx-byte', 0))
+        # ✅ تحويل آمن للبايتات
+        rx_byte = _safe_int(target.get('rx-byte', '0'), 0)
+        tx_byte = _safe_int(target.get('tx-byte', '0'), 0)
         
         cache_key = f"{router_id}_{interface}"
         now = time.time()
@@ -1355,6 +1399,7 @@ def api_get_traffic_stats(router_id, interface):
 
     except Exception as e:
         logger.error(f"❌ خطأ جلب الترافيك: {e}")
+        logger.error(traceback.format_exc())
         return jsonify({'ok': False, 'error': str(e)}), 500
     finally:
         if api:
