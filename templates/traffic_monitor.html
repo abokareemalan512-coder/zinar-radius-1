@@ -159,7 +159,7 @@
         color: #ef4444;
     }
 
-    /* ✅ قائمة المنافذ المنسدلة مع البحث */
+    /* ✅ قائمة المنافذ المنسدلة */
     .interface-dropdown {
         position: absolute;
         top: 100%;
@@ -225,7 +225,7 @@
         color: #94a3b8;
     }
 
-    /* ✅ زر تبديل الاتجاه */
+    /* زر تبديل الاتجاه */
     .direction-toggle {
         display: inline-flex;
         align-items: center;
@@ -282,7 +282,6 @@
     </div>
 
     <div class="d-flex gap-2 flex-wrap align-items-center">
-        <!-- الراوتر -->
         <select id="routerSelect" class="control-select" onchange="onRouterChange()">
             <option value="">🔌 اختر الراوتر...</option>
             {% for r in routers %}
@@ -290,7 +289,6 @@
             {% endfor %}
         </select>
 
-        <!-- ✅ خانة البحث عن منفذ -->
         <div class="interface-search-wrapper">
             <input type="text" id="interfaceSearch" placeholder="🔍 ابحث عن منفذ..." 
                    autocomplete="off" disabled
@@ -301,16 +299,11 @@
                 <i class="bi bi-x-circle-fill"></i>
             </button>
             
-            <!-- قائمة المنافذ المنسدلة -->
-            <div class="interface-dropdown" id="interfaceDropdown">
-                <!-- سيتم تعبئتها بـ JavaScript -->
-            </div>
+            <div class="interface-dropdown" id="interfaceDropdown"></div>
         </div>
 
-        <!-- حقل مخفي يحمل اسم المنفذ المختار -->
         <input type="hidden" id="interfaceSelect" value="">
 
-        <!-- زر تبديل الاتجاه -->
         <button id="directionBtn" class="direction-toggle" onclick="toggleDirection()" title="تبديل اتجاه الرفع والتحميل">
             <i class="bi bi-arrow-left-right" id="directionIcon"></i>
             <span id="directionText">الاتجاه: تلقائي</span>
@@ -325,13 +318,11 @@
     </div>
 </div>
 
-<!-- تنبيه الاتجاه -->
 <div class="direction-info" id="directionInfo" style="display: none;">
     <i class="bi bi-info-circle-fill text-info"></i>
     <span id="directionInfoText">الاتجاه التلقائي: <strong>WAN</strong> (منفذ الإنترنت)</span>
 </div>
 
-<!-- حالة الاتصال -->
 <div id="connectionStatus" class="mb-3" style="display: none;">
     <span class="status-indicator">
         <span class="pulse-dot"></span>
@@ -339,7 +330,6 @@
     </span>
 </div>
 
-<!-- منطقة المراقبة -->
 <div class="row g-4" id="monitoringArea" style="display: none;">
     <div class="col-md-6">
         <div class="traffic-card">
@@ -394,7 +384,6 @@
     </div>
 </div>
 
-<!-- ملاحظة -->
 <div class="alert alert-info border-0 rounded-4 small mt-4 d-flex align-items-center gap-2">
     <i class="bi bi-info-circle-fill fs-5"></i>
     <div>
@@ -420,10 +409,9 @@
     let labels = [];
 
     let isDirectionReversed = false;
-    let allInterfaces = [];  // ✅ قائمة جميع المنافذ
-    let selectedInterface = '';  // ✅ المنفذ المختار
+    let allInterfaces = [];
+    let selectedInterface = '';
 
-    // ============ الاتجاه ============
     function loadDirection() {
         try {
             const saved = localStorage.getItem(DIRECTION_KEY);
@@ -482,7 +470,6 @@
         }
     }
 
-    // ============ حفظ الحالة ============
     function saveState(routerId, interfaceName, isMonitoring) {
         try {
             localStorage.setItem(STORAGE_KEY, JSON.stringify({
@@ -504,7 +491,6 @@
         try { localStorage.removeItem(STORAGE_KEY); } catch(e) {}
     }
 
-    // ============ الرسوم البيانية ============
     function initCharts() {
         const ctxUpload = document.getElementById('uploadChart').getContext('2d');
         const ctxDownload = document.getElementById('downloadChart').getContext('2d');
@@ -557,7 +543,6 @@
         });
     }
 
-    // ============ جلب المنافذ ============
     function fetchInterfaces(routerId, callback) {
         const searchInput = document.getElementById('interfaceSearch');
         const statusDiv = document.getElementById('connectionStatus');
@@ -569,28 +554,36 @@
         document.getElementById('statusText').textContent = 'جاري الاتصال بالـ API...';
 
         fetch(`/api/traffic/interfaces/${routerId}`)
-            .then(res => res.json())
+            .then(res => {
+                if (!res.ok) {
+                    return res.text().then(text => {
+                        throw new Error(`HTTP ${res.status}: ${text.substring(0, 200)}`);
+                    });
+                }
+                return res.json();
+            })
             .then(data => {
                 if (data.ok) {
-                    allInterfaces = data.interfaces;
+                    allInterfaces = data.interfaces || [];
                     searchInput.disabled = false;
-                    searchInput.placeholder = `🔍 ابحث عن منفذ... (${data.interfaces.length})`;
-                    document.getElementById('statusText').textContent = `✅ تم جلب ${data.interfaces.length} منفذ عبر API`;
+                    searchInput.placeholder = `🔍 ابحث عن منفذ... (${allInterfaces.length})`;
+                    document.getElementById('statusText').textContent = `✅ تم جلب ${allInterfaces.length} منفذ عبر API`;
                     renderInterfaceDropdown(allInterfaces);
-
                     if (callback) callback();
                 } else {
                     searchInput.placeholder = '❌ خطأ في الجلب';
                     document.getElementById('statusText').textContent = '❌ ' + (data.error || 'فشل الاتصال');
+                    searchInput.disabled = false;
                 }
             })
             .catch(err => {
+                console.error('❌ Fetch Error:', err);
                 searchInput.placeholder = '❌ فشل الاتصال';
-                document.getElementById('statusText').textContent = '❌ فشل الاتصال بالسيرفر';
+                document.getElementById('statusText').textContent = '❌ ' + err.message;
+                searchInput.disabled = false;
             });
     }
 
-    // ============ عرض قائمة المنافذ ============
     function renderInterfaceDropdown(interfaces) {
         const dropdown = document.getElementById('interfaceDropdown');
         
@@ -617,7 +610,6 @@
         }).join('');
     }
 
-    // ============ فلترة المنافذ ============
     function filterInterfaces() {
         const query = document.getElementById('interfaceSearch').value.toLowerCase().trim();
         const clearBtn = document.getElementById('clearSearchBtn');
@@ -651,7 +643,6 @@
         renderInterfaceDropdown(allInterfaces);
     }
 
-    // ============ اختيار منفذ ============
     function selectInterface(name) {
         selectedInterface = name;
         document.getElementById('interfaceSelect').value = name;
@@ -663,7 +654,6 @@
         saveState(routerId, name, false);
     }
 
-    // ✅ إغلاق القائمة عند النقر خارجها
     document.addEventListener('click', function(e) {
         const wrapper = document.querySelector('.interface-search-wrapper');
         if (wrapper && !wrapper.contains(e.target)) {
@@ -671,7 +661,6 @@
         }
     });
 
-    // ============ تغيير الراوتر ============
     function onRouterChange() {
         const routerId = document.getElementById('routerSelect').value;
         const searchInput = document.getElementById('interfaceSearch');
@@ -689,7 +678,6 @@
             return;
         }
         
-        // مسح الاختيار السابق
         selectedInterface = '';
         document.getElementById('interfaceSelect').value = '';
         document.getElementById('interfaceDropdown').innerHTML = '';
@@ -699,7 +687,6 @@
         fetchInterfaces(routerId, null);
     }
 
-    // ============ بدء / إيقاف المراقبة ============
     function startMonitoring() {
         const routerId = document.getElementById('routerSelect').value;
         const interfaceName = selectedInterface;
@@ -737,7 +724,6 @@
         saveState(routerId, selectedInterface, false);
     }
 
-    // ============ جلب البيانات ============
     function fetchTrafficData(routerId, interfaceName) {
         fetch(`/api/traffic/stats/${routerId}/${interfaceName}`)
             .then(res => res.json())
@@ -808,7 +794,6 @@
         return isNaN(num) ? 0 : num / 1000000;
     }
 
-    // ============ استعادة الحالة ============
     window.addEventListener('DOMContentLoaded', function() {
         loadDirection();
 
