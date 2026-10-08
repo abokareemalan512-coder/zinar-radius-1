@@ -32,6 +32,14 @@ try:
 except ImportError:
     radius_sync = None
 
+# ✅ مكتبة MikroTik API
+try:
+    from librouteros import connect
+    from librouteros.query import Key
+    LIBROUTEROS_AVAILABLE = True
+except ImportError:
+    LIBROUTEROS_AVAILABLE = False
+
 # ============ الإعدادات ============
 
 app = Flask(__name__)
@@ -40,6 +48,9 @@ app.config['MAX_CONTENT_LENGTH'] = 20 * 1024 * 1024
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
+
+if not LIBROUTEROS_AVAILABLE:
+    logger.warning("⚠️ مكتبة librouteros غير مثبتة - مراقبة الترافيك معطلة. قم بتثبيتها عبر: pip install librouteros")
 
 LOCAL_TZ = ZoneInfo("Asia/Damascus")
 IMPORT_API_KEY = os.environ.get('IMPORT_API_KEY', 'zinar-import-key-2026')
@@ -236,7 +247,7 @@ def _day_bounds(day=None):
     return start, start + timedelta(days=1)
 
 
-# ============ ✅ فك ترميز MikroTik (تحويل \XX إلى عربي) ============
+# ============ فك ترميز MikroTik ============
 
 def decode_mikrotik_escapes(text):
     if not text or '\\' not in text:
@@ -1085,6 +1096,102 @@ def api_import_packages():
         return jsonify({'ok': False, 'error': str(e)}), 500
 
 
+# ============ API لمراقبة حركة المرور عبر MikroTik API ============
+
+def get_mikrotik_api(router):
+    """إنشاء اتصال مع MikroTik API"""
+    if not LIBROUTEROS_AVAILABLE:
+        raise Exception("مكتبة librouteros غير مثبتة. قم بتثبيتها عبر: pip install librouteros")
+    
+    try:
+        api_port = router.port or 8728
+        logger.info(f"🔌 اتصال API: {router.ip_address}:{api_port} (user={router.username})")
+        api = connect(
+            username=router.username,
+            password=router.password,
+            host=router.ip_address,
+            port=api_port,
+            timeout=5
+        )
+        return api
+    except Exception as e:
+        raise Exception(f"فشل الاتصال بالـ API على المنفذ {router.port}: {str(e)}")
+
+
+@app.route('/api/traffic/interfaces/<int:router_id>')
+def api_get_interfaces(router_id):
+    """جلب قائمة الواجهات من MikroTik API"""
+    router = Router.query.get_or_404(router_id)
+    api = None
+    try:
+        api = get_mikrotik_api(router)
+        interfaces_data = list(api.path('interface'))
+        interfaces = []
+        for iface in interfaces_data:
+            name = iface.get('name')
+            if name:
+                iface_type = iface.get('type', '')
+                running = iface.get('running', False)
+                disabled = iface.get('disabled', False)
+                if not disabled:
+                    interfaces.append(name)
+        return jsonify({'ok': True, 'interfaces': interfaces, 'method': 'API', 'count': len(interfaces)})
+    except Exception as e:
+        logger.error(f"❌ خطأ جلب الواجهات عبر API: {e}")
+        return jsonify({'ok': False, 'error': str(e)}), 500
+    finally:
+        if api:
+            try:
+                api.close()
+            except Exception:
+                pass
+
+
+@app.route('/api/traffic/stats/<int:router_id>/<interface>')
+def api_get_traffic_stats(router_id, interface):
+    """جلب إحصائيات حركة المرور عبر MikroTik API"""
+    router = Router.query.get_or_404(router_id)
+    api = None
+    try:
+        api = get_mikrotik_api(router)
+        monitor_path = api.path('interface', 'monitor-traffic')
+        result = list(monitor_path(**{'interface': interface, 'once': ''}))
+
+        if not result:
+            return jsonify({'ok': False, 'error': 'لا توجد بيانات من الراوتر'}), 404
+
+        data = result[0]
+
+        stats = {
+            'rx_rate': str(data.get('rx-rate', '0')),
+            'tx_rate': str(data.get('tx-rate', '0')),
+            'rx_byte': str(data.get('rx-byte', 0)),
+            'tx_byte': str(data.get('tx-byte', 0)),
+        }
+
+        # معالجة القيم إذا كانت مجرد أرقام (bps)
+        for key in ['rx_rate', 'tx_rate']:
+            val = str(stats[key])
+            if not any(x in val for x in ['bps', 'bps']):
+                try:
+                    num = float(val)
+                    stats[key] = f"{num}bps"
+                except ValueError:
+                    stats[key] = '0'
+
+        return jsonify({'ok': True, 'stats': stats, 'method': 'API'})
+
+    except Exception as e:
+        logger.error(f"❌ خطأ جلب الترافيك عبر API: {e}")
+        return jsonify({'ok': False, 'error': str(e)}), 500
+    finally:
+        if api:
+            try:
+                api.close()
+            except Exception:
+                pass
+
+
 # ============ API for Live Updates (AJAX) ============
 
 @app.route('/api/dashboard_data')
@@ -1176,7 +1283,8 @@ def check_admin_login():
         'login', 'logout', 'mobile', 'mobile_view',
         'sync.get_subscribers', 'sync.mark_first_use',
         'api_auth', 'api_log', 'api_router_notify',
-        'api_import_subscribers', 'api_import_packages'
+        'api_import_subscribers', 'api_import_packages',
+        'api_get_interfaces', 'api_get_traffic_stats'
     )
     if request.endpoint in public:
         return
@@ -1329,6 +1437,13 @@ def import_backup():
     )
 
 
+@app.route('/traffic-monitor')
+def traffic_monitor_page():
+    """صفحة مراقبة حركة المرور عبر MikroTik API"""
+    routers_list = Router.query.all()
+    return render_template('traffic_monitor.html', routers=routers_list)
+
+
 @app.route('/dashboard')
 def dashboard():
     try:
@@ -1345,6 +1460,26 @@ def dashboard():
             Payment.created_at >= start,
             Payment.created_at < end
         ).scalar() or 0
+
+        # ✅ الإيرادات الشهرية والسنوية
+        now = datetime.utcnow()
+        start_month = datetime(now.year, now.month, 1)
+        start_year = datetime(now.year, 1, 1)
+
+        monthly_revenue = db.session.query(db.func.sum(Payment.amount)).filter(
+            Payment.status == 'completed',
+            Payment.created_at >= start_month
+        ).scalar() or 0
+
+        yearly_revenue = db.session.query(db.func.sum(Payment.amount)).filter(
+            Payment.status == 'completed',
+            Payment.created_at >= start_year
+        ).scalar() or 0
+
+        # ✅ المشتركون المنتهون والمتوقفون
+        inactive_subs = Subscriber.query.filter(
+            Subscriber.status.in_(['expired', 'paused'])
+        ).all()
 
         new_users_today = Subscriber.query.filter(
             Subscriber.created_at >= start,
@@ -1365,6 +1500,9 @@ def dashboard():
             sub_count=sub_count,
             active_subs=active_subs,
             today_revenue=today_revenue,
+            monthly_revenue=monthly_revenue,
+            yearly_revenue=yearly_revenue,
+            inactive_subs=inactive_subs,
             new_users_today=new_users_today,
             has_master=master is not None,
             events=events_list,
@@ -1458,9 +1596,9 @@ def routers():
                 port=port, is_master=is_master, is_active=True
             ))
             db.session.commit()
-            log_event('إضافة راوتر', name, f'IP: {ip}')
+            log_event('إضافة راوتر', name, f'IP: {ip}:{port}')
             try:
-                notify_admin_action(f"🖥️ إضافة راوتر: `{name}` - IP: `{ip}`")
+                notify_admin_action(f"🖥️ إضافة راوتر: `{name}` - IP: `{ip}:{port}`")
             except Exception:
                 pass
             flash(f'✅ الراوتر "{name}" أُضيف', 'success')
@@ -1520,7 +1658,7 @@ def update_router(router_id):
             r.port = 22
 
         db.session.commit()
-        log_event('تعديل راوتر', name, f'IP: {ip}')
+        log_event('تعديل راوتر', name, f'IP: {ip}:{r.port}')
         try:
             notify_admin_action(f"✏️ تعديل راوتر: `{name}` - IP: `{ip}`")
         except Exception:
@@ -1556,7 +1694,7 @@ def subscribers():
     search = request.args.get('q', '').strip()
     ft = request.args.get('type', '').strip()
     page = request.args.get('page', 1, type=int)
-    per_page = 50  # ✅ عدد المشتركين في كل صفحة
+    per_page = 50
     now = datetime.utcnow()
 
     try:
@@ -1583,7 +1721,6 @@ def subscribers():
         if ft in ('pppoe', 'hotspot'):
             q = q.filter_by(user_type=ft)
 
-        # ✅ تقسيم الصفحات (50 مشترك لكل صفحة)
         pagination = q.order_by(Subscriber.created_at.desc()).paginate(page=page, per_page=per_page, error_out=False)
         subs = pagination.items
     except Exception as e:
@@ -1595,7 +1732,7 @@ def subscribers():
     return render_template(
         'subscribers.html',
         subscribers=subs,
-        pagination=pagination, # ✅ تمرير كائن الترقيم إلى القالب
+        pagination=pagination,
         routers={r.id: r for r in Router.query.all()},
         packages=Package.query.order_by(Package.name).all(),
         search=search,
@@ -1855,8 +1992,7 @@ def update_subscriber(sub_id):
         ut = request.form.get('user_type', '').strip()
         if ut in ('pppoe', 'hotspot'):
             sub.user_type = ut
-        
-        # ✅ معالجة تفعيل الأيام (تمديد الباقة)
+
         days_to_add = request.form.get('days_to_add', type=int)
         if days_to_add and days_to_add > 0:
             if sub.expires_at:
