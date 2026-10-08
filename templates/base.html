@@ -25,19 +25,26 @@
             margin: 0;
         }
         .layout { display: flex; min-height: 100vh; }
+        
+        /* =========================================
+           تصميم الشريط الجانبي (Sidebar)
+           ========================================= */
         .sidebar {
-            width: 240px;
+            width: 250px;
             background-color: var(--bg-card);
             border-left: 1px solid var(--bg-hover);
             padding: 20px 12px;
             flex-shrink: 0;
+            display: flex;
+            flex-direction: column;
         }
-        /* شعار ZINAR المحسّن */
+        
+        /* شعار ZINAR */
         .brand {
             text-align: center;
-            padding: 20px 0 24px;
+            padding: 10px 0 24px;
             border-bottom: 1px solid var(--bg-hover);
-            margin-bottom: 20px;
+            margin-bottom: 24px;
         }
         .brand-logo {
             display: flex;
@@ -74,42 +81,77 @@
             margin-top: 2px;
             letter-spacing: 1px;
         }
+        
+        /* ✅ تصميم أزرار التنقل الجديد */
         .sidebar .nav-item {
             display: flex;
             align-items: center;
-            gap: 10px;
-            padding: 10px 14px;
-            color: var(--text-main);
+            gap: 12px;
+            padding: 12px 16px;
+            color: var(--text-muted);
             text-decoration: none;
-            border-radius: 8px;
-            margin-bottom: 4px;
-            transition: 0.2s;
+            border-radius: 10px;
+            margin-bottom: 6px;
+            transition: all 0.3s ease;
+            border-right: 3px solid transparent; /* المؤشر الجانبي */
+            position: relative;
         }
-        .sidebar .nav-item:hover, .sidebar .nav-item.active {
-            background-color: var(--bg-hover);
+        .sidebar .nav-item i {
+            font-size: 18px;
+            transition: transform 0.3s ease;
+        }
+        
+        /* تأثير عند المرور بالماوس */
+        .sidebar .nav-item:hover {
+            background-color: rgba(56, 189, 248, 0.08);
             color: var(--accent);
+            border-right-color: var(--accent);
         }
-        /* ✅ تمييز خاص لرابط الاستيراد */
+        .sidebar .nav-item:hover i {
+            transform: scale(1.1);
+        }
+        
+        /* الزر النشط (الصفحة الحالية) */
+        .sidebar .nav-item.active {
+            background: linear-gradient(90deg, rgba(56, 189, 248, 0.15) 0%, transparent 100%);
+            color: var(--accent);
+            border-right: 3px solid var(--accent);
+            font-weight: 600;
+        }
+        
+        /* ✅ تمييز خاص لرابط الاستيراد (مع الحفاظ على التصميم المتقطع) */
         .sidebar .nav-item.import-link {
-            border: 1px dashed rgba(56, 189, 248, 0.3);
+            border: 1px dashed rgba(56, 189, 248, 0.4);
             background: rgba(56, 189, 248, 0.05);
+            border-right: 3px solid transparent;
         }
         .sidebar .nav-item.import-link:hover {
             border-color: var(--accent);
             background: rgba(56, 189, 248, 0.15);
+            border-right-color: var(--accent);
         }
+        
+        /* زر إضافة مشترك */
         .sidebar .btn-add {
-            background-color: var(--accent);
+            background: linear-gradient(135deg, #0ea5e9, #38bdf8);
             color: #0f172a;
             font-weight: bold;
             text-align: center;
-            padding: 12px;
-            border-radius: 8px;
+            padding: 14px;
+            border-radius: 10px;
             text-decoration: none;
             display: block;
-            margin-top: 20px;
+            margin-top: auto; /* يجعله في أسفل الشريط */
+            transition: all 0.3s ease;
+            box-shadow: 0 4px 15px rgba(56, 189, 248, 0.3);
+            border: none;
         }
-        .sidebar .btn-add:hover { background-color: var(--accent-hover); }
+        .sidebar .btn-add:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(56, 189, 248, 0.5);
+            color: #0f172a;
+        }
+
         .main { flex: 1; padding: 24px; overflow-x: auto; }
         .card {
             background-color: var(--bg-card) !important;
@@ -168,9 +210,11 @@
         .alert-warning { background-color: #78350f; color: #fcd34d; border-color: #f59e0b; }
         .alert-info    { background-color: #0c4a6e; color: #7dd3fc; border-color: var(--accent); }
         .modal-content { background-color: var(--bg-card) !important; color: var(--text-main) !important; border: 1px solid var(--bg-hover); }
+        
         @media (max-width: 768px) {
             .layout { flex-direction: column; }
             .sidebar { width: 100%; }
+            .sidebar .btn-add { margin-top: 20px; }
         }
     </style>
 </head>
@@ -186,16 +230,20 @@
                 </div>
             </div>
         </div>
+        
+        <!-- أزرار التنقل -->
         <a href="{{ url_for('dashboard') }}" class="nav-item {% if request.endpoint == 'dashboard' %}active{% endif %}">
             <i class="bi bi-speedometer2"></i> لوحة التحكم
         </a>
         <a href="{{ url_for('subscribers') }}" class="nav-item {% if request.endpoint in ['subscribers','add_subscriber'] %}active{% endif %}">
             <i class="bi bi-people"></i> المشتركين
         </a>
-        <!-- ✅ رابط استيراد من الميكروتيك (جديد) -->
+        
+        <!-- رابط استيراد من الميكروتيك -->
         <a href="{{ url_for('import_backup') }}" class="nav-item import-link {% if request.endpoint == 'import_backup' %}active{% endif %}">
             <i class="bi bi-cloud-upload"></i> استيراد من الميكروتيك
         </a>
+        
         <a href="{{ url_for('packages') }}" class="nav-item {% if request.endpoint == 'packages' %}active{% endif %}">
             <i class="bi bi-box-seam"></i> الباقات
         </a>
@@ -208,10 +256,13 @@
         <a href="{{ url_for('logout') }}" class="nav-item">
             <i class="bi bi-box-arrow-right"></i> خروج
         </a>
+        
+        <!-- زر إضافة مشترك -->
         <a href="{{ url_for('add_subscriber') }}" class="btn-add">
             <i class="bi bi-person-plus"></i> إضافة مشترك
         </a>
     </aside>
+    
     <main class="main">
         {% with messages = get_flashed_messages(with_categories=true) %}
             {% for category, message in messages %}
