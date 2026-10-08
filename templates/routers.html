@@ -1,120 +1,512 @@
 {% extends "base.html" %}
+{% block title %}الراوترات{% endblock %}
+
 {% block content %}
-<div class="container py-4" dir="rtl">
-    <h2 class="mb-4 fw-bold text-primary">إدارة الراوترات</h2>
+<link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@400;500;700;800&display=swap" rel="stylesheet">
 
-    <!-- رسائل التنبيه -->
-    {% with messages = get_flashed_messages(with_categories=true) %}
-        {% if messages %}
-            {% for category, message in messages %}
-                <div class="alert alert-{{ category }} alert-dismissible fade show" role="alert">
-                    {{ message }}
-                    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
-                </div>
-            {% endfor %}
-        {% endif %}
-    {% endwith %}
+<style>
+    body { font-family: 'Tajawal', sans-serif; }
 
-    <!-- نموذج إضافة راوتر جديد -->
-    <div class="card shadow-sm mb-4 border-0">
-        <div class="card-header bg-dark text-white fw-bold">إضافة راوتر جديد</div>
-        <div class="card-body bg-light">
+    .page-card {
+        background-color: var(--bg-card);
+        border: 1px solid var(--bg-hover);
+        border-radius: 16px;
+        padding: 24px;
+        margin-bottom: 24px;
+    }
+    .page-card-header {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        font-weight: 700;
+        font-size: 1.1rem;
+        color: var(--accent);
+        margin-bottom: 20px;
+        padding-bottom: 15px;
+        border-bottom: 1px solid var(--bg-hover);
+    }
+    .page-card-header i {
+        font-size: 1.3rem;
+    }
+
+    /* حقول الإدخال */
+    .form-control-dark {
+        background-color: var(--bg-main);
+        border: 1px solid var(--bg-hover);
+        color: var(--text-main);
+        padding: 10px 14px;
+        border-radius: 10px;
+        transition: all 0.2s;
+    }
+    .form-control-dark:focus {
+        background-color: var(--bg-main);
+        border-color: var(--accent);
+        color: var(--text-main);
+        box-shadow: 0 0 0 0.2rem var(--accent-glow);
+        outline: none;
+    }
+    .form-control-dark::placeholder {
+        color: var(--text-muted);
+        opacity: 0.7;
+    }
+    .form-label-dark {
+        color: var(--text-muted);
+        font-weight: 600;
+        margin-bottom: 6px;
+        font-size: 0.9rem;
+    }
+
+    /* الجدول */
+    .table-dark-custom {
+        margin: 0;
+        color: var(--text-main);
+    }
+    .table-dark-custom thead th {
+        background-color: var(--bg-hover);
+        color: var(--accent);
+        font-weight: 700;
+        border: none;
+        padding: 14px 12px;
+        font-size: 0.9rem;
+        white-space: nowrap;
+    }
+    .table-dark-custom tbody td {
+        border-color: var(--bg-hover);
+        padding: 14px 12px;
+        vertical-align: middle;
+        color: var(--text-main);
+    }
+    .table-dark-custom tbody tr {
+        transition: all 0.2s;
+    }
+    .table-dark-custom tbody tr:hover {
+        background-color: rgba(56, 189, 248, 0.05);
+    }
+
+    /* الأزرار */
+    .btn-dark-custom {
+        background-color: var(--bg-main);
+        border: 1px solid var(--bg-hover);
+        color: var(--text-main);
+        border-radius: 8px;
+        padding: 6px 12px;
+        font-size: 0.85rem;
+        font-weight: 500;
+        transition: all 0.2s;
+    }
+    .btn-dark-custom:hover {
+        background-color: var(--bg-hover);
+        color: var(--accent);
+        border-color: var(--accent);
+    }
+    .btn-dark-custom.warning {
+        border-color: rgba(245, 158, 11, 0.4);
+        color: #f59e0b;
+    }
+    .btn-dark-custom.warning:hover {
+        background-color: rgba(245, 158, 11, 0.1);
+        border-color: #f59e0b;
+        color: #f59e0b;
+    }
+    .btn-dark-custom.danger {
+        border-color: rgba(239, 68, 68, 0.4);
+        color: #ef4444;
+    }
+    .btn-dark-custom.danger:hover {
+        background-color: rgba(239, 68, 68, 0.1);
+        border-color: #ef4444;
+        color: #ef4444;
+    }
+    .btn-dark-custom.info {
+        border-color: rgba(56, 189, 248, 0.4);
+        color: var(--accent);
+    }
+    .btn-dark-custom.info:hover {
+        background-color: rgba(56, 189, 248, 0.1);
+        border-color: var(--accent);
+        color: var(--accent);
+    }
+
+    /* أزرار الحالة */
+    .status-badge {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        padding: 5px 12px;
+        border-radius: 20px;
+        font-size: 0.8rem;
+        font-weight: 600;
+    }
+    .status-active {
+        background: rgba(34, 197, 94, 0.1);
+        color: #22c55e;
+        border: 1px solid rgba(34, 197, 94, 0.3);
+    }
+    .status-inactive {
+        background: rgba(148, 163, 184, 0.1);
+        color: #94a3b8;
+        border: 1px solid rgba(148, 163, 184, 0.3);
+    }
+    .pulse-dot {
+        width: 7px;
+        height: 7px;
+        border-radius: 50%;
+        background-color: currentColor;
+        animation: pulse-animation 1.5s infinite;
+    }
+    @keyframes pulse-animation {
+        0% { box-shadow: 0 0 0 0 currentColor; opacity: 1; }
+        70% { box-shadow: 0 0 0 6px transparent; opacity: 0.7; }
+        100% { box-shadow: 0 0 0 0 transparent; opacity: 1; }
+    }
+
+    /* الشارات */
+    .master-badge {
+        background: linear-gradient(135deg, #f59e0b, #fbbf24);
+        color: #0f172a;
+        padding: 3px 10px;
+        border-radius: 12px;
+        font-size: 0.7rem;
+        font-weight: 700;
+        margin-right: 6px;
+    }
+
+    /* زر الإضافة */
+    .btn-add-router {
+        background: linear-gradient(135deg, #22c55e, #16a34a);
+        color: white;
+        border: none;
+        padding: 10px 24px;
+        border-radius: 10px;
+        font-weight: 700;
+        transition: all 0.3s;
+        box-shadow: 0 4px 15px rgba(34, 197, 94, 0.3);
+    }
+    .btn-add-router:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 6px 20px rgba(34, 197, 94, 0.5);
+        color: white;
+    }
+
+    /* Modal */
+    .modal-content-dark {
+        background-color: var(--bg-card);
+        border: 1px solid var(--bg-hover);
+        border-radius: 16px;
+    }
+    .modal-header-dark {
+        background: linear-gradient(135deg, var(--accent), #0ea5e9);
+        color: #0f172a;
+        border-radius: 16px 16px 0 0;
+        border: none;
+        padding: 16px 20px;
+    }
+    .modal-footer-dark {
+        background-color: var(--bg-hover);
+        border-top: 1px solid var(--bg-hover);
+        border-radius: 0 0 16px 16px;
+        padding: 14px 20px;
+    }
+
+    /* بطاقة معلومات صغيرة */
+    .info-pill {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        background-color: var(--bg-main);
+        border: 1px solid var(--bg-hover);
+        padding: 4px 10px;
+        border-radius: 8px;
+        font-size: 0.75rem;
+        color: var(--text-muted);
+        font-family: monospace;
+    }
+    .info-pill strong {
+        color: var(--accent);
+    }
+
+    /* صف فارغ */
+    .empty-state {
+        padding: 60px 20px;
+        text-align: center;
+        color: var(--text-muted);
+    }
+    .empty-state i {
+        font-size: 3rem;
+        color: var(--bg-hover);
+        display: block;
+        margin-bottom: 15px;
+    }
+</style>
+
+<div class="d-flex justify-content-between align-items-center mb-4 flex-wrap gap-3">
+    <div>
+        <h2 class="fw-bold mb-1">
+            <i class="bi bi-router text-accent"></i>
+            إدارة الراوترات
+        </h2>
+        <small class="text-muted">إضافة وتعديل وحذف راوترات MikroTik</small>
+    </div>
+    <button class="btn btn-add-router" data-bs-toggle="modal" data-bs-target="#addRouterModal">
+        <i class="bi bi-plus-circle"></i> إضافة راوتر جديد
+    </button>
+</div>
+
+<!-- رسائل التنبيه -->
+{% with messages = get_flashed_messages(with_categories=true) %}
+    {% if messages %}
+        {% for category, message in messages %}
+            <div class="alert alert-{{ category }} alert-dismissible fade show" role="alert">
+                {{ message }}
+                <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+            </div>
+        {% endfor %}
+    {% endif %}
+{% endwith %}
+
+<!-- جدول الراوترات -->
+<div class="page-card">
+    <div class="page-card-header">
+        <i class="bi bi-list-ul"></i>
+        قائمة الراوترات
+        <span class="badge bg-info bg-opacity-10 text-info border border-info ms-auto">
+            {{ routers|length }} راوتر
+        </span>
+    </div>
+
+    <div class="table-responsive">
+        <table class="table table-dark-custom text-center">
+            <thead>
+                <tr>
+                    <th>#</th>
+                    <th>الاسم</th>
+                    <th>عنوان IP</th>
+                    <th>المستخدم</th>
+                    <th>منفذ SSH</th>
+                    <th>منفذ API</th>
+                    <th>الحالة</th>
+                    <th>الإجراءات</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for r in routers %}
+                <tr>
+                    <td class="text-muted">#{{ r.id }}</td>
+                    <td>
+                        <span class="fw-bold text-accent">{{ r.name }}</span>
+                        {% if r.is_master %}
+                            <span class="master-badge">
+                                <i class="bi bi-star-fill"></i> رئيسي
+                            </span>
+                        {% endif %}
+                    </td>
+                    <td>
+                        <span class="info-pill">
+                            <i class="bi bi-globe"></i> {{ r.ip_address }}
+                        </span>
+                    </td>
+                    <td><span class="text-muted">{{ r.username }}</span></td>
+                    <td>
+                        <span class="info-pill">
+                            <i class="bi bi-terminal"></i> <strong>{{ r.port }}</strong>
+                        </span>
+                    </td>
+                    <td>
+                        <span class="info-pill">
+                            <i class="bi bi-plug"></i> <strong>{{ r.api_port or 8728 }}</strong>
+                        </span>
+                    </td>
+                    <td>
+                        {% if r.is_active %}
+                            <span class="status-badge status-active">
+                                <span class="pulse-dot"></span> نشط
+                            </span>
+                        {% else %}
+                            <span class="status-badge status-inactive">
+                                <i class="bi bi-x-circle-fill"></i> متوقف
+                            </span>
+                        {% endif %}
+                    </td>
+                    <td>
+                        <div class="d-flex justify-content-center gap-1 flex-wrap">
+                            <button class="btn btn-dark-custom info"
+                                    onclick='openEditRouter({{ r.id }}, "{{ r.name|e }}", "{{ r.ip_address|e }}", "{{ r.username|e }}", "{{ r.port }}", "{{ r.api_port or 8728 }}", {{ "true" if r.is_master else "false" }})'
+                                    title="تعديل">
+                                <i class="bi bi-pencil"></i>
+                            </button>
+                            {% if not r.is_master %}
+                                <a href="{{ url_for('set_master_router', router_id=r.id) }}"
+                                   class="btn btn-dark-custom warning"
+                                   title="تعيين كرئيسي">
+                                    <i class="bi bi-star"></i>
+                                </a>
+                            {% endif %}
+                            <a href="{{ url_for('delete_router', router_id=r.id) }}"
+                               class="btn btn-dark-custom danger"
+                               onclick="return confirm('هل أنت متأكد من حذف الراوتر {{ r.name }}؟')"
+                               title="حذف">
+                                <i class="bi bi-trash"></i>
+                            </a>
+                        </div>
+                    </td>
+                </tr>
+                {% else %}
+                <tr>
+                    <td colspan="8">
+                        <div class="empty-state">
+                            <i class="bi bi-router"></i>
+                            <h5 class="mb-2">لا توجد راوترات مضافة</h5>
+                            <p class="text-muted mb-3">ابدأ بإضافة أول راوتر MikroTik للبدء</p>
+                            <button class="btn btn-add-router" data-bs-toggle="modal" data-bs-target="#addRouterModal">
+                                <i class="bi bi-plus-circle"></i> إضافة راوتر جديد
+                            </button>
+                        </div>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<!-- ✅ Modal إضافة راوتر -->
+<div class="modal fade" id="addRouterModal" tabindex="-1">
+    <div class="modal-dialog modal-dialog-centered modal-lg">
+        <div class="modal-content modal-content-dark">
             <form method="POST" action="{{ url_for('routers') }}">
-                <div class="row g-3">
-                    <div class="col-md-3">
-                        <label class="form-label fw-bold">اسم الراوتر</label>
-                        <input type="text" name="name" class="form-control" placeholder="مثال: ZENAR net" required>
-                    </div>
-                    <div class="col-md-3">
-                        <label class="form-label fw-bold">عنوان IP</label>
-                        <input type="text" name="ip_address" class="form-control" placeholder="192.145.x.x" required>
-                    </div>
-                    <div class="col-md-2">
-                        <label class="form-label fw-bold">اسم المستخدم</label>
-                        <input type="text" name="username" class="form-control" value="zinar" required>
-                    </div>
-                    <div class="col-md-2">
-                        <label class="form-label fw-bold">كلمة المرور</label>
-                        <input type="password" name="password" class="form-control" placeholder="••••••••" required>
-                    </div>
-                    <div class="col-md-2">
-                        <label class="form-label fw-bold">المنفذ (Port)</label>
-                        <input type="number" name="port" class="form-control" value="22" required>
-                    </div>
+                <div class="modal-header modal-header-dark">
+                    <h5 class="modal-title fw-bold">
+                        <i class="bi bi-plus-circle-fill"></i> إضافة راوتر جديد
+                    </h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
                 </div>
-                <div class="row mt-3 align-items-center">
-                    <div class="col-md-6">
-                        <div class="form-check">
-                            <input class="form-check-input" type="checkbox" name="is_master" id="is_master">
-                            <label class="form-check-label fw-bold" for="is_master">
-                                جعله الراوتر الرئيسي
+                <div class="modal-body p-4">
+                    <div class="row g-3">
+                        <div class="col-md-6">
+                            <label class="form-label-dark">اسم الراوتر *</label>
+                            <input type="text" name="name" class="form-control form-control-dark"
+                                   placeholder="مثال: ZENAR-Net" required>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label-dark">عنوان IP *</label>
+                            <input type="text" name="ip_address" class="form-control form-control-dark"
+                                   placeholder="192.168.1.1" required>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label-dark">اسم المستخدم *</label>
+                            <input type="text" name="username" class="form-control form-control-dark"
+                                   value="admin" required>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label-dark">كلمة المرور *</label>
+                            <input type="password" name="password" class="form-control form-control-dark"
+                                   placeholder="••••••••" required>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label-dark">
+                                <i class="bi bi-terminal text-info"></i> منفذ SSH
                             </label>
+                            <input type="number" name="port" class="form-control form-control-dark"
+                                   value="22" required>
+                            <small class="text-muted" style="font-size: 0.75rem;">يُستخدم لقطع اتصال المشتركين</small>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label-dark">
+                                <i class="bi bi-plug text-success"></i> منفذ API
+                            </label>
+                            <input type="number" name="api_port" class="form-control form-control-dark"
+                                   value="8728" required>
+                            <small class="text-muted" style="font-size: 0.75rem;">يُستخدم لمراقبة الترافيك (8728 أو 13)</small>
+                        </div>
+                        <div class="col-12">
+                            <div class="form-check mt-2">
+                                <input class="form-check-input" type="checkbox" name="is_master" id="is_master">
+                                <label class="form-check-label" for="is_master" style="color: var(--text-main);">
+                                    <i class="bi bi-star-fill text-warning"></i> جعله الراوتر الرئيسي
+                                </label>
+                            </div>
                         </div>
                     </div>
-                    <div class="col-md-6 text-md-end mt-2 mt-md-0">
-                        <button type="submit" class="btn btn-success px-4 fw-bold">
-                            <i class="fas fa-plus"></i> إضافة الراوتر
-                        </button>
-                    </div>
+                </div>
+                <div class="modal-footer modal-footer-dark">
+                    <button type="button" class="btn btn-dark-custom" data-bs-dismiss="modal">إلغاء</button>
+                    <button type="submit" class="btn btn-add-router">
+                        <i class="bi bi-check-circle"></i> إضافة الراوتر
+                    </button>
                 </div>
             </form>
         </div>
     </div>
+</div>
 
-    <!-- جدول عرض الراوترات -->
-    <div class="card shadow-sm border-0">
-        <div class="card-body p-0">
-            <div class="table-responsive">
-                <table class="table table-hover align-middle mb-0 text-center">
-                    <thead class="table-dark">
-                        <tr>
-                            <th>الاسم</th>
-                            <th>IP</th>
-                            <th>المستخدم</th>
-                            <th>المنفذ</th>
-                            <th>الحالة</th>
-                            <th>الإجراءات</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {% for r in routers %}
-                        <tr>
-                            <td class="fw-bold">
-                                {{ r.name }}
-                                {% if r.is_master %}
-                                    <span class="badge bg-warning text-dark ms-1">رئيسي</span>
-                                {% endif %}
-                            </td>
-                            <td><code>{{ r.ip_address }}</code></td>
-                            <td>{{ r.username }}</td>
-                            <td>{{ r.port }}</td>
-                            <td>
-                                {% if r.is_active %}
-                                    <span class="badge bg-success">نشط</span>
-                                {% else %}
-                                    <span class="badge bg-secondary">متوقف</span>
-                                {% endif %}
-                            </td>
-                            <td>
-                                {% if not r.is_master %}
-                                    <a href="{{ url_for('set_master_router', router_id=r.id) }}" class="btn btn-sm btn-outline-warning" title="تعيين رئيسي">
-                                        تعيين رئيسي
-                                    </a>
-                                {% endif %}
-                                <a href="{{ url_for('delete_router', router_id=r.id) }}" class="btn btn-sm btn-outline-danger" onclick="return confirm('هل أنت متأكد من الحذف؟')" title="حذف">
-                                    حذف
-                                </a>
-                            </td>
-                        </tr>
-                        {% else %}
-                        <tr>
-                            <td colspan="6" class="text-muted py-4">لا توجد راوترات مضافة حالياً.</td>
-                        </tr>
-                        {% endfor %}
-                    </tbody>
-                </table>
-            </div>
+<!-- ✅ Modal تعديل راوتر -->
+<div class="modal fade" id="editRouterModal" tabindex="-1">
+    <div class="modal-dialog modal-dialog-centered modal-lg">
+        <div class="modal-content modal-content-dark">
+            <form method="POST" id="editRouterForm">
+                <div class="modal-header modal-header-dark">
+                    <h5 class="modal-title fw-bold">
+                        <i class="bi bi-pencil-square"></i> تعديل بيانات الراوتر
+                    </h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body p-4">
+                    <div class="row g-3">
+                        <div class="col-md-6">
+                            <label class="form-label-dark">اسم الراوتر *</label>
+                            <input type="text" name="name" id="edit_name" class="form-control form-control-dark" required>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label-dark">عنوان IP *</label>
+                            <input type="text" name="ip_address" id="edit_ip" class="form-control form-control-dark" required>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label-dark">اسم المستخدم *</label>
+                            <input type="text" name="username" id="edit_username" class="form-control form-control-dark" required>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label-dark">كلمة المرور</label>
+                            <input type="password" name="password" id="edit_password" class="form-control form-control-dark"
+                                   placeholder="اتركها فارغة للإبقاء عليها">
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label-dark">
+                                <i class="bi bi-terminal text-info"></i> منفذ SSH
+                            </label>
+                            <input type="number" name="port" id="edit_port" class="form-control form-control-dark" required>
+                            <small class="text-muted" style="font-size: 0.75rem;">لقطع اتصال المشتركين</small>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label-dark">
+                                <i class="bi bi-plug text-success"></i> منفذ API
+                            </label>
+                            <input type="number" name="api_port" id="edit_api_port" class="form-control form-control-dark" required>
+                            <small class="text-muted" style="font-size: 0.75rem;">لمراقبة الترافيك</small>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer modal-footer-dark">
+                    <button type="button" class="btn btn-dark-custom" data-bs-dismiss="modal">إلغاء</button>
+                    <button type="submit" class="btn btn-add-router" style="background: linear-gradient(135deg, #38bdf8, #0ea5e9);">
+                        <i class="bi bi-save"></i> حفظ التعديلات
+                    </button>
+                </div>
+            </form>
         </div>
     </div>
 </div>
+
+<script>
+function openEditRouter(id, name, ip, username, port, apiPort, isMaster) {
+    document.getElementById('editRouterForm').action = '/routers/update/' + id;
+    document.getElementById('edit_name').value = name;
+    document.getElementById('edit_ip').value = ip;
+    document.getElementById('edit_username').value = username;
+    document.getElementById('edit_password').value = '';
+    document.getElementById('edit_port').value = port;
+    document.getElementById('edit_api_port').value = apiPort;
+    new bootstrap.Modal(document.getElementById('editRouterModal')).show();
+}
+</script>
+
 {% endblock %}
