@@ -96,7 +96,6 @@
     .dashboard-card:hover .details-hint { opacity: 1; color: #7dd3fc; }
     .details-hint i { font-size: 0.7rem; }
 
-    /* ✅ قائمة آخر 5 عناصر */
     .mini-events-list {
         display: flex;
         flex-direction: column;
@@ -636,10 +635,8 @@
     </div>
 </div>
 
-<!-- ✅ الصف الأول: بطاقات الإحصائيات -->
+<!-- الصف الأول: البطاقات -->
 <div class="row g-3 mb-3">
-    
-    <!-- MikroTik -->
     <div class="col-xl-3 col-md-6">
         <div class="dashboard-card text-center clickable" data-bs-toggle="modal" data-bs-target="#mikrotikDetailsModal">
             <div class="icon-circle mx-auto" style="background: rgba(56, 189, 248, 0.1); border: 1px solid rgba(56, 189, 248, 0.3);">
@@ -649,16 +646,11 @@
             <div class="stat-label">سيرفرات MikroTik</div>
             <div class="d-flex justify-content-center mb-2">
                 {% if routers_online > 0 %}
-                    <span class="stat-badge success">
-                        <span class="pulse-dot"></span> {{ routers_online }} متصل
-                    </span>
+                    <span class="stat-badge success"><span class="pulse-dot"></span> {{ routers_online }} متصل</span>
                 {% else %}
-                    <span class="stat-badge danger">
-                        <i class="bi bi-x-circle-fill"></i> 0 متصل
-                    </span>
+                    <span class="stat-badge danger"><i class="bi bi-x-circle-fill"></i> 0 متصل</span>
                 {% endif %}
             </div>
-
             {% if recent_routers %}
                 <div class="mini-events-list">
                     {% for r in recent_routers[:5] %}
@@ -668,22 +660,16 @@
                         {% else %}
                             <i class="bi bi-x-circle-fill text-danger mini-event-icon"></i>
                         {% endif %}
-                        <span class="mini-event-text" title="{{ r.name }} - {{ r.ip_address }}">
-                            {{ r.name }}
-                        </span>
+                        <span class="mini-event-text" title="{{ r.name }} - {{ r.ip_address }}">{{ r.name }}</span>
                         <span class="mini-event-meta">{{ r.ip_address }}</span>
                     </div>
                     {% endfor %}
                 </div>
             {% endif %}
-
-            <div class="details-hint">
-                <i class="bi bi-info-circle"></i> اضغط لعرض التفاصيل
-            </div>
+            <div class="details-hint"><i class="bi bi-info-circle"></i> اضغط لعرض التفاصيل</div>
         </div>
     </div>
 
-    <!-- المشتركين -->
     <div class="col-xl-3 col-md-6">
         <div class="dashboard-card text-center clickable" data-bs-toggle="modal" data-bs-target="#subscribersDetailsModal">
             <div class="icon-circle mx-auto" style="background: rgba(34, 197, 94, 0.1); border: 1px solid rgba(34, 197, 94, 0.2);">
@@ -692,32 +678,23 @@
             <div class="stat-number">{{ sub_count }}</div>
             <div class="stat-label">إجمالي المشتركين</div>
             <div class="d-flex justify-content-center mb-2">
-                <span class="stat-badge success">
-                    <i class="bi bi-check-circle-fill"></i> {{ active_subs }} نشط
-                </span>
+                <span class="stat-badge success"><i class="bi bi-check-circle-fill"></i> {{ active_subs }} نشط</span>
             </div>
-
             {% if recent_subs %}
                 <div class="mini-events-list">
                     {% for sub in recent_subs[:5] %}
                     <div class="mini-event-item">
                         <i class="bi bi-person-plus-fill text-success mini-event-icon"></i>
-                        <span class="mini-event-text" title="{{ sub.name or sub.username }}">
-                            {{ sub.name or sub.username }}
-                        </span>
+                        <span class="mini-event-text" title="{{ sub.name or sub.username }}">{{ sub.name or sub.username }}</span>
                         <span class="mini-event-meta">{{ sub.created_at | localtime('%H:%M') }}</span>
                     </div>
                     {% endfor %}
                 </div>
             {% endif %}
-
-            <div class="details-hint">
-                <i class="bi bi-info-circle"></i> اضغط لعرض التفاصيل
-            </div>
+            <div class="details-hint"><i class="bi bi-info-circle"></i> اضغط لعرض التفاصيل</div>
         </div>
     </div>
 
-    <!-- الإيرادات -->
     <div class="col-xl-3 col-md-6">
         <div class="dashboard-card text-center clickable" data-bs-toggle="modal" data-bs-target="#revenueDetailsModal">
             <div class="icon-circle mx-auto" style="background: rgba(245, 158, 11, 0.1); border: 1px solid rgba(245, 158, 11, 0.3);">
@@ -726,32 +703,23 @@
             <div class="stat-number">{{ today_revenue }}</div>
             <div class="stat-label">إيرادات اليوم (ل.س)</div>
             <div class="d-flex justify-content-center mb-2">
-                <span class="stat-badge warning">
-                    <i class="bi bi-graph-up-arrow"></i> إيراد يومي
-                </span>
+                <span class="stat-badge warning"><i class="bi bi-graph-up-arrow"></i> إيراد يومي</span>
             </div>
-
             {% if recent_payments %}
                 <div class="mini-events-list">
                     {% for p in recent_payments[:5] %}
                     <div class="mini-event-item">
                         <i class="bi bi-cash-stack text-warning mini-event-icon"></i>
-                        <span class="mini-event-text" title="دفعة #{{ p.id }}">
-                            دفعة #{{ p.id }}
-                        </span>
+                        <span class="mini-event-text" title="دفعة #{{ p.id }}">دفعة #{{ p.id }}</span>
                         <span class="mini-event-meta" style="color: #f59e0b;">{{ p.amount|int }}</span>
                     </div>
                     {% endfor %}
                 </div>
             {% endif %}
-
-            <div class="details-hint">
-                <i class="bi bi-info-circle"></i> اضغط لعرض التفاصيل
-            </div>
+            <div class="details-hint"><i class="bi bi-info-circle"></i> اضغط لعرض التفاصيل</div>
         </div>
     </div>
 
-    <!-- التلجرام -->
     <div class="col-xl-3 col-md-6">
         <div class="dashboard-card text-center clickable" data-bs-toggle="modal" data-bs-target="#telegramDetailsModal">
             <div class="icon-circle mx-auto" style="background: rgba(34, 158, 217, 0.1); border: 1px solid rgba(34, 158, 217, 0.3);">
@@ -765,7 +733,6 @@
                 {% endif %}
             </div>
             <div class="stat-label">إشعارات التلجرام</div>
-
             {% if recent_telegram_logs %}
                 <div class="mini-events-list">
                     {% for log in recent_telegram_logs[:5] %}
@@ -775,43 +742,33 @@
                         {% else %}
                             <i class="bi bi-x-circle-fill text-danger mini-event-icon"></i>
                         {% endif %}
-                        <span class="mini-event-text" title="{{ log.message }}">
-                            {{ log.message_type }}
-                        </span>
+                        <span class="mini-event-text" title="{{ log.message }}">{{ log.message_type }}</span>
                         <span class="mini-event-meta">{{ log.created_at | localtime('%H:%M') }}</span>
                     </div>
                     {% endfor %}
                 </div>
             {% endif %}
-
-            <div class="details-hint">
-                <i class="bi bi-info-circle"></i> اضغط لعرض التفاصيل
-            </div>
+            <div class="details-hint"><i class="bi bi-info-circle"></i> اضغط لعرض التفاصيل</div>
         </div>
     </div>
 </div>
 
-<!-- ✅ الصف الثاني: إجراءات سريعة + مراقبة الترافيك -->
+<!-- الصف الثاني: إجراءات سريعة + الترافيك -->
 <div class="row g-3 mb-3">
-    
-    <!-- إجراءات سريعة -->
     <div class="col-xl-3 col-md-6">
         <div class="quick-actions-card">
             <div class="quick-actions-header">
                 <i class="bi bi-lightning-charge-fill lightning"></i>
                 <span>إجراءات سريعة</span>
             </div>
-
             <a href="{{ url_for('add_subscriber') }}" class="quick-action-btn">
                 <i class="bi bi-plus-circle-fill"></i>
                 <span>إضافة مشترك جديد</span>
             </a>
-
             <a href="{{ url_for('routers') }}" class="quick-action-btn">
                 <i class="bi bi-router-fill"></i>
                 <span>إدارة الراوترات</span>
             </a>
-
             <a href="{{ url_for('payments') }}" class="quick-action-btn">
                 <i class="bi bi-cash-stack"></i>
                 <span>عرض الدفعات</span>
@@ -819,7 +776,6 @@
         </div>
     </div>
 
-    <!-- مراقبة الترافيك -->
     <div class="col-xl-9 col-md-6">
         <div class="traffic-section">
             <div class="traffic-section-header">
@@ -887,9 +843,7 @@
                 <div class="col-md-6">
                     <div class="traffic-mini-card upload">
                         <div class="traffic-mini-header">
-                            <div class="traffic-mini-label upload">
-                                <i class="bi bi-arrow-up-circle-fill"></i> رفع
-                            </div>
+                            <div class="traffic-mini-label upload"><i class="bi bi-arrow-up-circle-fill"></i> رفع</div>
                             <span class="stat-badge warning" id="dashUploadBadge" style="font-size: 0.58rem; padding: 2px 8px;">0 Mbps</span>
                         </div>
                         <div class="traffic-mini-rate upload">
@@ -903,17 +857,13 @@
                             <span><i class="bi bi-hdd-stack"></i> إجمالي:</span>
                             <span id="dashUploadTotal" class="fw-bold">0 GB</span>
                         </div>
-                        <div class="traffic-mini-chart">
-                            <canvas id="dashUploadChart"></canvas>
-                        </div>
+                        <div class="traffic-mini-chart"><canvas id="dashUploadChart"></canvas></div>
                     </div>
                 </div>
                 <div class="col-md-6">
                     <div class="traffic-mini-card download">
                         <div class="traffic-mini-header">
-                            <div class="traffic-mini-label download">
-                                <i class="bi bi-arrow-down-circle-fill"></i> تحميل
-                            </div>
+                            <div class="traffic-mini-label download"><i class="bi bi-arrow-down-circle-fill"></i> تحميل</div>
                             <span class="stat-badge success" id="dashDownloadBadge" style="font-size: 0.58rem; padding: 2px 8px;">0 Mbps</span>
                         </div>
                         <div class="traffic-mini-rate download">
@@ -927,9 +877,7 @@
                             <span><i class="bi bi-hdd-stack"></i> إجمالي:</span>
                             <span id="dashDownloadTotal" class="fw-bold">0 GB</span>
                         </div>
-                        <div class="traffic-mini-chart">
-                            <canvas id="dashDownloadChart"></canvas>
-                        </div>
+                        <div class="traffic-mini-chart"><canvas id="dashDownloadChart"></canvas></div>
                     </div>
                 </div>
             </div>
@@ -937,26 +885,18 @@
     </div>
 </div>
 
-<!-- ✅ الصف الثالث: الأحداث + تلجرام -->
+<!-- الصف الثالث: الأحداث + تلجرام -->
 <div class="row g-3 mb-3">
     <div class="col-lg-8">
         <div class="dashboard-card p-0 overflow-hidden">
             <div class="d-flex justify-content-between align-items-center p-3 border-bottom" style="border-color: var(--bg-hover) !important;">
-                <h6 class="mb-0 fw-bold text-accent" style="font-size: 0.85rem;">
-                    <i class="bi bi-activity"></i> آخر الأحداث
-                </h6>
+                <h6 class="mb-0 fw-bold text-accent" style="font-size: 0.85rem;"><i class="bi bi-activity"></i> آخر الأحداث</h6>
                 <span class="badge bg-secondary bg-opacity-25" style="font-size: 0.68rem;">{{ events|length }} حدث</span>
             </div>
             <div class="table-responsive" style="max-height: 280px; overflow-y: auto;">
                 <table class="table table-hover table-clean mb-0 text-center">
                     <thead>
-                        <tr>
-                            <th>الوقت</th>
-                            <th>المدير</th>
-                            <th>الإجراء</th>
-                            <th>الهدف</th>
-                            <th>التفاصيل</th>
-                        </tr>
+                        <tr><th>الوقت</th><th>المدير</th><th>الإجراء</th><th>الهدف</th><th>التفاصيل</th></tr>
                     </thead>
                     <tbody>
                         {% for e in events %}
@@ -968,12 +908,7 @@
                             <td class="text-muted">{{ e.details or '-' }}</td>
                         </tr>
                         {% else %}
-                        <tr>
-                            <td colspan="5" class="text-center py-4 text-muted">
-                                <i class="bi bi-inbox" style="font-size: 1.3rem;"></i>
-                                <div style="font-size: 0.72rem; margin-top: 4px;">لا توجد أحداث</div>
-                            </td>
-                        </tr>
+                        <tr><td colspan="5" class="text-center py-4 text-muted"><i class="bi bi-inbox" style="font-size: 1.3rem;"></i><div style="font-size: 0.72rem; margin-top: 4px;">لا توجد أحداث</div></td></tr>
                         {% endfor %}
                     </tbody>
                 </table>
@@ -985,13 +920,10 @@
         <div class="dashboard-card p-0 overflow-hidden">
             <div class="d-flex justify-content-between align-items-center p-3 border-bottom" style="border-color: var(--bg-hover) !important;">
                 <h6 class="mb-0 fw-bold text-accent d-flex align-items-center gap-2" style="font-size: 0.85rem;">
-                    <i class="bi bi-telegram" style="color: #229ED9;"></i>
-                    سجل الإشعارات
+                    <i class="bi bi-telegram" style="color: #229ED9;"></i> سجل الإشعارات
                 </h6>
                 {% if telegram_status and telegram_status.enabled %}
-                    <span class="stat-badge success" style="font-size: 0.62rem; padding: 3px 8px;">
-                        <span class="pulse-dot" style="width: 4px; height: 4px;"></span> نشط
-                    </span>
+                    <span class="stat-badge success" style="font-size: 0.62rem; padding: 3px 8px;"><span class="pulse-dot" style="width: 4px; height: 4px;"></span> نشط</span>
                 {% else %}
                     <span class="stat-badge secondary" style="font-size: 0.62rem; padding: 3px 8px;">معطل</span>
                 {% endif %}
@@ -1010,15 +942,10 @@
                         </div>
                         <small class="text-muted" style="font-size: 0.62rem;">{{ log.created_at | localtime('%m-%d %H:%M') }}</small>
                     </div>
-                    <div class="text-muted" style="font-size: 0.68rem;">
-                        {{ log.message[:55] }}{% if log.message|length > 55 %}...{% endif %}
-                    </div>
+                    <div class="text-muted" style="font-size: 0.68rem;">{{ log.message[:55] }}{% if log.message|length > 55 %}...{% endif %}</div>
                 </div>
                 {% else %}
-                <div class="p-4 text-center text-muted">
-                    <i class="bi bi-bell-slash" style="font-size: 1.3rem;"></i>
-                    <div style="font-size: 0.72rem; margin-top: 4px;">لا توجد إشعارات</div>
-                </div>
+                <div class="p-4 text-center text-muted"><i class="bi bi-bell-slash" style="font-size: 1.3rem;"></i><div style="font-size: 0.72rem; margin-top: 4px;">لا توجد إشعارات</div></div>
                 {% endfor %}
             </div>
         </div>
@@ -1029,9 +956,7 @@
 <div class="row g-3 mb-3">
     <div class="col-12">
         <div class="dashboard-card">
-            <h6 class="fw-bold text-accent mb-2" style="font-size: 0.85rem;">
-                <i class="bi bi-shield-lock"></i> إعدادات حساب المدير
-            </h6>
+            <h6 class="fw-bold text-accent mb-2" style="font-size: 0.85rem;"><i class="bi bi-shield-lock"></i> إعدادات حساب المدير</h6>
             <p class="text-muted mb-2" style="font-size: 0.72rem;">يمكنك تغيير اسم المستخدم أو كلمة المرور.</p>
             <button class="btn btn-outline-warning w-100 py-2 rounded-3" style="font-size: 0.78rem;" data-bs-toggle="modal" data-bs-target="#changeCredentialsModal">
                 <i class="bi bi-key-fill"></i> تغيير بيانات الدخول
@@ -1051,30 +976,13 @@
             </div>
             <div class="modal-body p-3">
                 <div class="row g-2 mb-3 text-center">
-                    <div class="col-4">
-                        <div class="p-2 rounded-3" style="background-color: var(--bg-main); border: 1px solid var(--bg-hover);">
-                            <h5 class="fw-bold text-accent mb-0">{{ routers_count }}</h5>
-                            <small class="text-muted" style="font-size: 0.68rem;">إجمالي</small>
-                        </div>
-                    </div>
-                    <div class="col-4">
-                        <div class="p-2 rounded-3" style="background-color: var(--bg-main); border: 1px solid var(--bg-hover);">
-                            <h5 class="fw-bold text-success mb-0">{{ routers_online }}</h5>
-                            <small class="text-muted" style="font-size: 0.68rem;">متصل</small>
-                        </div>
-                    </div>
-                    <div class="col-4">
-                        <div class="p-2 rounded-3" style="background-color: var(--bg-main); border: 1px solid var(--bg-hover);">
-                            <h5 class="fw-bold text-danger mb-0">{{ routers_count - routers_online }}</h5>
-                            <small class="text-muted" style="font-size: 0.68rem;">متوقف</small>
-                        </div>
-                    </div>
+                    <div class="col-4"><div class="p-2 rounded-3" style="background-color: var(--bg-main); border: 1px solid var(--bg-hover);"><h5 class="fw-bold text-accent mb-0">{{ routers_count }}</h5><small class="text-muted" style="font-size: 0.68rem;">إجمالي</small></div></div>
+                    <div class="col-4"><div class="p-2 rounded-3" style="background-color: var(--bg-main); border: 1px solid var(--bg-hover);"><h5 class="fw-bold text-success mb-0">{{ routers_online }}</h5><small class="text-muted" style="font-size: 0.68rem;">متصل</small></div></div>
+                    <div class="col-4"><div class="p-2 rounded-3" style="background-color: var(--bg-main); border: 1px solid var(--bg-hover);"><h5 class="fw-bold text-danger mb-0">{{ routers_count - routers_online }}</h5><small class="text-muted" style="font-size: 0.68rem;">متوقف</small></div></div>
                 </div>
                 <div class="table-responsive" style="max-height: 300px; overflow-y: auto; border: 1px solid var(--bg-hover); border-radius: 8px;">
                     <table class="table table-hover table-clean mb-0 text-center">
-                        <thead>
-                            <tr><th>#</th><th>الاسم</th><th>IP</th><th>SSH</th><th>API</th><th>الحالة</th></tr>
-                        </thead>
+                        <thead><tr><th>#</th><th>الاسم</th><th>IP</th><th>SSH</th><th>API</th><th>الحالة</th></tr></thead>
                         <tbody>
                             {% for r in routers %}
                             <tr>
@@ -1114,4 +1022,404 @@
                 <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
             </div>
             <div class="modal-body p-3">
-                <div class="table-responsive" style="max-height: 350px; overflow-y
+                <div class="table-responsive" style="max-height: 350px; overflow-y: auto; border: 1px solid var(--bg-hover); border-radius: 8px;">
+                    <table class="table table-hover table-clean mb-0 text-center">
+                        <thead><tr><th>#</th><th>الاسم</th><th>المستخدم</th><th>الحالة</th><th>ينتهي</th></tr></thead>
+                        <tbody>
+                            {% for sub in inactive_subs %}
+                            <tr>
+                                <td class="text-muted">#{{ sub.id }}</td>
+                                <td class="fw-bold text-primary">{{ sub.name or '-' }}</td>
+                                <td class="text-muted">{{ sub.username }}</td>
+                                <td>
+                                    {% if sub.status == 'expired' %}
+                                        <span class="stat-badge danger" style="font-size: 0.62rem; padding: 3px 8px;">🔴 منتهي</span>
+                                    {% elif sub.status == 'paused' %}
+                                        <span class="stat-badge warning" style="font-size: 0.62rem; padding: 3px 8px;">⏸ موقوف</span>
+                                    {% endif %}
+                                </td>
+                                <td class="text-muted">{{ sub.expires_at.strftime('%Y-%m-%d') if sub.expires_at else '-' }}</td>
+                            </tr>
+                            {% else %}
+                            <tr><td colspan="5" class="text-center py-3 text-muted">لا توجد حسابات</td></tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+            <div class="modal-footer border-top" style="border-color: var(--bg-hover) !important; background-color: var(--bg-hover); border-radius: 0 0 12px 12px;">
+                <a href="{{ url_for('subscribers') }}" class="btn btn-outline-info btn-sm rounded-3" style="font-size: 0.72rem;">الإدارة الكاملة</a>
+                <button type="button" class="btn btn-secondary btn-sm rounded-3" style="font-size: 0.72rem;" data-bs-dismiss="modal">إغلاق</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="modal fade" id="revenueDetailsModal" tabindex="-1">
+    <div class="modal-dialog modal-dialog-centered modal-lg">
+        <div class="modal-content border-0 shadow-lg" style="border-radius: 12px; background-color: var(--bg-card);">
+            <div class="modal-header revenue-modal-header">
+                <h5 class="modal-title fw-bold" style="font-size: 0.95rem;"><i class="bi bi-cash-coin"></i> تفاصيل الإيرادات</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body p-3">
+                <div class="row g-2">
+                    <div class="col-md-4"><div class="revenue-box"><h6 class="text-muted mb-1" style="font-size: 0.72rem;">مبيعات اليوم</h6><h4 class="fw-bold text-warning mb-0">{{ today_revenue }}</h4><small class="text-muted" style="font-size: 0.68rem;">ل.س</small></div></div>
+                    <div class="col-md-4"><div class="revenue-box"><h6 class="text-muted mb-1" style="font-size: 0.72rem;">مبيعات الشهر</h6><h4 class="fw-bold text-info mb-0">{{ monthly_revenue|default(0) }}</h4><small class="text-muted" style="font-size: 0.68rem;">ل.س</small></div></div>
+                    <div class="col-md-4"><div class="revenue-box"><h6 class="text-muted mb-1" style="font-size: 0.72rem;">مبيعات السنة</h6><h4 class="fw-bold mb-0" style="color: #a855f7;">{{ yearly_revenue|default(0) }}</h4><small class="text-muted" style="font-size: 0.68rem;">ل.س</small></div></div>
+                </div>
+            </div>
+            <div class="modal-footer border-top" style="border-color: var(--bg-hover) !important; background-color: var(--bg-hover); border-radius: 0 0 12px 12px;">
+                <a href="{{ url_for('payments') }}" class="btn btn-outline-warning btn-sm rounded-3" style="font-size: 0.72rem;">سجل الدفعات</a>
+                <button type="button" class="btn btn-secondary btn-sm rounded-3" style="font-size: 0.72rem;" data-bs-dismiss="modal">إغلاق</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="modal fade" id="telegramDetailsModal" tabindex="-1">
+    <div class="modal-dialog modal-dialog-centered modal-lg">
+        <div class="modal-content border-0 shadow-lg" style="border-radius: 12px; background-color: var(--bg-card);">
+            <div class="modal-header telegram-modal-header">
+                <h5 class="modal-title fw-bold" style="font-size: 0.95rem;"><i class="bi bi-telegram"></i> تفاصيل الإشعارات</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body p-3">
+                <div class="table-responsive" style="max-height: 300px; overflow-y: auto; border: 1px solid var(--bg-hover); border-radius: 8px;">
+                    <table class="table table-hover table-clean mb-0">
+                        <thead><tr><th>الوقت</th><th>النوع</th><th>الحالة</th><th>الرسالة</th></tr></thead>
+                        <tbody>
+                            {% for log in recent_telegram_logs %}
+                            <tr>
+                                <td class="text-muted">{{ log.created_at | localtime('%m-%d %H:%M') }}</td>
+                                <td><span class="stat-badge info" style="font-size: 0.62rem; padding: 3px 8px;">{{ log.message_type }}</span></td>
+                                <td>{% if log.status == 'success' %}<i class="bi bi-check-circle-fill text-success"></i>{% else %}<i class="bi bi-x-circle-fill text-danger"></i>{% endif %}</td>
+                                <td class="text-muted">{{ log.message[:50] }}</td>
+                            </tr>
+                            {% else %}
+                            <tr><td colspan="4" class="text-center py-3 text-muted">لا توجد إشعارات</td></tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+            <div class="modal-footer border-top" style="border-color: var(--bg-hover) !important; background-color: var(--bg-hover); border-radius: 0 0 12px 12px;">
+                <a href="{{ url_for('admin_settings') }}" class="btn btn-outline-info btn-sm rounded-3" style="font-size: 0.72rem;">الإعدادات الكاملة</a>
+                <button type="button" class="btn btn-secondary btn-sm rounded-3" style="font-size: 0.72rem;" data-bs-dismiss="modal">إغلاق</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="modal fade" id="changeCredentialsModal" tabindex="-1">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content border-0 shadow-lg" style="border-radius: 12px; background-color: var(--bg-card);">
+            <form method="POST" action="{{ url_for('change_admin_credentials') }}">
+                <div class="modal-header border-bottom" style="border-color: var(--bg-hover) !important; background-color: var(--bg-hover); border-radius: 12px 12px 0 0;">
+                    <h5 class="modal-title text-accent fw-bold" style="font-size: 0.95rem;"><i class="bi bi-shield-lock"></i> تغيير بيانات الدخول</h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body p-3">
+                    <div class="mb-2"><label class="form-label fw-bold text-muted" style="font-size: 0.75rem;">اسم المستخدم الجديد</label><input type="text" name="new_username" class="form-control" style="background-color: var(--bg-main); color: var(--text-main); border: 1px solid var(--bg-hover); font-size: 0.82rem;"></div>
+                    <div class="mb-2"><label class="form-label fw-bold text-muted" style="font-size: 0.75rem;">كلمة المرور الحالية *</label><input type="password" name="current_password" class="form-control" style="background-color: var(--bg-main); color: var(--text-main); border: 1px solid var(--bg-hover); font-size: 0.82rem;" required></div>
+                    <hr style="border-color: var(--bg-hover);">
+                    <div class="mb-2"><label class="form-label fw-bold text-muted" style="font-size: 0.75rem;">كلمة المرور الجديدة</label><input type="password" name="new_password" class="form-control" style="background-color: var(--bg-main); color: var(--text-main); border: 1px solid var(--bg-hover); font-size: 0.82rem;"></div>
+                    <div class="mb-2"><label class="form-label fw-bold text-muted" style="font-size: 0.75rem;">تأكيد كلمة المرور</label><input type="password" name="confirm_password" class="form-control" style="background-color: var(--bg-main); color: var(--text-main); border: 1px solid var(--bg-hover); font-size: 0.82rem;"></div>
+                </div>
+                <div class="modal-footer border-top" style="border-color: var(--bg-hover) !important; background-color: var(--bg-hover); border-radius: 0 0 12px 12px;">
+                    <button type="button" class="btn btn-outline-secondary btn-sm" data-bs-dismiss="modal" style="color: var(--text-main); border-color: var(--text-muted); font-size: 0.75rem;">إلغاء</button>
+                    <button type="submit" class="btn btn-primary btn-sm" style="font-size: 0.75rem;"><i class="bi bi-save"></i> حفظ</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- ==================== JavaScript ==================== -->
+<script>
+    let dashUploadChart, dashDownloadChart;
+    let dashMonitoringInterval = null;
+    let dashAllInterfaces = [];
+    let dashSelectedInterface = '';
+    let dashIsDirectionReversed = false;
+
+    const DASH_MAX_POINTS = 20;
+    const DASH_UPDATE_INTERVAL = 3000;
+    const DASH_STORAGE_KEY = 'dashboard_traffic_state';
+    const DASH_DIRECTION_KEY = 'dashboard_traffic_direction';
+
+    let dashUploadData = [];
+    let dashDownloadData = [];
+    let dashLabels = [];
+
+    function escapeHtml(str) {
+        if (str === null || str === undefined) return '';
+        return String(str).replace(/[&<>"']/g, function(m) {
+            return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[m];
+        });
+    }
+
+    function dashLoadDirection() {
+        try { dashIsDirectionReversed = localStorage.getItem(DASH_DIRECTION_KEY) === 'true'; }
+        catch(e) { dashIsDirectionReversed = false; }
+        dashUpdateDirectionUI();
+    }
+
+    function dashUpdateDirectionUI() {
+        const btn = document.getElementById('dashDirectionBtn');
+        const text = document.getElementById('dashDirectionText');
+        if (dashIsDirectionReversed) {
+            btn.classList.add('reversed');
+            text.textContent = 'معكوس';
+        } else {
+            btn.classList.remove('reversed');
+            text.textContent = 'تلقائي';
+        }
+    }
+
+    function dashToggleDirection() {
+        dashIsDirectionReversed = !dashIsDirectionReversed;
+        try { localStorage.setItem(DASH_DIRECTION_KEY, String(dashIsDirectionReversed)); } catch(e) {}
+        dashUpdateDirectionUI();
+        dashUploadData.length = 0;
+        dashDownloadData.length = 0;
+        dashLabels.length = 0;
+        if (dashUploadChart && dashDownloadChart) {
+            dashUploadChart.data.labels = dashLabels;
+            dashUploadChart.data.datasets[0].data = dashUploadData;
+            dashUploadChart.update();
+            dashDownloadChart.data.labels = dashLabels;
+            dashDownloadChart.data.datasets[0].data = dashDownloadData;
+            dashDownloadChart.update();
+        }
+        const routerId = document.getElementById('dashRouterSelect').value;
+        if (routerId && dashSelectedInterface && dashMonitoringInterval) {
+            dashFetchTraffic(routerId, dashSelectedInterface);
+        }
+    }
+
+    function dashSaveState(routerId, iface, isMonitoring) {
+        try { localStorage.setItem(DASH_STORAGE_KEY, JSON.stringify({ routerId, interfaceName: iface, isMonitoring })); } catch(e) {}
+    }
+
+    function dashLoadState() {
+        try { const raw = localStorage.getItem(DASH_STORAGE_KEY); return raw ? JSON.parse(raw) : null; }
+        catch(e) { return null; }
+    }
+
+    function dashInitCharts() {
+        const ctxU = document.getElementById('dashUploadChart').getContext('2d');
+        const ctxD = document.getElementById('dashDownloadChart').getContext('2d');
+        const opts = {
+            responsive: true, maintainAspectRatio: false, animation: { duration: 200 },
+            plugins: { legend: { display: false } },
+            scales: { x: { display: false }, y: { beginAtZero: true, grid: { color: 'rgba(255,255,255,0.05)' }, ticks: { color: '#94a3b8', font: { size: 8 }, maxTicksLimit: 3 } } },
+            elements: { point: { radius: 0 }, line: { tension: 0.4, borderWidth: 1.8 } }
+        };
+        dashUploadChart = new Chart(ctxU, { type: 'line', data: { labels: dashLabels, datasets: [{ data: dashUploadData, borderColor: '#f59e0b', backgroundColor: 'rgba(245,158,11,0.15)', fill: true }] }, options: opts });
+        dashDownloadChart = new Chart(ctxD, { type: 'line', data: { labels: dashLabels, datasets: [{ data: dashDownloadData, borderColor: '#22c55e', backgroundColor: 'rgba(34,197,94,0.15)', fill: true }] }, options: opts });
+    }
+
+    function dashFetchInterfaces(routerId, callback) {
+        const input = document.getElementById('dashInterfaceSearch');
+        input.value = '';
+        input.placeholder = '⏳ جاري الجلب...';
+        input.disabled = true;
+        document.getElementById('dashStatus').style.display = 'block';
+        document.getElementById('dashStatusText').textContent = 'جاري الاتصال...';
+        fetch(`/api/traffic/interfaces/${routerId}`)
+            .then(res => { if (!res.ok) return res.text().then(t => { throw new Error(`HTTP ${res.status}`); }); return res.json(); })
+            .then(data => {
+                if (data.ok) {
+                    dashAllInterfaces = data.interfaces || [];
+                    input.disabled = false;
+                    input.placeholder = `🔍 ابحث... (${dashAllInterfaces.length})`;
+                    document.getElementById('dashStatusText').textContent = `✅ ${dashAllInterfaces.length} منفذ`;
+                    dashRenderDropdown(dashAllInterfaces);
+                    if (callback) callback();
+                } else {
+                    input.placeholder = '❌ خطأ';
+                    document.getElementById('dashStatusText').textContent = '❌ ' + (data.error || 'فشل');
+                    input.disabled = false;
+                }
+            })
+            .catch(err => {
+                console.error('❌ Fetch Error:', err);
+                input.placeholder = '❌ فشل';
+                document.getElementById('dashStatusText').textContent = '❌ فشل الاتصال';
+                input.disabled = false;
+            });
+    }
+
+    function dashRenderDropdown(interfaces) {
+        const dd = document.getElementById('dashInterfaceDropdown');
+        if (interfaces.length === 0) {
+            dd.innerHTML = '<div style="padding: 12px; text-align: center; color: var(--text-muted); font-size: 0.72rem;">لا توجد نتائج</div>';
+            return;
+        }
+        dd.innerHTML = interfaces.map(i => {
+            const cls = i.running ? 'iface-running' : 'iface-idle';
+            const txt = i.running ? '🟢 يعمل' : '⚪ متوقف';
+            const safeName = escapeHtml(i.name);
+            const isSel = i.name === dashSelectedInterface ? 'selected' : '';
+            return `<div class="traffic-dropdown-item ${isSel}" onclick="dashSelectInterface('${escapeHtml(i.name).replace(/'/g, "\\'")}')">
+                <span class="iface-name" title="${safeName}">${safeName}</span>
+                <span class="iface-status-badge ${cls}">${txt}</span>
+            </div>`;
+        }).join('');
+    }
+
+    function dashFilterInterfaces() {
+        const q = document.getElementById('dashInterfaceSearch').value.toLowerCase().trim();
+        document.getElementById('dashClearBtn').style.display = q ? 'block' : 'none';
+        const filtered = q ? dashAllInterfaces.filter(i => i.name.toLowerCase().includes(q) || (i.type && i.type.toLowerCase().includes(q))) : dashAllInterfaces;
+        dashRenderDropdown(filtered);
+        document.getElementById('dashInterfaceDropdown').classList.add('show');
+    }
+
+    function dashShowDropdown() {
+        if (dashAllInterfaces.length > 0) document.getElementById('dashInterfaceDropdown').classList.add('show');
+    }
+
+    function dashClearSearch() {
+        document.getElementById('dashInterfaceSearch').value = '';
+        document.getElementById('dashClearBtn').style.display = 'none';
+        dashRenderDropdown(dashAllInterfaces);
+        document.getElementById('dashInterfaceDropdown').classList.add('show');
+    }
+
+    function dashSelectInterface(name) {
+        dashSelectedInterface = name;
+        document.getElementById('dashInterfaceSelect').value = name;
+        document.getElementById('dashInterfaceSearch').value = name;
+        document.getElementById('dashClearBtn').style.display = 'block';
+        document.getElementById('dashInterfaceDropdown').classList.remove('show');
+        const routerId = document.getElementById('dashRouterSelect').value;
+        dashSaveState(routerId, name, false);
+    }
+
+    document.addEventListener('click', function(e) {
+        const w = e.target.closest('.traffic-search-wrapper');
+        if (!w) {
+            const dd = document.getElementById('dashInterfaceDropdown');
+            if (dd) dd.classList.remove('show');
+        }
+    });
+
+    function onDashRouterChange() {
+        const rid = document.getElementById('dashRouterSelect').value;
+        const input = document.getElementById('dashInterfaceSearch');
+        if (!rid) {
+            input.value = '';
+            input.disabled = true;
+            input.placeholder = '🔍 ابحث...';
+            document.getElementById('dashInterfaceDropdown').classList.remove('show');
+            document.getElementById('dashStatus').style.display = 'none';
+            dashAllInterfaces = [];
+            dashSelectedInterface = '';
+            return;
+        }
+        dashSelectedInterface = '';
+        document.getElementById('dashInterfaceSelect').value = '';
+        document.getElementById('dashInterfaceDropdown').innerHTML = '';
+        dashSaveState(rid, '', false);
+        dashFetchInterfaces(rid, null);
+    }
+
+    function dashStartMonitoring() {
+        const rid = document.getElementById('dashRouterSelect').value;
+        const iface = dashSelectedInterface;
+        if (!rid || !iface) { alert('⚠️ الرجاء اختيار الراوتر والمنفذ أولاً'); return; }
+        document.getElementById('trafficEmptyState').style.display = 'none';
+        document.getElementById('trafficContent').style.display = 'flex';
+        document.getElementById('dashStartBtn').style.display = 'none';
+        document.getElementById('dashStopBtn').style.display = 'inline-flex';
+        document.getElementById('liveBadge').style.display = 'inline-flex';
+        dashUploadData.length = 0;
+        dashDownloadData.length = 0;
+        dashLabels.length = 0;
+        if (!dashUploadChart) dashInitCharts();
+        dashSaveState(rid, iface, true);
+        dashFetchTraffic(rid, iface);
+        dashMonitoringInterval = setInterval(() => dashFetchTraffic(rid, iface), DASH_UPDATE_INTERVAL);
+    }
+
+    function dashStopMonitoring() {
+        clearInterval(dashMonitoringInterval);
+        document.getElementById('dashStartBtn').style.display = 'inline-flex';
+        document.getElementById('dashStopBtn').style.display = 'none';
+        document.getElementById('liveBadge').style.display = 'none';
+        const rid = document.getElementById('dashRouterSelect').value;
+        dashSaveState(rid, dashSelectedInterface, false);
+    }
+
+    function dashFetchTraffic(routerId, interfaceName) {
+        fetch(`/api/traffic/stats/${routerId}/${interfaceName}`)
+            .then(r => r.json())
+            .then(data => {
+                if (!data.ok) return;
+                const s = data.stats;
+                const rx = dashParseMbps(s.rx_rate);
+                const tx = dashParseMbps(s.tx_rate);
+                const rxB = parseInt(s.rx_byte) || 0;
+                const txB = parseInt(s.tx_byte) || 0;
+                let upRate, downRate, upByte, downByte;
+                if (dashIsDirectionReversed) {
+                    upRate = rx; downRate = tx; upByte = rxB; downByte = txB;
+                } else {
+                    upRate = tx; downRate = rx; upByte = txB; downByte = rxB;
+                }
+                const upGB = (upByte / (1024*1024*1024)).toFixed(2);
+                const downGB = (downByte / (1024*1024*1024)).toFixed(2);
+                document.getElementById('dashUploadRate').textContent = upRate.toFixed(2);
+                document.getElementById('dashDownloadRate').textContent = downRate.toFixed(2);
+                document.getElementById('dashUploadTotal').textContent = upGB + ' GB';
+                document.getElementById('dashDownloadTotal').textContent = downGB + ' GB';
+                document.getElementById('dashUploadBadge').textContent = upRate.toFixed(2) + ' Mbps';
+                document.getElementById('dashDownloadBadge').textContent = downRate.toFixed(2) + ' Mbps';
+                document.getElementById('dashUploadProgress').style.width = Math.min((upRate / 100) * 100, 100) + '%';
+                document.getElementById('dashDownloadProgress').style.width = Math.min((downRate / 100) * 100, 100) + '%';
+                const now = new Date().toLocaleTimeString('ar-EG', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+                dashLabels.push(now);
+                dashUploadData.push(upRate);
+                dashDownloadData.push(downRate);
+                if (dashLabels.length > DASH_MAX_POINTS) {
+                    dashLabels.shift();
+                    dashUploadData.shift();
+                    dashDownloadData.shift();
+                }
+                dashUploadChart.update('none');
+                dashDownloadChart.update('none');
+            })
+            .catch(err => console.error(err));
+    }
+
+    function dashParseMbps(s) {
+        if (!s) return 0;
+        s = String(s);
+        if (s.includes('Gbps')) return parseFloat(s) * 1000;
+        if (s.includes('Mbps')) return parseFloat(s);
+        if (s.includes('kbps')) return parseFloat(s) / 1000;
+        const n = parseFloat(s);
+        return isNaN(n) ? 0 : n / 1000000;
+    }
+
+    window.addEventListener('DOMContentLoaded', function() {
+        dashLoadDirection();
+        const state = dashLoadState();
+        if (!state || !state.routerId) return;
+        const rs = document.getElementById('dashRouterSelect');
+        rs.value = state.routerId;
+        if (rs.value !== state.routerId) return;
+        dashFetchInterfaces(state.routerId, function() {
+            if (state.interfaceName) {
+                dashSelectInterface(state.interfaceName);
+                if (state.isMonitoring) {
+                    setTimeout(() => dashStartMonitoring(), 500);
+                }
+            }
+        });
+    });
+</script>
+
+{% endblock %}
