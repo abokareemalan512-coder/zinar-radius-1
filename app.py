@@ -50,10 +50,13 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 if not LIBROUTEROS_AVAILABLE:
-    logger.warning("⚠️ مكتبة librouteros غير مثبتة - مراقبة الترافيك معطلة. قم بتثبيتها عبر: pip install librouteros")
+    logger.warning("⚠️ مكتبة librouteros غير مثبتة - مراقبة الترافيك معطلة")
 
 LOCAL_TZ = ZoneInfo("Asia/Damascus")
 IMPORT_API_KEY = os.environ.get('IMPORT_API_KEY', 'zinar-import-key-2026')
+
+# ✅ ذاكرة مؤقتة لحساب السرعة من فارق البايتات
+_traffic_cache = {}
 
 # ============ Database Config ============
 
@@ -111,7 +114,7 @@ class Router(db.Model):
     username = db.Column(db.String(50), nullable=False)
     password = db.Column(db.String(150), nullable=False)
     port = db.Column(db.Integer, default=22)              # منفذ SSH للـ Kick
-    api_port = db.Column(db.Integer, default=8728)        # ✅ منفذ API للمراقبة
+    api_port = db.Column(db.Integer, default=13)          # ✅ منفذ API الافتراضي = 13
     is_master = db.Column(db.Boolean, default=False)
     is_active = db.Column(db.Boolean, default=True)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
@@ -818,7 +821,7 @@ def ensure_columns():
                     if 'is_active' not in cols:
                         conn.execute(text("ALTER TABLE routers ADD COLUMN is_active BOOLEAN DEFAULT TRUE"))
                     if 'api_port' not in cols:
-                        conn.execute(text("ALTER TABLE routers ADD COLUMN api_port INTEGER DEFAULT 8728"))
+                        conn.execute(text("ALTER TABLE routers ADD COLUMN api_port INTEGER DEFAULT 13"))
 
                 if 'telegram_settings' in tables:
                     cols = [c['name'] for c in insp.get_columns('telegram_settings')]
@@ -1104,10 +1107,10 @@ def api_import_packages():
 def get_mikrotik_api(router):
     """إنشاء اتصال مع MikroTik API"""
     if not LIBROUTEROS_AVAILABLE:
-        raise Exception("مكتبة librouteros غير مثبتة. قم بتثبيتها عبر: pip install librouteros")
+        raise Exception("مكتبة librouteros غير مثبتة")
     
     try:
-        api_port = router.api_port or 8728
+        api_port = router.api_port or 13
         logger.info(f"🔌 اتصال API: {router.ip_address}:{api_port} (user={router.username})")
         api = connect(
             username=router.username,
@@ -1123,7 +1126,7 @@ def get_mikrotik_api(router):
 
 @app.route('/api/traffic/interfaces/<int:router_id>')
 def api_get_interfaces(router_id):
-    """جلب قائمة الواجهات من MikroTik API"""
+    """جلب قائمة المنافذ (Interfaces) من MikroTik"""
     router = Router.query.get_or_404(router_id)
     api = None
     try:
@@ -1135,10 +1138,21 @@ def api_get_interfaces(router_id):
             if name:
                 disabled = iface.get('disabled', False)
                 if not disabled:
-                    interfaces.append(name)
-        return jsonify({'ok': True, 'interfaces': interfaces, 'method': 'API', 'count': len(interfaces)})
+                    iface_type = iface.get('type', '')
+                    running = iface.get('running', False)
+                    interfaces.append({
+                        'name': name,
+                        'type': iface_type,
+                        'running': running
+                    })
+        return jsonify({
+            'ok': True,
+            'interfaces': interfaces,
+            'method': 'API',
+            'count': len(interfaces)
+        })
     except Exception as e:
-        logger.error(f"❌ خطأ جلب الواجهات عبر API: {e}")
+        logger.error(f"❌ خطأ جلب المنافذ: {e}")
         return jsonify({'ok': False, 'error': str(e)}), 500
     finally:
         if api:
@@ -1150,39 +1164,78 @@ def api_get_interfaces(router_id):
 
 @app.route('/api/traffic/stats/<int:router_id>/<interface>')
 def api_get_traffic_stats(router_id, interface):
-    """جلب إحصائيات حركة المرور عبر MikroTik API"""
+    """
+    جلب إحصائيات حركة المرور عبر MikroTik API
+    يحسب السرعة من فارق البايتات بين قراءتين متتاليتين
+    """
     router = Router.query.get_or_404(router_id)
     api = None
     try:
         api = get_mikrotik_api(router)
-        monitor_path = api.path('interface', 'monitor-traffic')
-        result = list(monitor_path(**{'interface': interface, 'once': ''}))
-
-        if not result:
-            return jsonify({'ok': False, 'error': 'لا توجد بيانات من الراوتر'}), 404
-
-        data = result[0]
-
-        stats = {
-            'rx_rate': str(data.get('rx-rate', '0')),
-            'tx_rate': str(data.get('tx-rate', '0')),
-            'rx_byte': str(data.get('rx-byte', 0)),
-            'tx_byte': str(data.get('tx-byte', 0)),
+        
+        # جلب إحصائيات المنفذ الحالي
+        interfaces = list(api.path('interface'))
+        target = None
+        for iface in interfaces:
+            if iface.get('name') == interface:
+                target = iface
+                break
+        
+        if not target:
+            return jsonify({'ok': False, 'error': f'المنفذ {interface} غير موجود'}), 404
+        
+        # القيم الإجمالية الحالية (البايتات)
+        rx_byte = int(target.get('rx-byte', 0))
+        tx_byte = int(target.get('tx-byte', 0))
+        
+        # مفتاح التخزين المؤقت
+        cache_key = f"{router_id}_{interface}"
+        now = time.time()
+        
+        rx_rate_bps = 0
+        tx_rate_bps = 0
+        
+        # حساب السرعة من فارق البايتات
+        if cache_key in _traffic_cache:
+            prev = _traffic_cache[cache_key]
+            elapsed = now - prev['time']
+            
+            if elapsed > 0:
+                rx_diff = max(0, rx_byte - prev['rx_byte'])
+                tx_diff = max(0, tx_byte - prev['tx_byte'])
+                
+                rx_rate_bps = (rx_diff / elapsed) * 8
+                tx_rate_bps = (tx_diff / elapsed) * 8
+        
+        # حفظ القراءة الحالية
+        _traffic_cache[cache_key] = {
+            'time': now,
+            'rx_byte': rx_byte,
+            'tx_byte': tx_byte,
         }
-
-        for key in ['rx_rate', 'tx_rate']:
-            val = str(stats[key])
-            if not any(x in val for x in ['bps']):
-                try:
-                    num = float(val)
-                    stats[key] = f"{num}bps"
-                except ValueError:
-                    stats[key] = '0'
-
+        
+        # تحويل إلى صيغة MikroTik
+        def format_rate(bps):
+            if bps >= 1_000_000_000:
+                return f"{bps / 1_000_000_000:.2f}Gbps"
+            elif bps >= 1_000_000:
+                return f"{bps / 1_000_000:.2f}Mbps"
+            elif bps >= 1_000:
+                return f"{bps / 1_000:.2f}kbps"
+            else:
+                return f"{int(bps)}bps"
+        
+        stats = {
+            'rx_rate': format_rate(rx_rate_bps),
+            'tx_rate': format_rate(tx_rate_bps),
+            'rx_byte': str(rx_byte),
+            'tx_byte': str(tx_byte),
+        }
+        
         return jsonify({'ok': True, 'stats': stats, 'method': 'API'})
 
     except Exception as e:
-        logger.error(f"❌ خطأ جلب الترافيك عبر API: {e}")
+        logger.error(f"❌ خطأ جلب الترافيك: {e}")
         return jsonify({'ok': False, 'error': str(e)}), 500
     finally:
         if api:
@@ -1353,7 +1406,7 @@ def import_backup():
                     content = raw_bytes.decode('utf-8', errors='ignore')
 
             if content[:5] == 'PK\x03\x04' or raw_bytes[:4] == b'\x00\x00\x00\x00':
-                flash('❌ هذا ملف Backup ثنائي وليس RSC! استخدم /export file=name', 'danger')
+                flash('❌ هذا ملف Backup ثنائي وليس RSC!', 'danger')
                 return redirect(url_for('import_backup'))
 
             packages, subscribers, debug_info = parse_mikrotik_rsc(content)
@@ -1572,7 +1625,7 @@ def routers():
         un = request.form.get('username', '').strip()
         pw = request.form.get('password', '').strip()
         port = request.form.get('port', '22').strip()
-        api_port = request.form.get('api_port', '8728').strip()
+        api_port = request.form.get('api_port', '13').strip()
         is_master = request.form.get('is_master') == 'on'
 
         if not name or not ip:
@@ -1590,7 +1643,7 @@ def routers():
         try:
             api_port = int(api_port)
         except ValueError:
-            api_port = 8728
+            api_port = 13
 
         try:
             if is_master:
@@ -1642,7 +1695,7 @@ def update_router(router_id):
         un = request.form.get('username', '').strip()
         pw = request.form.get('password', '').strip()
         port = request.form.get('port', '22').strip()
-        api_port = request.form.get('api_port', '8728').strip()
+        api_port = request.form.get('api_port', '13').strip()
 
         if not name or not ip:
             flash('❌ الاسم و IP مطلوبان', 'danger')
@@ -1665,7 +1718,7 @@ def update_router(router_id):
         try:
             r.api_port = int(api_port)
         except ValueError:
-            r.api_port = 8728
+            r.api_port = 13
 
         db.session.commit()
         log_event('تعديل راوتر', name, f'IP: {ip} | SSH: {r.port} | API: {r.api_port}')
