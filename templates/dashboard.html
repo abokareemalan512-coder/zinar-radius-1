@@ -96,6 +96,49 @@
     .dashboard-card:hover .details-hint { opacity: 1; color: #7dd3fc; }
     .details-hint i { font-size: 0.7rem; }
 
+    /* ✅ أحداث مصغّرة على بطاقة التلجرام */
+    .mini-events-list {
+        display: flex;
+        flex-direction: column;
+        gap: 3px;
+        margin-top: 6px;
+        margin-bottom: 2px;
+    }
+    .mini-event-item {
+        display: flex;
+        align-items: center;
+        gap: 5px;
+        background-color: var(--bg-main);
+        border: 1px solid var(--bg-hover);
+        border-radius: 6px;
+        padding: 4px 8px;
+        font-size: 0.65rem;
+        transition: all 0.2s;
+        text-align: right;
+        overflow: hidden;
+    }
+    .mini-event-item:hover {
+        border-color: var(--accent);
+        background-color: rgba(56, 189, 248, 0.05);
+    }
+    .mini-event-icon {
+        font-size: 0.7rem;
+        flex-shrink: 0;
+    }
+    .mini-event-text {
+        flex: 1;
+        color: var(--text-muted);
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }
+    .mini-event-time {
+        color: var(--text-muted);
+        font-size: 0.58rem;
+        flex-shrink: 0;
+        opacity: 0.7;
+    }
+
     .table-clean th {
         font-size: 0.72rem;
         text-transform: uppercase;
@@ -112,7 +155,6 @@
         vertical-align: middle;
     }
 
-    /* ✅ صندوق ترحيب مصغّر */
     .welcome-box {
         background: linear-gradient(135deg, rgba(56, 189, 248, 0.1), rgba(14, 165, 233, 0.02));
         border: 1px solid rgba(56, 189, 248, 0.2);
@@ -165,7 +207,6 @@
     }
     .revenue-box:hover { border-color: #f59e0b; }
 
-    /* ✅ قسم الإجراءات السريعة (بعرض بطاقة واحدة) */
     .quick-actions-card {
         background-color: var(--bg-card);
         border: 1px solid var(--bg-hover);
@@ -249,7 +290,6 @@
         z-index: 1;
     }
 
-    /* ============ قسم الترافيك (مضغوط) ============ */
     .traffic-section {
         background-color: var(--bg-card);
         border: 1px solid var(--bg-hover);
@@ -606,7 +646,7 @@
     .traffic-full-link i { font-size: 0.72rem; }
 </style>
 
-<!-- ✅ صندوق ترحيب مصغّر (الوقت والتاريخ في الزاوية اليسرى) -->
+<!-- صندوق ترحيب مصغّر -->
 <div class="welcome-box">
     <div class="welcome-text">
         <h5><i class="bi bi-speedometer2"></i> مرحباً، {{ admin_name }}</h5>
@@ -620,7 +660,7 @@
     </div>
 </div>
 
-<!-- ✅ الصف الأول: 4 بطاقات الإحصائيات -->
+<!-- ✅ الصف الأول: بطاقات الإحصائيات -->
 <div class="row g-3 mb-3">
     
     <!-- MikroTik -->
@@ -686,7 +726,7 @@
         </div>
     </div>
 
-    <!-- تلجرام -->
+    <!-- ✅ التلجرام مع عرض آخر 5 أحداث -->
     <div class="col-xl-3 col-md-6">
         <div class="dashboard-card text-center clickable" data-bs-toggle="modal" data-bs-target="#telegramDetailsModal">
             <div class="icon-circle mx-auto" style="background: rgba(34, 158, 217, 0.1); border: 1px solid rgba(34, 158, 217, 0.3);">
@@ -700,11 +740,32 @@
                 {% endif %}
             </div>
             <div class="stat-label">إشعارات التلجرام</div>
-            <div class="d-flex justify-content-center mb-2">
-                <span class="stat-badge info">
-                    <i class="bi bi-bell-fill"></i> {{ recent_telegram_logs|length }} إشعار
-                </span>
-            </div>
+
+            <!-- ✅ عرض آخر 5 أحداث -->
+            {% if recent_telegram_logs %}
+                <div class="mini-events-list">
+                    {% for log in recent_telegram_logs[:5] %}
+                    <div class="mini-event-item">
+                        {% if log.status == 'success' %}
+                            <i class="bi bi-check-circle-fill text-success mini-event-icon"></i>
+                        {% else %}
+                            <i class="bi bi-x-circle-fill text-danger mini-event-icon"></i>
+                        {% endif %}
+                        <span class="mini-event-text" title="{{ log.message }}">
+                            {{ log.message_type }}
+                        </span>
+                        <span class="mini-event-time">{{ log.created_at | localtime('%H:%M') }}</span>
+                    </div>
+                    {% endfor %}
+                </div>
+            {% else %}
+                <div class="d-flex justify-content-center mb-2">
+                    <span class="stat-badge info">
+                        <i class="bi bi-bell-fill"></i> لا أحداث
+                    </span>
+                </div>
+            {% endif %}
+
             <div class="details-hint">
                 <i class="bi bi-info-circle"></i> اضغط لعرض التفاصيل
             </div>
@@ -715,7 +776,7 @@
 <!-- ✅ الصف الثاني: إجراءات سريعة + مراقبة الترافيك -->
 <div class="row g-3 mb-3">
     
-    <!-- إجراءات سريعة (بعرض بطاقة واحدة) -->
+    <!-- إجراءات سريعة -->
     <div class="col-xl-3 col-md-6">
         <div class="quick-actions-card">
             <div class="quick-actions-header">
@@ -740,7 +801,7 @@
         </div>
     </div>
 
-    <!-- مراقبة الترافيك (بعرض 3 أضعاف) -->
+    <!-- مراقبة الترافيك -->
     <div class="col-xl-9 col-md-6">
         <div class="traffic-section">
             <div class="traffic-section-header">
