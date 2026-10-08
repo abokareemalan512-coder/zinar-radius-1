@@ -30,7 +30,9 @@
         border-radius: 8px;
     }
     
-    /* تصميم القائمة المنسدلة */
+    /* =========================================
+       تصميم القائمة المنسدلة (نفس تصميم زر استيراد من الميكروتيك)
+       ========================================= */
     .dropdown-menu {
         border: 1px solid var(--bg-hover);
         box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.3);
@@ -69,7 +71,9 @@
         color: #ef4444;
     }
     
-    /* تصحيح ألوان البحث والفلترة */
+    /* =========================================
+       تصحيح ألوان البحث والفلترة (الوضع الليلي)
+       ========================================= */
     .search-group .input-group-text {
         background-color: var(--bg-main) !important;
         border: 1px solid var(--bg-hover) !important;
@@ -102,25 +106,44 @@
         font-weight: bold;
     }
 
-    /* تصميم شريط الترقيم (Pagination) */
-    .pagination .page-link {
+    /* =========================================
+       تصميم شريط الترقيم (Pagination) - واضح جداً
+       ========================================= */
+    .pagination-container {
         background-color: var(--bg-card);
+        border-top: 1px solid var(--bg-hover);
+        padding: 20px;
+        border-radius: 0 0 12px 12px;
+    }
+    .pagination-info {
+        color: var(--text-muted);
+        font-size: 0.9rem;
+        margin-bottom: 15px;
+        font-weight: 500;
+    }
+    .pagination .page-link {
+        background-color: var(--bg-main);
         border-color: var(--bg-hover);
         color: var(--text-main);
-        margin: 0 3px;
+        margin: 0 5px;
         border-radius: 8px !important;
         transition: all 0.2s;
+        font-weight: 600;
+        min-width: 40px;
+        text-align: center;
     }
     .pagination .page-link:hover {
         background-color: var(--bg-hover);
         color: var(--accent);
         border-color: var(--accent);
+        transform: translateY(-2px);
     }
     .pagination .page-item.active .page-link {
         background-color: var(--accent);
         border-color: var(--accent);
         color: #0f172a;
         font-weight: bold;
+        box-shadow: 0 0 10px var(--accent-glow);
     }
     .pagination .page-item.disabled .page-link {
         background-color: var(--bg-main);
@@ -129,7 +152,9 @@
         opacity: 0.5;
     }
 
-    /* تصحيح ألوان النافذة المنبثقة (Modal) */
+    /* =========================================
+       تصحيح ألوان النافذة المنبثقة (Modal) - داكنة وأنيقة
+       ========================================= */
     .modal-content {
         background-color: var(--bg-card) !important;
         border: 1px solid var(--bg-hover) !important;
@@ -247,7 +272,7 @@
 </div>
 
 <!-- الجدول -->
-<div class="card overflow-hidden">
+<div class="card mb-5">
     <div class="table-responsive">
         <table class="table table-hover mb-0 text-center">
             <thead class="table-light">
@@ -257,7 +282,7 @@
                     </th>
                     <th class="text-nowrap">#</th>
                     <th class="text-nowrap">اسم المشترك</th>
-                    <th class="text-nowrap">اسم المستخدم</th> <!-- ✅ عمود مستقل -->
+                    <th class="text-nowrap">اسم المستخدم</th>
                     <th class="text-nowrap">المرور</th>
                     <th class="text-nowrap">النوع</th>
                     <th class="text-nowrap">الباقة</th>
@@ -276,15 +301,8 @@
                     </td>
                     <td class="text-muted fw-bold">#{{ sub.id }}</td>
                     
-                    <!-- ✅ خانة اسم المشترك فقط -->
-                    <td class="fw-bold text-primary">
-                        {{ sub.name or '-' }}
-                    </td>
-                    
-                    <!-- ✅ خانة اسم المستخدم فقط -->
-                    <td class="text-muted">
-                        {{ sub.username }}
-                    </td>
+                    <td class="fw-bold text-primary">{{ sub.name or '-' }}</td>
+                    <td class="text-muted">{{ sub.username }}</td>
                     
                     <td>
                         <div class="d-flex align-items-center justify-content-center gap-1">
@@ -344,7 +362,7 @@
                         {% endif %}
                     </td>
                     <td>
-                        <!-- قائمة الإجراءات المنسدلة -->
+                        <!-- قائمة الإجراءات المنسدلة بتصميم الميكروتيك -->
                         <div class="dropdown">
                             <button class="btn btn-sm btn-light border btn-icon shadow-sm" type="button" data-bs-toggle="dropdown" aria-expanded="false" title="الإجراءات">
                                 <i class="bi bi-three-dots-vertical fs-5 text-secondary"></i>
@@ -397,17 +415,23 @@
         </table>
     </div>
     
-    <!-- شريط الترقيم (Pagination) -->
+    <!-- شريط الترقيم (Pagination) - واضح وبارز -->
     {% if pagination and pagination.pages > 1 %}
-    <div class="d-flex justify-content-center py-4" style="background-color: var(--bg-card); border-top: 1px solid var(--bg-hover);">
+    <div class="pagination-container d-flex flex-column align-items-center">
+        <div class="pagination-info">
+            إجمالي المشتركين: <strong>{{ pagination.total }}</strong> | 
+            الصفحة <strong>{{ pagination.page }}</strong> من <strong>{{ pagination.pages }}</strong>
+        </div>
         <nav aria-label="Page navigation">
             <ul class="pagination mb-0">
+                <!-- زر السابق -->
                 <li class="page-item {% if not pagination.has_prev %}disabled{% endif %}">
                     <a class="page-link" href="{{ url_for('subscribers', page=pagination.prev_num, q=search, type=filter_type) if pagination.has_prev else '#' }}">
                         <i class="bi bi-chevron-right"></i> السابق
                     </a>
                 </li>
                 
+                <!-- أرقام الصفحات -->
                 {% for page_num in pagination.iter_pages(left_edge=1, right_edge=1, left_current=2, right_current=2) %}
                     {% if page_num %}
                         <li class="page-item {% if page_num == pagination.page %}active{% endif %}">
@@ -418,6 +442,7 @@
                     {% endif %}
                 {% endfor %}
                 
+                <!-- زر التالي -->
                 <li class="page-item {% if not pagination.has_next %}disabled{% endif %}">
                     <a class="page-link" href="{{ url_for('subscribers', page=pagination.next_num, q=search, type=filter_type) if pagination.has_next else '#' }}">
                         التالي <i class="bi bi-chevron-left"></i>
@@ -430,7 +455,7 @@
     
 </div>
 
-<!-- Modal تعديل -->
+<!-- Modal تعديل (بتصميم داكن أنيق) -->
 <div class="modal fade" id="editSubModal" tabindex="-1">
     <div class="modal-dialog modal-dialog-centered">
         <div class="modal-content border-0 shadow-lg" style="border-radius: 16px; background-color: var(--bg-card);">
@@ -455,6 +480,7 @@
                         <input type="text" name="password" id="sub_password" class="form-control" style="background-color: var(--bg-main); color: var(--text-main); border: 1px solid var(--bg-hover);" placeholder="اتركها فارغة للإبقاء عليها">
                     </div>
                     
+                    <!-- ✅ خانة تفعيل الأيام -->
                     <div class="mb-3">
                         <label class="form-label fw-bold text-muted">تفعيل الأيام (تمديد الباقة)</label>
                         <input type="number" name="days_to_add" id="sub_days" class="form-control" style="background-color: var(--bg-main); color: var(--text-main); border: 1px solid var(--bg-hover);" placeholder="أدخل عدد الأيام (مثال: 30)" min="1">
@@ -504,7 +530,7 @@ function openEditSub(id, name, username, pkg) {
     document.getElementById('sub_name').value = name;
     document.getElementById('sub_username').value = username;
     document.getElementById('sub_password').value = '';
-    document.getElementById('sub_days').value = '';
+    document.getElementById('sub_days').value = ''; // تصفير خانة الأيام عند الفتح
     document.getElementById('sub_package').value = pkg || '';
     new bootstrap.Modal(document.getElementById('editSubModal')).show();
 }
