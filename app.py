@@ -55,7 +55,7 @@ if not LIBROUTEROS_AVAILABLE:
 LOCAL_TZ = ZoneInfo("Asia/Damascus")
 IMPORT_API_KEY = os.environ.get('IMPORT_API_KEY', 'zinar-import-key-2026')
 
-# ✅ ذاكرة مؤقتة لحساب السرعة من فارق البايتات
+# ✅ ذاكرة مؤقتة لحساب السرعة
 _traffic_cache = {}
 
 # ============ Database Config ============
@@ -113,8 +113,8 @@ class Router(db.Model):
     ip_address = db.Column(db.String(50), nullable=False)
     username = db.Column(db.String(50), nullable=False)
     password = db.Column(db.String(150), nullable=False)
-    port = db.Column(db.Integer, default=22)              # منفذ SSH للـ Kick
-    api_port = db.Column(db.Integer, default=13)          # ✅ منفذ API الافتراضي = 13
+    port = db.Column(db.Integer, default=22)
+    api_port = db.Column(db.Integer, default=13)
     is_master = db.Column(db.Boolean, default=False)
     is_active = db.Column(db.Boolean, default=True)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
@@ -142,6 +142,10 @@ class Subscriber(db.Model):
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     expires_at = db.Column(db.DateTime)
     first_used_at = db.Column(db.DateTime)
+    # ✅ حقول جديدة لتتبع IP
+    current_ip = db.Column(db.String(50))
+    ip_updated_at = db.Column(db.DateTime)
+    last_seen_at = db.Column(db.DateTime)
 
 
 class Payment(db.Model):
@@ -720,6 +724,123 @@ def background_router_monitor():
         time.sleep(60)
 
 
+# ============ ✅ Background IP Updater ============
+
+def fetch_active_ips_from_router(router):
+    """
+    جلب جميع المستخدمين النشطين (PPPoE + Hotspot) من راوتر MikroTik مع IP الحقيقي
+    Returns: dict {username: {'ip': '...', 'uptime': '...', 'type': 'pppoe'|'hotspot', 'router_id': id}}
+    """
+    if not LIBROUTEROS_AVAILABLE:
+        return {}
+    
+    result = {}
+    api = None
+    try:
+        api = get_mikrotik_api(router)
+        
+        # ✅ جلب مستخدمي PPPoE النشطين
+        try:
+            for ppp in api.path('ppp', 'active'):
+                uname = ppp.get('name')
+                addr = ppp.get('address')
+                if uname and addr and addr != '0.0.0.0':
+                    result[uname] = {
+                        'ip': addr,
+                        'uptime': ppp.get('uptime', ''),
+                        'type': 'pppoe',
+                        'router_id': router.id
+                    }
+        except Exception as e:
+            logger.warning(f"⚠️ فشل جلب PPP active من {router.name}: {e}")
+        
+        # ✅ جلب مستخدمي Hotspot النشطين
+        try:
+            for hs in api.path('ip', 'hotspot', 'active'):
+                uname = hs.get('user')
+                addr = hs.get('address')
+                if uname and addr:
+                    # تنظيف IP إذا كان يحتوي على بورت
+                    if ':' in addr:
+                        addr = addr.split(':')[0]
+                    result[uname] = {
+                        'ip': addr,
+                        'uptime': hs.get('uptime', ''),
+                        'type': 'hotspot',
+                        'router_id': router.id
+                    }
+        except Exception as e:
+            logger.warning(f"⚠️ فشل جلب Hotspot active من {router.name}: {e}")
+        
+        logger.info(f"✅ {router.name}: تم جلب {len(result)} مشترك نشط")
+        return result
+        
+    except Exception as e:
+        logger.warning(f"⚠️ فشل جلب IPs من {router.name}: {e}")
+        return {}
+    finally:
+        if api:
+            try:
+                api.close()
+            except Exception:
+                pass
+
+
+def background_ip_updater():
+    """
+    تحديث IP المشتركين من جميع الراوترات كل دقيقتين
+    """
+    time.sleep(30)
+    while True:
+        try:
+            with app.app_context():
+                routers = Router.query.all()
+                total_updated = 0
+                all_active_usernames = set()
+                
+                for router in routers:
+                    try:
+                        active_ips = fetch_active_ips_from_router(router)
+                        
+                        if not active_ips:
+                            continue
+                        
+                        for username, info in active_ips.items():
+                            all_active_usernames.add(username)
+                            sub = Subscriber.query.filter_by(username=username).first()
+                            if sub:
+                                changed = False
+                                if sub.current_ip != info['ip']:
+                                    sub.current_ip = info['ip']
+                                    changed = True
+                                if sub.router_id != router.id:
+                                    sub.router_id = router.id
+                                    changed = True
+                                sub.ip_updated_at = datetime.utcnow()
+                                sub.last_seen_at = datetime.utcnow()
+                                
+                                if changed:
+                                    total_updated += 1
+                        
+                        db.session.commit()
+                    except Exception as e:
+                        db.session.rollback()
+                        logger.warning(f"⚠️ خطأ تحديث IP من {router.name}: {e}")
+                
+                if total_updated > 0:
+                    logger.info(f"✅ تم تحديث IP لـ {total_updated} مشترك")
+                    
+        except Exception as e:
+            logger.warning(f"⚠️ خطأ في background_ip_updater: {e}")
+        finally:
+            try:
+                db.session.remove()
+            except Exception:
+                pass
+        
+        time.sleep(120)
+
+
 # ============ Kick via SSH ============
 
 def kick_user_via_ssh(router, username, user_type='pppoe'):
@@ -834,6 +955,9 @@ def ensure_columns():
                         ('name', "ALTER TABLE subscribers ADD COLUMN name VARCHAR(100)"),
                         ('user_type', "ALTER TABLE subscribers ADD COLUMN user_type VARCHAR(20) DEFAULT 'pppoe'"),
                         ('first_used_at', "ALTER TABLE subscribers ADD COLUMN first_used_at TIMESTAMP"),
+                        ('current_ip', "ALTER TABLE subscribers ADD COLUMN current_ip VARCHAR(50)"),
+                        ('ip_updated_at', "ALTER TABLE subscribers ADD COLUMN ip_updated_at TIMESTAMP"),
+                        ('last_seen_at', "ALTER TABLE subscribers ADD COLUMN last_seen_at TIMESTAMP"),
                     ]:
                         if col not in cols:
                             conn.execute(text(sql))
@@ -856,8 +980,12 @@ def ensure_columns():
 init_database()
 ensure_columns()
 
+# ✅ تشغيل الخيوط
 monitor_thread = threading.Thread(target=background_router_monitor, daemon=True)
 monitor_thread.start()
+
+ip_updater_thread = threading.Thread(target=background_ip_updater, daemon=True)
+ip_updater_thread.start()
 
 
 # ============ API للميكروتيك ============
@@ -1102,7 +1230,7 @@ def api_import_packages():
         return jsonify({'ok': False, 'error': str(e)}), 500
 
 
-# ============ API لمراقبة حركة المرور عبر MikroTik API ============
+# ============ API لمراقبة حركة المرور ============
 
 def get_mikrotik_api(router):
     """إنشاء اتصال مع MikroTik API"""
@@ -1126,7 +1254,7 @@ def get_mikrotik_api(router):
 
 @app.route('/api/traffic/interfaces/<int:router_id>')
 def api_get_interfaces(router_id):
-    """جلب قائمة المنافذ (Interfaces) من MikroTik"""
+    """جلب قائمة المنافذ من MikroTik"""
     router = Router.query.get_or_404(router_id)
     api = None
     try:
@@ -1164,16 +1292,12 @@ def api_get_interfaces(router_id):
 
 @app.route('/api/traffic/stats/<int:router_id>/<interface>')
 def api_get_traffic_stats(router_id, interface):
-    """
-    جلب إحصائيات حركة المرور عبر MikroTik API
-    يحسب السرعة من فارق البايتات بين قراءتين متتاليتين
-    """
+    """جلب إحصائيات حركة المرور عبر MikroTik API"""
     router = Router.query.get_or_404(router_id)
     api = None
     try:
         api = get_mikrotik_api(router)
         
-        # جلب إحصائيات المنفذ الحالي
         interfaces = list(api.path('interface'))
         target = None
         for iface in interfaces:
@@ -1184,18 +1308,15 @@ def api_get_traffic_stats(router_id, interface):
         if not target:
             return jsonify({'ok': False, 'error': f'المنفذ {interface} غير موجود'}), 404
         
-        # القيم الإجمالية الحالية (البايتات)
         rx_byte = int(target.get('rx-byte', 0))
         tx_byte = int(target.get('tx-byte', 0))
         
-        # مفتاح التخزين المؤقت
         cache_key = f"{router_id}_{interface}"
         now = time.time()
         
         rx_rate_bps = 0
         tx_rate_bps = 0
         
-        # حساب السرعة من فارق البايتات
         if cache_key in _traffic_cache:
             prev = _traffic_cache[cache_key]
             elapsed = now - prev['time']
@@ -1207,14 +1328,12 @@ def api_get_traffic_stats(router_id, interface):
                 rx_rate_bps = (rx_diff / elapsed) * 8
                 tx_rate_bps = (tx_diff / elapsed) * 8
         
-        # حفظ القراءة الحالية
         _traffic_cache[cache_key] = {
             'time': now,
             'rx_byte': rx_byte,
             'tx_byte': tx_byte,
         }
         
-        # تحويل إلى صيغة MikroTik
         def format_rate(bps):
             if bps >= 1_000_000_000:
                 return f"{bps / 1_000_000_000:.2f}Gbps"
@@ -1245,7 +1364,7 @@ def api_get_traffic_stats(router_id, interface):
                 pass
 
 
-# ============ API for Live Updates (AJAX) ============
+# ============ API for Live Updates ============
 
 @app.route('/api/dashboard_data')
 def api_dashboard_data():
@@ -2198,12 +2317,13 @@ def export_subscribers(format):
         out = io.StringIO()
         out.write('\ufeff')
         w = csv.writer(out)
-        w.writerow(['#', 'الاسم', 'المستخدم', 'كلمة المرور', 'الباقة', 'النوع', 'الحالة', 'تاريخ الانتهاء'])
+        w.writerow(['#', 'الاسم', 'المستخدم', 'كلمة المرور', 'الباقة', 'النوع', 'الحالة', 'IP', 'تاريخ الانتهاء'])
         for i, s in enumerate(subs, 1):
             w.writerow([
                 i, s.name or '', s.username, s.password,
                 s.package or '', s.user_type or 'pppoe',
                 s.status or 'active',
+                s.current_ip or '',
                 s.expires_at.strftime('%Y-%m-%d %H:%M') if s.expires_at else 'غير محدد'
             ])
 
