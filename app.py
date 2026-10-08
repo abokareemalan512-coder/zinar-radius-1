@@ -767,8 +767,8 @@ def fetch_active_ips_from_router(router):
                 result[uname] = {
                     'ip': addr,
                     'uptime': _safe_str(ppp.get('uptime', '')),
-                    'rx_bytes': rx_bytes,   # رفع
-                    'tx_bytes': tx_bytes,   # تحميل
+                    'rx_bytes': rx_bytes,
+                    'tx_bytes': tx_bytes,
                     'type': 'pppoe',
                     'router_id': router.id
                 }
@@ -783,13 +783,13 @@ def fetch_active_ips_from_router(router):
                     continue
                 if ':' in addr:
                     addr = addr.split(':')[0]
-                bytes_in = _safe_int(hs.get('bytes-in', 0), 0)   # تحميل
-                bytes_out = _safe_int(hs.get('bytes-out', 0), 0) # رفع
+                bytes_in = _safe_int(hs.get('bytes-in', 0), 0)
+                bytes_out = _safe_int(hs.get('bytes-out', 0), 0)
                 result[uname] = {
                     'ip': addr,
                     'uptime': _safe_str(hs.get('uptime', '')),
-                    'rx_bytes': bytes_out,  # رفع
-                    'tx_bytes': bytes_in,   # تحميل
+                    'rx_bytes': bytes_out,
+                    'tx_bytes': bytes_in,
                     'type': 'hotspot',
                     'router_id': router.id
                 }
@@ -1363,7 +1363,7 @@ def check_admin_login():
         return redirect(url_for('login'))
 
 
-# ============ ✅ بوابة المشتركين ============
+# ============ بوابة المشتركين ============
 
 @app.route('/my-account', methods=['GET', 'POST'])
 def my_account_login():
@@ -1480,7 +1480,7 @@ def my_account_refresh():
 
 @app.route('/my-account/live-speed', methods=['POST'])
 def my_account_live_speed():
-    """جلب السرعة اللحظية الحقيقية (Mbps) مثل MikroTik"""
+    """جلب السرعة اللحظية من MikroTik مباشرة عبر monitor-traffic"""
     if not session.get('subscriber_id'):
         return jsonify({'ok': False, 'error': 'Unauthorized'}), 401
 
@@ -1496,49 +1496,102 @@ def my_account_live_speed():
     try:
         api = get_mikrotik_api(router)
         iface_name = f"<pppoe-{sub.username}>"
+
+        found_iface = None
+        all_ifaces = list(api.path('interface'))
+        for iface in all_ifaces:
+            name = _safe_str(iface.get('name'))
+            if name == iface_name:
+                found_iface = name
+                break
+
+        if not found_iface:
+            for iface in all_ifaces:
+                name = _safe_str(iface.get('name'))
+                if sub.username in name and 'pppoe' in name.lower():
+                    found_iface = name
+                    break
+
+        if not found_iface:
+            api.close()
+            api = None
+            return jsonify({
+                'ok': True,
+                'online': False,
+                'upload_speed': 0,
+                'upload_unit': 'bps',
+                'download_speed': 0,
+                'download_unit': 'bps',
+                'upload_total': 0,
+                'download_total': 0,
+            })
+
+        rx_rate_bps = 0
+        tx_rate_bps = 0
         rx_byte = 0
         tx_byte = 0
-        found = False
 
-        for iface in api.path('interface'):
-            name = _safe_str(iface.get('name'))
-            if name == iface_name or (sub.username in name and 'pppoe' in name.lower()):
-                rx_byte = _safe_int(iface.get('rx-byte', 0), 0)
-                tx_byte = _safe_int(iface.get('tx-byte', 0), 0)
-                found = True
-                break
+        try:
+            monitor_path = api.path('interface', 'monitor-traffic')
+            result = list(monitor_path(**{
+                'interface': found_iface,
+                'once': ''
+            }))
+
+            if result and len(result) > 0:
+                data = result[0]
+                rx_rate_str = _safe_str(data.get('rx-rate', '0'))
+                tx_rate_str = _safe_str(data.get('tx-rate', '0'))
+                rx_byte = _safe_int(data.get('rx-byte', 0), 0)
+                tx_byte = _safe_int(data.get('tx-byte', 0), 0)
+
+                def parse_rate(rate_str):
+                    rate_str = str(rate_str).strip()
+                    if not rate_str or rate_str == '0':
+                        return 0
+                    try:
+                        if rate_str.endswith('k') or rate_str.endswith('K'):
+                            return float(rate_str[:-1]) * 1000
+                        elif rate_str.endswith('M'):
+                            return float(rate_str[:-1]) * 1_000_000
+                        elif rate_str.endswith('G'):
+                            return float(rate_str[:-1]) * 1_000_000_000
+                        else:
+                            return float(rate_str)
+                    except (ValueError, TypeError):
+                        return 0
+
+                rx_rate_bps = parse_rate(rx_rate_str)
+                tx_rate_bps = parse_rate(tx_rate_str)
+
+                logger.info(f"📊 {sub.username}: iface={found_iface}, rx-rate={rx_rate_str}, tx-rate={tx_rate_str}")
+        except Exception as me:
+            logger.warning(f"⚠️ monitor-traffic فشل: {me} — استخدام طريقة الفرق")
+            cache_key = f"live_fallback_{sub.id}"
+            now = time.time()
+
+            if cache_key in _traffic_cache:
+                prev = _traffic_cache[cache_key]
+                elapsed = now - prev['time']
+                if elapsed >= 1.5:
+                    target = None
+                    for iface in all_ifaces:
+                        if _safe_str(iface.get('name')) == found_iface:
+                            target = iface
+                            break
+                    if target:
+                        rx_byte = _safe_int(target.get('rx-byte', 0), 0)
+                        tx_byte = _safe_int(target.get('tx-byte', 0), 0)
+                        rx_diff = max(0, rx_byte - prev['rx_byte'])
+                        tx_diff = max(0, tx_byte - prev['tx_byte'])
+                        rx_rate_bps = (rx_diff / elapsed) * 8
+                        tx_rate_bps = (tx_diff / elapsed) * 8
+                        _traffic_cache[cache_key] = {
+                            'time': now, 'rx_byte': rx_byte, 'tx_byte': tx_byte
+                        }
 
         api.close()
         api = None
-
-        cache_key = f"live_speed_{sub.id}"
-        now = time.time()
-        rx_rate_bps = 0
-        tx_rate_bps = 0
-
-        if cache_key in _traffic_cache:
-            prev = _traffic_cache[cache_key]
-            elapsed = now - prev['time']
-            if elapsed > 0.5:
-                rx_diff = max(0, rx_byte - prev['rx_byte'])
-                tx_diff = max(0, tx_byte - prev['tx_byte'])
-                rx_rate_bps = (rx_diff / elapsed) * 8
-                tx_rate_bps = (tx_diff / elapsed) * 8
-
-        _traffic_cache[cache_key] = {
-            'time': now,
-            'rx_byte': rx_byte,
-            'tx_byte': tx_byte,
-        }
-
-        if found:
-            sub.session_rx_bytes = rx_byte
-            sub.session_tx_bytes = tx_byte
-            sub.ip_updated_at = datetime.utcnow()
-            try:
-                db.session.commit()
-            except Exception:
-                db.session.rollback()
 
         def format_speed(bps):
             if bps >= 1_000_000_000:
@@ -1553,9 +1606,18 @@ def my_account_live_speed():
         up_val, up_unit = format_speed(rx_rate_bps)
         down_val, down_unit = format_speed(tx_rate_bps)
 
+        if rx_byte > 0 or tx_byte > 0:
+            sub.session_rx_bytes = rx_byte
+            sub.session_tx_bytes = tx_byte
+            sub.ip_updated_at = datetime.utcnow()
+            try:
+                db.session.commit()
+            except Exception:
+                db.session.rollback()
+
         return jsonify({
             'ok': True,
-            'online': found,
+            'online': True,
             'upload_speed': up_val,
             'upload_unit': up_unit,
             'download_speed': down_val,
