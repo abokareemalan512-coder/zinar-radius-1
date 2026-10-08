@@ -17,6 +17,14 @@
         border-color: var(--accent);
         box-shadow: 0 10px 25px -5px rgba(56, 189, 248, 0.15);
     }
+    /* بطاقة قابلة للضغط */
+    .dashboard-card.clickable {
+        cursor: pointer;
+    }
+    .dashboard-card.clickable:hover {
+        background-color: rgba(56, 189, 248, 0.05); /* لمسة لون أزرق عند المرور */
+        border-color: var(--accent);
+    }
     .icon-circle {
         width: 64px;
         height: 64px;
@@ -74,6 +82,17 @@
         border-radius: 16px;
         padding: 24px;
     }
+    /* تنسيقات النوافذ المنبثقة */
+    .telegram-modal-header {
+        background: linear-gradient(135deg, #229ED9, #1c7fb0);
+        border-radius: 16px 16px 0 0;
+        color: white;
+    }
+    .mikrotik-modal-header {
+        background: linear-gradient(135deg, #38bdf8, #0ea5e9);
+        border-radius: 16px 16px 0 0;
+        color: #0f172a;
+    }
 </style>
 
 <!-- ✅ ترحيب ووقت -->
@@ -94,11 +113,17 @@
 <!-- ✅ الصف الأول: بطاقات الإحصائيات -->
 <div class="row g-4 mb-4">
     
-    <!-- بطاقة سيرفرات MikroTik -->
+    <!-- ✅ بطاقة سيرفرات MikroTik (قابلة للضغط وتفاعلية) -->
     <div class="col-xl-3 col-md-6">
-        <div class="dashboard-card text-center">
-            <div class="icon-circle mx-auto" style="background: rgba(56, 189, 248, 0.1); border: 1px solid rgba(56, 189, 248, 0.2);">
-                <i class="bi bi-router text-accent"></i>
+        <div class="dashboard-card text-center clickable" data-bs-toggle="modal" data-bs-target="#mikrotikDetailsModal">
+            <div class="icon-circle mx-auto" style="background: rgba(56, 189, 248, 0.1); border: 1px solid rgba(56, 189, 248, 0.3);">
+                <!-- أيقونة راوتر/سيرفر حقيقية (SVG) -->
+                <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" fill="#38bdf8" viewBox="0 0 16 16">
+                    <path d="M5.5 0a.5.5 0 0 1 .5.5V3h4V.5a.5.5 0 0 1 1 0V3h2a2 2 0 0 1 2 2v6a2 2 0 0 1-2 2H2a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h2V.5a.5.5 0 0 1 .5-.5zM2 4a1 1 0 0 0-1 1v6a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1V5a1 1 0 0 0-1-1H2z"/>
+                    <circle cx="4" cy="7" r="1.5" fill="#38bdf8"/>
+                    <circle cx="8" cy="7" r="1.5" fill="#38bdf8"/>
+                    <circle cx="12" cy="7" r="1.5" fill="#38bdf8"/>
+                </svg>
             </div>
             <div class="stat-number">{{ routers_count }}</div>
             <div class="stat-label">سيرفرات MikroTik</div>
@@ -120,6 +145,9 @@
             <div class="d-flex justify-content-between text-muted small border-top pt-3" style="border-color: var(--bg-hover) !important;">
                 <span><i class="bi bi-check-circle-fill text-success"></i> متصل: {{ routers_online }}</span>
                 <span><i class="bi bi-x-circle-fill text-danger"></i> متوقف: {{ routers_count - routers_online }}</span>
+            </div>
+            <div class="text-center mt-2">
+                <small class="text-info"><i class="bi bi-info-circle"></i> اضغط لعرض التفاصيل</small>
             </div>
         </div>
     </div>
@@ -167,12 +195,12 @@
         </div>
     </div>
 
-    <!-- بطاقة إعدادات التلجرام -->
+    <!-- بطاقة إعدادات التلجرام (قابلة للضغط) -->
     <div class="col-xl-3 col-md-6">
-        <div class="dashboard-card text-center">
-            <div class="icon-circle mx-auto" style="background: rgba(34, 158, 217, 0.1); border: 1px solid rgba(34, 158, 217, 0.2);">
-                <!-- ✅ أيقونة تلجرام الرسمية (SVG) لضمان الظهور -->
-                <svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" fill="#229ED9" viewBox="0 0 16 16">
+        <div class="dashboard-card text-center clickable" data-bs-toggle="modal" data-bs-target="#telegramDetailsModal">
+            <div class="icon-circle mx-auto" style="background: rgba(34, 158, 217, 0.1); border: 1px solid rgba(34, 158, 217, 0.3);">
+                <!-- أيقونة تلجرام الرسمية (SVG) -->
+                <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" fill="#229ED9" viewBox="0 0 16 16">
                     <path d="M16 8A8 8 0 1 1 0 8a8 8 0 0 1 16 0zM8.287 5.906c-.778.324-2.334.994-4.666 2.01-.378.15-.577.298-.595.442-.03.243.275.339.69.47l.175.055c.408.133.958.288 1.243.294.26.006.549-.1.868-.32 2.179-1.471 3.304-2.214 3.374-2.23.05-.012.12-.026.166.016.047.041.042.12.037.141-.03.129-1.227 1.241-1.846 1.817-.193.18-.33.307-.358.336a8.154 8.154 0 0 1-.188.186c-.38.366-.664.64.015 1.088.327.216.589.393.85.571.284.194.568.387.936.629.093.06.183.125.27.187.331.236.63.448.997.414.214-.02.435-.22.547-.82.265-1.417.786-4.486.906-5.751a1.426 1.426 0 0 0-.013-.315.337.337 0 0 0-.114-.217.526.526 0 0 0-.31-.093c-.3.005-.763.166-2.984 1.09z"/>
                 </svg>
             </div>
@@ -186,9 +214,9 @@
             <div class="stat-label">إشعارات التلجرام</div>
             
             <div class="d-flex justify-content-center mb-3">
-                <a href="{{ url_for('admin_settings') }}" class="btn btn-sm btn-outline-info rounded-pill px-3">
-                    <i class="bi bi-gear"></i> الإعدادات
-                </a>
+                <span class="badge bg-info bg-opacity-10 text-info border border-info px-3 py-2 rounded-pill">
+                    <i class="bi bi-info-circle"></i> عرض التفاصيل
+                </span>
             </div>
             
             <div class="d-flex justify-content-between text-muted small border-top pt-3" style="border-color: var(--bg-hover) !important;">
@@ -244,12 +272,11 @@
         </div>
     </div>
 
-    <!-- سجل تلجرام -->
+    <!-- سجل تلجرام (مختصر) -->
     <div class="col-lg-4">
         <div class="dashboard-card p-0 overflow-hidden d-flex flex-column">
             <div class="d-flex justify-content-between align-items-center p-4 border-bottom" style="border-color: var(--bg-hover) !important;">
                 <h6 class="mb-0 fw-bold text-accent d-flex align-items-center gap-2">
-                    <!-- ✅ أيقونة تلجرام الرسمية -->
                     <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="#229ED9" viewBox="0 0 16 16">
                         <path d="M16 8A8 8 0 1 1 0 8a8 8 0 0 1 16 0zM8.287 5.906c-.778.324-2.334.994-4.666 2.01-.378.15-.577.298-.595.442-.03.243.275.339.69.47l.175.055c.408.133.958.288 1.243.294.26.006.549-.1.868-.32 2.179-1.471 3.304-2.214 3.374-2.23.05-.012.12-.026.166.016.047.041.042.12.037.141-.03.129-1.227 1.241-1.846 1.817-.193.18-.33.307-.358.336a8.154 8.154 0 0 1-.188.186c-.38.366-.664.64.015 1.088.327.216.589.393.85.571.284.194.568.387.936.629.093.06.183.125.27.187.331.236.63.448.997.414.214-.02.435-.22.547-.82.265-1.417.786-4.486.906-5.751a1.426 1.426 0 0 0-.013-.315.337.337 0 0 0-.114-.217.526.526 0 0 0-.31-.093c-.3.005-.763.166-2.984 1.09z"/>
                     </svg>
@@ -292,74 +319,9 @@
     </div>
 </div>
 
-<!-- ✅ الصف الثالث: قائمة الراوترات وإعدادات المدير -->
+<!-- ✅ الصف الثالث: إعدادات المدير -->
 <div class="row g-4">
-    
-    <!-- قائمة الراوترات -->
-    <div class="col-lg-8">
-        <div class="dashboard-card p-0 overflow-hidden">
-            <div class="d-flex justify-content-between align-items-center p-4 border-bottom" style="border-color: var(--bg-hover) !important;">
-                <h6 class="mb-0 fw-bold text-accent">
-                    <i class="bi bi-router"></i> حالة راوترات الشبكة
-                </h6>
-                <a href="{{ url_for('routers') }}" class="btn btn-sm btn-outline-info rounded-pill px-3">
-                    <i class="bi bi-gear"></i> إدارة
-                </a>
-            </div>
-            <div class="table-responsive">
-                <table class="table table-hover table-clean mb-0 text-center">
-                    <thead>
-                        <tr>
-                            <th>#</th>
-                            <th>الاسم</th>
-                            <th>عنوان IP</th>
-                            <th>المنفذ</th>
-                            <th>الحالة</th>
-                            <th>الرئيسي</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {% for r in routers %}
-                        <tr>
-                            <td class="text-muted">#{{ r.id }}</td>
-                            <td class="fw-bold text-accent">{{ r.name }}</td>
-                            <td><span class="font-monospace text-muted">{{ r.ip_address }}</span></td>
-                            <td>{{ r.port }}</td>
-                            <td>
-                                {% if r.is_active %}
-                                    <span class="badge bg-success bg-opacity-10 text-success border border-success">
-                                        <span class="pulse-dot" style="width: 6px; height: 6px;"></span> متصل
-                                    </span>
-                                {% else %}
-                                    <span class="badge bg-danger bg-opacity-10 text-danger border border-danger">
-                                        <i class="bi bi-x-circle-fill"></i> متوقف
-                                    </span>
-                                {% endif %}
-                            </td>
-                            <td>
-                                {% if r.is_master %}
-                                    <i class="bi bi-star-fill text-warning"></i>
-                                {% else %}
-                                    <span class="text-muted">—</span>
-                                {% endif %}
-                            </td>
-                        </tr>
-                        {% else %}
-                        <tr>
-                            <td colspan="6" class="text-center py-5 text-muted">
-                                <i class="bi bi-router fs-2 d-block mb-2"></i>
-                                لا توجد راوترات مضافة
-                            </td>
-                        </tr>
-                        {% endfor %}
-                    </tbody>
-                </table>
-            </div>
-        </div>
-    </div>
-
-    <!-- إعدادات المدير -->
-    <div class="col-lg-4">
+    <div class="col-12">
         <div class="dashboard-card">
             <h6 class="fw-bold text-accent mb-4">
                 <i class="bi bi-shield-lock"></i> إعدادات حساب المدير
@@ -368,6 +330,220 @@
             <button class="btn btn-outline-warning w-100 py-3 rounded-3" data-bs-toggle="modal" data-bs-target="#changeCredentialsModal">
                 <i class="bi bi-key-fill"></i> تغيير بيانات الدخول
             </button>
+        </div>
+    </div>
+</div>
+
+<!-- ✅ نافذة تفاصيل سيرفرات MikroTik (جديدة) -->
+<div class="modal fade" id="mikrotikDetailsModal" tabindex="-1">
+    <div class="modal-dialog modal-dialog-centered modal-lg">
+        <div class="modal-content border-0 shadow-lg" style="border-radius: 16px; background-color: var(--bg-card);">
+            <div class="modal-header mikrotik-modal-header">
+                <h5 class="modal-title fw-bold d-flex align-items-center gap-2">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" fill="#0f172a" viewBox="0 0 16 16">
+                        <path d="M5.5 0a.5.5 0 0 1 .5.5V3h4V.5a.5.5 0 0 1 1 0V3h2a2 2 0 0 1 2 2v6a2 2 0 0 1-2 2H2a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h2V.5a.5.5 0 0 1 .5-.5zM2 4a1 1 0 0 0-1 1v6a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1V5a1 1 0 0 0-1-1H2z"/>
+                        <circle cx="4" cy="7" r="1.5" fill="#0f172a"/>
+                        <circle cx="8" cy="7" r="1.5" fill="#0f172a"/>
+                        <circle cx="12" cy="7" r="1.5" fill="#0f172a"/>
+                    </svg>
+                    تفاصيل سيرفرات MikroTik
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body p-4">
+                
+                <!-- إحصائيات سريعة -->
+                <div class="row g-3 mb-4 text-center">
+                    <div class="col-4">
+                        <div class="p-3 rounded-3" style="background-color: var(--bg-main); border: 1px solid var(--bg-hover);">
+                            <h4 class="fw-bold text-accent mb-0">{{ routers_count }}</h4>
+                            <small class="text-muted">إجمالي السيرفرات</small>
+                        </div>
+                    </div>
+                    <div class="col-4">
+                        <div class="p-3 rounded-3" style="background-color: var(--bg-main); border: 1px solid var(--bg-hover);">
+                            <h4 class="fw-bold text-success mb-0">{{ routers_online }}</h4>
+                            <small class="text-muted">متصل</small>
+                        </div>
+                    </div>
+                    <div class="col-4">
+                        <div class="p-3 rounded-3" style="background-color: var(--bg-main); border: 1px solid var(--bg-hover);">
+                            <h4 class="fw-bold text-danger mb-0">{{ routers_count - routers_online }}</h4>
+                            <small class="text-muted">متوقف</small>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- جدول السيرفرات -->
+                <div class="d-flex justify-content-between align-items-center mb-3">
+                    <h6 class="fw-bold text-accent mb-0"><i class="bi bi-list-ul"></i> قائمة السيرفرات</h6>
+                    <a href="{{ url_for('routers') }}" class="btn btn-sm btn-primary rounded-pill px-3">
+                        <i class="bi bi-plus-circle"></i> إضافة سيرفر جديد
+                    </a>
+                </div>
+                
+                <div class="table-responsive" style="max-height: 300px; overflow-y: auto; border: 1px solid var(--bg-hover); border-radius: 10px;">
+                    <table class="table table-hover table-clean mb-0 text-center">
+                        <thead>
+                            <tr>
+                                <th>#</th>
+                                <th>الاسم</th>
+                                <th>عنوان IP</th>
+                                <th>المنفذ</th>
+                                <th>الحالة</th>
+                                <th>إجراءات</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for r in routers %}
+                            <tr>
+                                <td class="text-muted">#{{ r.id }}</td>
+                                <td class="fw-bold text-accent">{{ r.name }}</td>
+                                <td><span class="font-monospace text-muted">{{ r.ip_address }}</span></td>
+                                <td>{{ r.port }}</td>
+                                <td>
+                                    {% if r.is_active %}
+                                        <span class="badge bg-success bg-opacity-10 text-success border border-success">
+                                            <span class="pulse-dot" style="width: 6px; height: 6px;"></span> متصل
+                                        </span>
+                                    {% else %}
+                                        <span class="badge bg-danger bg-opacity-10 text-danger border border-danger">
+                                            <i class="bi bi-x-circle-fill"></i> متوقف
+                                        </span>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    <div class="d-flex justify-content-center gap-1">
+                                        <!-- زر تعديل: يذهب لصفحة الراوترات -->
+                                        <a href="{{ url_for('routers') }}" class="btn btn-sm btn-outline-info" title="تعديل">
+                                            <i class="bi bi-pencil"></i>
+                                        </a>
+                                        <!-- زر حذف: يذهب لرابط الحذف -->
+                                        <a href="{{ url_for('delete_router', router_id=r.id) }}" class="btn btn-sm btn-outline-danger" title="حذف" onclick="return confirm('تأكيد حذف السيرفر {{ r.name }}؟')">
+                                            <i class="bi bi-trash"></i>
+                                        </a>
+                                    </div>
+                                </td>
+                            </tr>
+                            {% else %}
+                            <tr>
+                                <td colspan="6" class="text-center py-4 text-muted">لا توجد سيرفرات مضافة</td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+            <div class="modal-footer border-top" style="border-color: var(--bg-hover) !important; background-color: var(--bg-hover); border-radius: 0 0 16px 16px;">
+                <a href="{{ url_for('routers') }}" class="btn btn-outline-info rounded-3">
+                    <i class="bi bi-gear"></i> الإدارة الكاملة
+                </a>
+                <button type="button" class="btn btn-secondary rounded-3" data-bs-dismiss="modal">إغلاق</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- ✅ نافذة تفاصيل التلجرام المنبثقة -->
+<div class="modal fade" id="telegramDetailsModal" tabindex="-1">
+    <div class="modal-dialog modal-dialog-centered modal-lg">
+        <div class="modal-content border-0 shadow-lg" style="border-radius: 16px; background-color: var(--bg-card);">
+            <div class="modal-header telegram-modal-header">
+                <h5 class="modal-title fw-bold d-flex align-items-center gap-2">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" fill="white" viewBox="0 0 16 16">
+                        <path d="M16 8A8 8 0 1 1 0 8a8 8 0 0 1 16 0zM8.287 5.906c-.778.324-2.334.994-4.666 2.01-.378.15-.577.298-.595.442-.03.243.275.339.69.47l.175.055c.408.133.958.288 1.243.294.26.006.549-.1.868-.32 2.179-1.471 3.304-2.214 3.374-2.23.05-.012.12-.026.166.016.047.041.042.12.037.141-.03.129-1.227 1.241-1.846 1.817-.193.18-.33.307-.358.336a8.154 8.154 0 0 1-.188.186c-.38.366-.664.64.015 1.088.327.216.589.393.85.571.284.194.568.387.936.629.093.06.183.125.27.187.331.236.63.448.997.414.214-.02.435-.22.547-.82.265-1.417.786-4.486.906-5.751a1.426 1.426 0 0 0-.013-.315.337.337 0 0 0-.114-.217.526.526 0 0 0-.31-.093c-.3.005-.763.166-2.984 1.09z"/>
+                    </svg>
+                    تفاصيل إشعارات التلجرام
+                </h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body p-4">
+                
+                <!-- حالة التلجرام -->
+                <div class="d-flex justify-content-between align-items-center p-3 mb-4 rounded-3" style="background-color: var(--bg-main); border: 1px solid var(--bg-hover);">
+                    <div class="d-flex align-items-center gap-3">
+                        <i class="bi bi-info-circle-fill fs-4 text-info"></i>
+                        <div>
+                            <h6 class="mb-0 fw-bold">حالة الإشعارات</h6>
+                            <small class="text-muted">حالة الاتصال بخدمة التلجرام</small>
+                        </div>
+                    </div>
+                    <div>
+                        {% if telegram_status and telegram_status.enabled %}
+                            <span class="badge bg-success fs-6 px-3 py-2">
+                                <span class="pulse-dot"></span> مفعل ويعمل
+                            </span>
+                        {% else %}
+                            <span class="badge bg-danger fs-6 px-3 py-2">
+                                <i class="bi bi-x-circle-fill"></i> معطل
+                            </span>
+                        {% endif %}
+                    </div>
+                </div>
+
+                <!-- إحصائيات سريعة -->
+                <div class="row g-3 mb-4 text-center">
+                    <div class="col-4">
+                        <div class="p-3 rounded-3" style="background-color: var(--bg-main); border: 1px solid var(--bg-hover);">
+                            <h4 class="fw-bold text-accent mb-0">{{ recent_telegram_logs|length }}</h4>
+                            <small class="text-muted">إشعارات حديثة</small>
+                        </div>
+                    </div>
+                    <div class="col-4">
+                        <div class="p-3 rounded-3" style="background-color: var(--bg-main); border: 1px solid var(--bg-hover);">
+                            <h4 class="fw-bold text-success mb-0">{{ recent_telegram_logs|selectattr('status', 'equalto', 'success')|list|length }}</h4>
+                            <small class="text-muted">ناجحة</small>
+                        </div>
+                    </div>
+                    <div class="col-4">
+                        <div class="p-3 rounded-3" style="background-color: var(--bg-main); border: 1px solid var(--bg-hover);">
+                            <h4 class="fw-bold text-danger mb-0">{{ recent_telegram_logs|rejectattr('status', 'equalto', 'success')|list|length }}</h4>
+                            <small class="text-muted">فاشلة</small>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- سجل الرسائل -->
+                <h6 class="fw-bold text-accent mb-3"><i class="bi bi-list-ul"></i> آخر الإشعارات المرسلة</h6>
+                <div class="table-responsive" style="max-height: 250px; overflow-y: auto; border: 1px solid var(--bg-hover); border-radius: 10px;">
+                    <table class="table table-hover table-clean mb-0">
+                        <thead>
+                            <tr>
+                                <th>الوقت</th>
+                                <th>النوع</th>
+                                <th>الحالة</th>
+                                <th>الرسالة</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for log in recent_telegram_logs %}
+                            <tr>
+                                <td class="text-muted small">{{ log.created_at | localtime('%m-%d %H:%M') }}</td>
+                                <td><span class="badge bg-secondary">{{ log.message_type }}</span></td>
+                                <td>
+                                    {% if log.status == 'success' %}
+                                        <i class="bi bi-check-circle-fill text-success"></i>
+                                    {% else %}
+                                        <i class="bi bi-x-circle-fill text-danger"></i>
+                                    {% endif %}
+                                </td>
+                                <td class="text-muted small">{{ log.message[:50] }}{% if log.message|length > 50 %}...{% endif %}</td>
+                            </tr>
+                            {% else %}
+                            <tr>
+                                <td colspan="4" class="text-center py-4 text-muted">لا توجد إشعارات مسجلة</td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+            <div class="modal-footer border-top" style="border-color: var(--bg-hover) !important; background-color: var(--bg-hover); border-radius: 0 0 16px 16px;">
+                <a href="{{ url_for('admin_settings') }}" class="btn btn-outline-info rounded-3">
+                    <i class="bi bi-gear"></i> الإعدادات الكاملة
+                </a>
+                <button type="button" class="btn btn-secondary rounded-3" data-bs-dismiss="modal">إغلاق</button>
+            </div>
         </div>
     </div>
 </div>
@@ -413,7 +589,7 @@
     </div>
 </div>
 
-<!-- ✅ سكريبت تحديث البيانات تلقائياً (كل 30 ثانية) -->
+<!-- ✅ سكريبت تحديث البيانات تلقائياً -->
 <script>
     setInterval(function() {
         fetch('/api/dashboard_data')
@@ -421,7 +597,6 @@
             .then(data => {
                 if (data.error) return;
                 console.log('✅ تم تحديث بيانات لوحة التحكم:', data);
-                // يمكنك هنا إضافة كود لتحديث الأرقام مباشرة في الصفحة إذا أردت
             })
             .catch(err => console.log('⚠️ فشل تحديث البيانات:', err));
     }, 30000);
