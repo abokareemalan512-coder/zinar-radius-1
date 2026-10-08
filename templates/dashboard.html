@@ -10,15 +10,15 @@
     .dashboard-card {
         background-color: var(--bg-card);
         border: 1px solid var(--bg-hover);
-        border-radius: 16px;
-        padding: 24px;
+        border-radius: 12px;
+        padding: 16px;
         transition: all 0.3s ease;
         height: 100%;
     }
     .dashboard-card:hover {
-        transform: translateY(-5px);
+        transform: translateY(-3px);
         border-color: var(--accent);
-        box-shadow: 0 10px 25px -5px rgba(56, 189, 248, 0.15);
+        box-shadow: 0 8px 20px -5px rgba(56, 189, 248, 0.15);
     }
     .dashboard-card.clickable { cursor: pointer; }
     .dashboard-card.clickable:hover {
@@ -26,31 +26,31 @@
         border-color: var(--accent);
     }
     .icon-circle {
-        width: 64px;
-        height: 64px;
+        width: 48px;
+        height: 48px;
         display: inline-flex;
         align-items: center;
         justify-content: center;
         border-radius: 50%;
-        font-size: 28px;
-        margin-bottom: 15px;
+        font-size: 22px;
+        margin-bottom: 10px;
     }
     .stat-number {
-        font-size: 2.5rem;
+        font-size: 1.8rem;
         font-weight: 800;
         color: var(--text-main);
         line-height: 1;
-        margin: 5px 0;
+        margin: 4px 0;
     }
     .stat-label {
         color: var(--text-muted);
-        font-size: 1rem;
+        font-size: 0.8rem;
         font-weight: 500;
-        margin-bottom: 15px;
+        margin-bottom: 8px;
     }
     .pulse-dot {
-        width: 10px;
-        height: 10px;
+        width: 7px;
+        height: 7px;
         border-radius: 50%;
         background-color: currentColor;
         display: inline-block;
@@ -58,126 +58,97 @@
     }
     @keyframes pulse-animation {
         0% { box-shadow: 0 0 0 0 currentColor; opacity: 1; }
-        70% { box-shadow: 0 0 0 10px transparent; opacity: 0.7; }
+        70% { box-shadow: 0 0 0 8px transparent; opacity: 0.7; }
         100% { box-shadow: 0 0 0 0 transparent; opacity: 1; }
     }
     .table-clean th {
-        font-size: 0.85rem;
+        font-size: 0.75rem;
         text-transform: uppercase;
         color: var(--text-muted) !important;
         font-weight: 700;
         border-bottom: 1px solid var(--bg-hover) !important;
-        padding: 12px;
+        padding: 8px;
     }
     .table-clean td {
-        font-size: 0.9rem;
+        font-size: 0.8rem;
         color: var(--text-main);
         border-bottom: 1px solid var(--bg-hover) !important;
-        padding: 12px;
+        padding: 8px;
         vertical-align: middle;
     }
     .welcome-box {
         background: linear-gradient(135deg, rgba(56, 189, 248, 0.1), rgba(14, 165, 233, 0.02));
         border: 1px solid rgba(56, 189, 248, 0.2);
-        border-radius: 16px;
-        padding: 24px;
+        border-radius: 12px;
+        padding: 14px 18px;
     }
 
-    /* ============ نافذة الترافيك ============ */
-    .traffic-modal-header {
-        background: linear-gradient(135deg, #8b5cf6, #7c3aed);
-        border-radius: 16px 16px 0 0;
-        color: white;
-    }
-    .mikrotik-modal-header {
-        background: linear-gradient(135deg, #38bdf8, #0ea5e9);
-        border-radius: 16px 16px 0 0;
-        color: #0f172a;
-    }
-    .subscribers-modal-header {
-        background: linear-gradient(135deg, #22c55e, #16a34a);
-        border-radius: 16px 16px 0 0;
-        color: white;
-    }
-    .revenue-modal-header {
-        background: linear-gradient(135deg, #f59e0b, #d97706);
-        border-radius: 16px 16px 0 0;
-        color: white;
-    }
-    .telegram-modal-header {
-        background: linear-gradient(135deg, #229ED9, #1c7fb0);
-        border-radius: 16px 16px 0 0;
-        color: white;
-    }
+    /* ألوان رؤوس النوافذ */
+    .mikrotik-modal-header { background: linear-gradient(135deg, #38bdf8, #0ea5e9); border-radius: 12px 12px 0 0; color: #0f172a; }
+    .subscribers-modal-header { background: linear-gradient(135deg, #22c55e, #16a34a); border-radius: 12px 12px 0 0; color: white; }
+    .revenue-modal-header { background: linear-gradient(135deg, #f59e0b, #d97706); border-radius: 12px 12px 0 0; color: white; }
+    .telegram-modal-header { background: linear-gradient(135deg, #229ED9, #1c7fb0); border-radius: 12px 12px 0 0; color: white; }
 
     .revenue-box {
         background-color: var(--bg-main);
         border: 1px solid var(--bg-hover);
-        border-radius: 12px;
-        padding: 20px;
+        border-radius: 10px;
+        padding: 12px;
         text-align: center;
-        transition: transform 0.2s;
     }
-    .revenue-box:hover {
-        transform: scale(1.02);
-        border-color: #f59e0b;
-    }
+    .revenue-box:hover { border-color: #f59e0b; }
 
-    /* ============ قسم الترافيك في لوحة التحكم ============ */
+    /* ============ قسم الترافيك (مضغوط) ============ */
     .traffic-section {
         background-color: var(--bg-card);
         border: 1px solid var(--bg-hover);
-        border-radius: 16px;
-        padding: 24px;
-        margin-bottom: 24px;
+        border-radius: 12px;
+        padding: 14px;
+        margin-bottom: 16px;
         position: relative;
-        overflow: hidden;
+        overflow: visible;
     }
     .traffic-section::before {
         content: '';
         position: absolute;
-        top: 0;
-        right: 0;
-        left: 0;
-        height: 3px;
+        top: 0; right: 0; left: 0;
+        height: 2px;
         background: linear-gradient(90deg, #f59e0b, #22c55e, #38bdf8, #a855f7);
+        border-radius: 12px 12px 0 0;
     }
     .traffic-section-header {
         display: flex;
         justify-content: space-between;
         align-items: center;
-        margin-bottom: 20px;
+        margin-bottom: 12px;
         flex-wrap: wrap;
-        gap: 12px;
+        gap: 8px;
     }
     .traffic-section-title {
         display: flex;
         align-items: center;
-        gap: 10px;
+        gap: 8px;
         font-weight: 700;
-        font-size: 1.15rem;
+        font-size: 0.95rem;
         color: var(--text-main);
     }
-    .traffic-section-title i {
-        color: var(--accent);
-        font-size: 1.4rem;
-    }
+    .traffic-section-title i { color: var(--accent); font-size: 1.1rem; }
+
     .live-badge {
         display: inline-flex;
         align-items: center;
-        gap: 6px;
-        padding: 4px 12px;
-        border-radius: 20px;
+        gap: 5px;
+        padding: 2px 8px;
+        border-radius: 12px;
         background: rgba(239, 68, 68, 0.1);
         color: #ef4444;
         border: 1px solid rgba(239, 68, 68, 0.3);
-        font-size: 0.75rem;
+        font-size: 0.65rem;
         font-weight: 700;
-        margin-right: 8px;
     }
-    .live-badge .live-dot {
-        width: 8px;
-        height: 8px;
+    .live-dot {
+        width: 6px;
+        height: 6px;
         border-radius: 50%;
         background-color: #ef4444;
         animation: live-pulse 1.2s infinite;
@@ -188,10 +159,9 @@
         100% { opacity: 1; transform: scale(1); }
     }
 
-    /* أدوات التحكم في القسم */
     .traffic-controls {
         display: flex;
-        gap: 10px;
+        gap: 6px;
         flex-wrap: wrap;
         align-items: center;
     }
@@ -199,147 +169,191 @@
         background-color: var(--bg-main);
         color: var(--text-main);
         border: 1px solid var(--bg-hover);
-        padding: 8px 14px;
-        border-radius: 10px;
+        padding: 6px 10px;
+        border-radius: 8px;
         font-weight: 500;
-        font-size: 0.85rem;
-        transition: all 0.2s;
+        font-size: 0.78rem;
+        max-width: 160px;
     }
     .traffic-select:focus {
         border-color: var(--accent);
-        box-shadow: 0 0 0 0.2rem var(--accent-glow);
+        box-shadow: 0 0 0 0.15rem var(--accent-glow);
         outline: none;
     }
 
-    /* خانة البحث */
+    /* ============ خانة البحث المصغرة ============ */
     .traffic-search-wrapper {
         position: relative;
-        width: 200px;
+        width: 180px;
     }
     .traffic-search-wrapper input {
         width: 100%;
-        padding: 8px 35px 8px 12px;
+        padding: 6px 28px 6px 10px;
         background-color: var(--bg-main);
         color: var(--text-main);
         border: 1px solid var(--bg-hover);
-        border-radius: 10px;
+        border-radius: 8px;
         font-weight: 500;
-        font-size: 0.85rem;
+        font-size: 0.78rem;
     }
     .traffic-search-wrapper input:focus {
         border-color: var(--accent);
-        box-shadow: 0 0 0 0.2rem var(--accent-glow);
+        box-shadow: 0 0 0 0.15rem var(--accent-glow);
         outline: none;
+    }
+    .traffic-search-wrapper input::placeholder {
+        color: var(--text-muted);
     }
     .traffic-search-wrapper .search-icon {
         position: absolute;
-        right: 12px;
+        right: 9px;
         top: 50%;
         transform: translateY(-50%);
         color: var(--text-muted);
         pointer-events: none;
-        font-size: 0.9rem;
+        font-size: 0.8rem;
     }
+    .traffic-search-wrapper .clear-btn {
+        position: absolute;
+        left: 6px;
+        top: 50%;
+        transform: translateY(-50%);
+        background: none;
+        border: none;
+        color: var(--text-muted);
+        cursor: pointer;
+        padding: 0;
+        font-size: 0.9rem;
+        display: none;
+    }
+    .traffic-search-wrapper .clear-btn:hover { color: #ef4444; }
+
+    /* ============ قائمة المنافذ ============ */
     .traffic-dropdown {
         position: absolute;
         top: 100%;
         right: 0;
         left: 0;
-        margin-top: 5px;
+        margin-top: 4px;
         background-color: var(--bg-card);
         border: 1px solid var(--bg-hover);
-        border-radius: 10px;
-        max-height: 250px;
+        border-radius: 8px;
+        max-height: 280px;
         overflow-y: auto;
-        z-index: 1000;
-        box-shadow: 0 10px 25px rgba(0,0,0,0.4);
+        z-index: 2000;
+        box-shadow: 0 8px 20px rgba(0,0,0,0.4);
         display: none;
+        min-width: 260px;
     }
     .traffic-dropdown.show { display: block; }
     .traffic-dropdown-item {
-        padding: 8px 12px;
+        padding: 8px 10px;
         cursor: pointer;
         border-bottom: 1px solid var(--bg-hover);
         display: flex;
         justify-content: space-between;
         align-items: center;
+        gap: 8px;
         transition: all 0.15s;
-        font-size: 0.85rem;
+        font-size: 0.78rem;
+        color: var(--text-main);
     }
     .traffic-dropdown-item:last-child { border-bottom: none; }
     .traffic-dropdown-item:hover {
         background-color: rgba(56, 189, 248, 0.1);
         color: var(--accent);
     }
+    .traffic-dropdown-item.selected {
+        background-color: rgba(56, 189, 248, 0.15);
+        color: var(--accent);
+    }
+    .iface-name {
+        font-family: 'Courier New', monospace;
+        font-weight: 600;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        max-width: 180px;
+    }
+    .iface-status-badge {
+        font-size: 0.6rem;
+        padding: 2px 6px;
+        border-radius: 8px;
+        font-weight: 700;
+        white-space: nowrap;
+    }
+    .iface-running {
+        background: rgba(34, 197, 94, 0.15);
+        color: #22c55e;
+    }
+    .iface-idle {
+        background: rgba(148, 163, 184, 0.15);
+        color: #94a3b8;
+    }
 
-    /* زر تبديل الاتجاه */
+    /* أزرار */
     .traffic-direction-btn {
         display: inline-flex;
         align-items: center;
-        gap: 6px;
-        padding: 8px 14px;
-        border-radius: 10px;
+        gap: 5px;
+        padding: 6px 12px;
+        border-radius: 8px;
         font-weight: 600;
-        font-size: 0.8rem;
+        font-size: 0.72rem;
         cursor: pointer;
-        transition: all 0.3s;
         border: none;
         color: white;
         background: linear-gradient(135deg, #a855f7, #9333ea);
-        box-shadow: 0 3px 10px rgba(168, 85, 247, 0.3);
+        transition: all 0.3s;
     }
     .traffic-direction-btn:hover {
-        transform: translateY(-2px);
-        box-shadow: 0 5px 14px rgba(168, 85, 247, 0.5);
+        transform: translateY(-1px);
+        box-shadow: 0 4px 10px rgba(168, 85, 247, 0.4);
         color: white;
     }
     .traffic-direction-btn.reversed {
         background: linear-gradient(135deg, #f59e0b, #d97706);
-        box-shadow: 0 3px 10px rgba(245, 158, 11, 0.3);
     }
     .traffic-direction-btn.reversed:hover {
-        box-shadow: 0 5px 14px rgba(245, 158, 11, 0.5);
+        box-shadow: 0 4px 10px rgba(245, 158, 11, 0.4);
     }
 
-    /* أزرار البدء/الإيقاف */
     .btn-traffic-start {
         background: linear-gradient(135deg, #22c55e, #16a34a);
         color: white;
         border: none;
-        padding: 8px 18px;
-        border-radius: 10px;
+        padding: 6px 14px;
+        border-radius: 8px;
         font-weight: 700;
-        font-size: 0.85rem;
+        font-size: 0.78rem;
         cursor: pointer;
-        transition: all 0.3s;
-        box-shadow: 0 3px 10px rgba(34, 197, 94, 0.3);
         display: inline-flex;
         align-items: center;
-        gap: 6px;
+        gap: 5px;
+        transition: all 0.3s;
     }
     .btn-traffic-start:hover {
-        transform: translateY(-2px);
-        box-shadow: 0 5px 14px rgba(34, 197, 94, 0.5);
+        transform: translateY(-1px);
+        box-shadow: 0 4px 10px rgba(34, 197, 94, 0.4);
         color: white;
     }
     .btn-traffic-stop {
         background: linear-gradient(135deg, #ef4444, #dc2626);
         color: white;
         border: none;
-        padding: 8px 18px;
-        border-radius: 10px;
+        padding: 6px 14px;
+        border-radius: 8px;
         font-weight: 700;
-        font-size: 0.85rem;
+        font-size: 0.78rem;
         cursor: pointer;
-        transition: all 0.3s;
-        box-shadow: 0 3px 10px rgba(239, 68, 68, 0.3);
         display: inline-flex;
         align-items: center;
-        gap: 6px;
+        gap: 5px;
+        transition: all 0.3s;
     }
     .btn-traffic-stop:hover {
-        transform: translateY(-2px);
-        box-shadow: 0 5px 14px rgba(239, 68, 68, 0.5);
+        transform: translateY(-1px);
+        box-shadow: 0 4px 10px rgba(239, 68, 68, 0.4);
         color: white;
     }
 
@@ -347,15 +361,11 @@
     .traffic-mini-card {
         background-color: var(--bg-main);
         border: 1px solid var(--bg-hover);
-        border-radius: 14px;
-        padding: 18px;
+        border-radius: 10px;
+        padding: 12px;
         height: 100%;
-        transition: all 0.3s;
         position: relative;
         overflow: hidden;
-    }
-    .traffic-mini-card:hover {
-        border-color: var(--accent);
     }
     .traffic-mini-card.upload { border-right: 3px solid #f59e0b; }
     .traffic-mini-card.download { border-right: 3px solid #22c55e; }
@@ -364,38 +374,38 @@
         display: flex;
         justify-content: space-between;
         align-items: center;
-        margin-bottom: 10px;
+        margin-bottom: 6px;
     }
     .traffic-mini-label {
         display: flex;
         align-items: center;
-        gap: 8px;
+        gap: 5px;
         font-weight: 700;
-        font-size: 0.9rem;
+        font-size: 0.78rem;
     }
     .traffic-mini-label.upload { color: #f59e0b; }
     .traffic-mini-label.download { color: #22c55e; }
 
     .traffic-mini-rate {
-        font-size: 1.8rem;
+        font-size: 1.4rem;
         font-weight: 800;
         line-height: 1;
-        margin: 8px 0;
+        margin: 5px 0;
     }
     .traffic-mini-rate.upload { color: #f59e0b; }
     .traffic-mini-rate.download { color: #22c55e; }
     .traffic-mini-rate-unit {
-        font-size: 0.85rem;
+        font-size: 0.7rem;
         font-weight: 500;
         opacity: 0.8;
     }
 
     .traffic-mini-progress {
-        height: 6px;
+        height: 5px;
         background-color: var(--bg-hover);
         border-radius: 3px;
         overflow: hidden;
-        margin: 8px 0;
+        margin: 6px 0;
     }
     .traffic-mini-progress-bar {
         height: 100%;
@@ -408,164 +418,153 @@
     .traffic-mini-total {
         display: flex;
         justify-content: space-between;
-        font-size: 0.75rem;
+        font-size: 0.68rem;
         color: var(--text-muted);
-        margin-bottom: 12px;
+        margin-bottom: 8px;
     }
     .traffic-mini-chart {
         position: relative;
-        height: 90px;
+        height: 70px;
         width: 100%;
     }
 
-    /* حالة فارغة */
     .traffic-empty {
         text-align: center;
-        padding: 40px 20px;
+        padding: 20px 15px;
         color: var(--text-muted);
     }
     .traffic-empty i {
-        font-size: 3rem;
+        font-size: 2rem;
         color: var(--bg-hover);
         display: block;
-        margin-bottom: 12px;
+        margin-bottom: 8px;
+    }
+    .traffic-empty h6 {
+        font-size: 0.85rem;
+        margin-bottom: 4px;
+    }
+    .traffic-empty p {
+        font-size: 0.75rem;
+        margin: 0;
     }
 
-    /* رابط الصفحة الكاملة */
     .traffic-full-link {
         display: inline-flex;
         align-items: center;
-        gap: 6px;
-        padding: 8px 14px;
+        gap: 5px;
+        padding: 5px 10px;
         background-color: rgba(139, 92, 246, 0.1);
         color: #a855f7;
         border: 1px solid rgba(139, 92, 246, 0.3);
-        border-radius: 10px;
-        font-size: 0.8rem;
+        border-radius: 8px;
+        font-size: 0.7rem;
         font-weight: 600;
         text-decoration: none;
         transition: all 0.3s;
     }
     .traffic-full-link:hover {
         background-color: rgba(139, 92, 246, 0.2);
-        border-color: #a855f7;
         color: #a855f7;
-        transform: translateY(-2px);
+        transform: translateY(-1px);
     }
 </style>
 
-<!-- ✅ ترحيب ووقت -->
-<div class="welcome-box mb-4 d-flex justify-content-between align-items-center flex-wrap gap-3">
+<!-- ترحيب -->
+<div class="welcome-box mb-3 d-flex justify-content-between align-items-center flex-wrap gap-2">
     <div>
-        <h4 class="fw-bold mb-1 text-accent">
-            <i class="bi bi-speedometer2"></i> مرحباً بك، {{ admin_name }}
-        </h4>
-        <p class="text-muted mb-0 small">نظرة عامة على أداء النظام والشبكة</p>
+        <h5 class="fw-bold mb-0 text-accent" style="font-size: 1.1rem;">
+            <i class="bi bi-speedometer2"></i> مرحباً، {{ admin_name }}
+        </h5>
+        <p class="text-muted mb-0" style="font-size: 0.75rem;">نظرة عامة على أداء النظام والشبكة</p>
     </div>
     <div>
-        <span class="badge bg-info bg-opacity-10 text-info border border-info px-4 py-3 rounded-3 fs-6">
+        <span class="badge bg-info bg-opacity-10 text-info border border-info px-3 py-2 rounded-3" style="font-size: 0.75rem;">
             <i class="bi bi-clock-history"></i> {{ current_time }}
         </span>
     </div>
 </div>
 
-<!-- ✅ الصف الأول: بطاقات الإحصائيات -->
-<div class="row g-4 mb-4">
-    
-    <!-- بطاقة سيرفرات MikroTik -->
+<!-- الصف الأول: البطاقات -->
+<div class="row g-3 mb-3">
+    <!-- MikroTik -->
     <div class="col-xl-3 col-md-6">
         <div class="dashboard-card text-center clickable" data-bs-toggle="modal" data-bs-target="#mikrotikDetailsModal">
             <div class="icon-circle mx-auto" style="background: rgba(56, 189, 248, 0.1); border: 1px solid rgba(56, 189, 248, 0.3);">
-                <i class="bi bi-router text-accent" style="font-size: 2rem;"></i>
+                <i class="bi bi-router text-accent"></i>
             </div>
             <div class="stat-number">{{ routers_count }}</div>
             <div class="stat-label">سيرفرات MikroTik</div>
-            <div class="d-flex justify-content-center mb-3">
+            <div class="d-flex justify-content-center">
                 {% if routers_online > 0 %}
-                    <span class="badge bg-success bg-opacity-10 text-success border border-success px-3 py-2 rounded-pill d-flex align-items-center gap-2">
+                    <span class="badge bg-success bg-opacity-10 text-success border border-success px-3 py-1 rounded-pill d-flex align-items-center gap-2" style="font-size: 0.72rem;">
                         <span class="pulse-dot"></span> {{ routers_online }} متصل
                     </span>
                 {% else %}
-                    <span class="badge bg-danger bg-opacity-10 text-danger border border-danger px-3 py-2 rounded-pill">
+                    <span class="badge bg-danger bg-opacity-10 text-danger border border-danger px-3 py-1 rounded-pill" style="font-size: 0.72rem;">
                         <i class="bi bi-x-circle-fill"></i> 0 متصل
                     </span>
                 {% endif %}
             </div>
-            <div class="text-center mt-2">
-                <small class="text-info"><i class="bi bi-info-circle"></i> اضغط لعرض التفاصيل</small>
-            </div>
         </div>
     </div>
 
-    <!-- بطاقة المشتركين -->
+    <!-- المشتركين -->
     <div class="col-xl-3 col-md-6">
         <div class="dashboard-card text-center clickable" data-bs-toggle="modal" data-bs-target="#subscribersDetailsModal">
             <div class="icon-circle mx-auto" style="background: rgba(34, 197, 94, 0.1); border: 1px solid rgba(34, 197, 94, 0.2);">
-                <i class="bi bi-people-fill text-success" style="font-size: 2rem;"></i>
+                <i class="bi bi-people-fill text-success"></i>
             </div>
             <div class="stat-number">{{ sub_count }}</div>
             <div class="stat-label">إجمالي المشتركين</div>
-            <div class="d-flex justify-content-center mb-3">
-                <span class="badge bg-success bg-opacity-10 text-success border border-success px-3 py-2 rounded-pill">
+            <div class="d-flex justify-content-center">
+                <span class="badge bg-success bg-opacity-10 text-success border border-success px-3 py-1 rounded-pill" style="font-size: 0.72rem;">
                     <i class="bi bi-check-circle"></i> {{ active_subs }} نشط
                 </span>
             </div>
-            <div class="text-center mt-2">
-                <small class="text-success"><i class="bi bi-info-circle"></i> اضغط لعرض المنتهين والمتوقفين</small>
-            </div>
         </div>
     </div>
 
-    <!-- بطاقة إيرادات اليوم -->
+    <!-- الإيرادات -->
     <div class="col-xl-3 col-md-6">
         <div class="dashboard-card text-center clickable" data-bs-toggle="modal" data-bs-target="#revenueDetailsModal">
             <div class="icon-circle mx-auto" style="background: rgba(245, 158, 11, 0.1); border: 1px solid rgba(245, 158, 11, 0.3);">
-                <i class="bi bi-cash-coin text-warning" style="font-size: 2rem;"></i>
+                <i class="bi bi-cash-coin text-warning"></i>
             </div>
             <div class="stat-number">{{ today_revenue }}</div>
             <div class="stat-label">إيرادات اليوم (ل.س)</div>
-            <div class="d-flex justify-content-center mb-3">
-                <span class="badge bg-warning bg-opacity-10 text-warning border border-warning px-3 py-2 rounded-pill">
+            <div class="d-flex justify-content-center">
+                <span class="badge bg-warning bg-opacity-10 text-warning border border-warning px-3 py-1 rounded-pill" style="font-size: 0.72rem;">
                     <i class="bi bi-graph-up-arrow"></i> إيراد يومي
                 </span>
-            </div>
-            <div class="text-center mt-2">
-                <small class="text-warning"><i class="bi bi-info-circle"></i> اضغط لعرض المبيعات</small>
             </div>
         </div>
     </div>
 
-    <!-- بطاقة التلجرام -->
+    <!-- تلجرام -->
     <div class="col-xl-3 col-md-6">
         <div class="dashboard-card text-center clickable" data-bs-toggle="modal" data-bs-target="#telegramDetailsModal">
             <div class="icon-circle mx-auto" style="background: rgba(34, 158, 217, 0.1); border: 1px solid rgba(34, 158, 217, 0.3);">
-                <i class="bi bi-telegram" style="font-size: 2rem; color: #229ED9;"></i>
+                <i class="bi bi-telegram" style="color: #229ED9;"></i>
             </div>
             <div class="stat-number">
                 {% if telegram_status and telegram_status.enabled %}
-                    <span class="text-success fs-3">مفعل</span>
+                    <span class="text-success" style="font-size: 1.2rem;">مفعل</span>
                 {% else %}
-                    <span class="text-danger fs-3">معطل</span>
+                    <span class="text-danger" style="font-size: 1.2rem;">معطل</span>
                 {% endif %}
             </div>
             <div class="stat-label">إشعارات التلجرام</div>
-            <div class="d-flex justify-content-center mb-3">
-                <span class="badge bg-info bg-opacity-10 text-info border border-info px-3 py-2 rounded-pill">
-                    <i class="bi bi-bell"></i> الإشعارات: {{ recent_telegram_logs|length }}
+            <div class="d-flex justify-content-center">
+                <span class="badge bg-info bg-opacity-10 text-info border border-info px-3 py-1 rounded-pill" style="font-size: 0.72rem;">
+                    <i class="bi bi-bell"></i> {{ recent_telegram_logs|length }}
                 </span>
-            </div>
-            <div class="text-center mt-2">
-                <small class="text-info"><i class="bi bi-info-circle"></i> اضغط لعرض التفاصيل</small>
             </div>
         </div>
     </div>
 </div>
 
-<!-- ========================================================== -->
-<!-- ✅ قسم مراقبة الترافيك المباشر (جديد) -->
-<!-- ========================================================== -->
-<div class="traffic-section" id="trafficSection">
-    <!-- رأس القسم -->
+<!-- ✅ قسم مراقبة الترافيك (مضغوط ومُصلَّح) -->
+<div class="traffic-section">
     <div class="traffic-section-header">
         <div class="traffic-section-title">
             <i class="bi bi-activity"></i>
@@ -574,14 +573,13 @@
                 <span class="live-dot"></span> LIVE
             </span>
         </div>
-        
         <a href="{{ url_for('traffic_monitor_page') }}" class="traffic-full-link">
             <i class="bi bi-arrows-fullscreen"></i> الصفحة الكاملة
         </a>
     </div>
 
     <!-- أدوات التحكم -->
-    <div class="traffic-controls mb-3">
+    <div class="traffic-controls mb-2">
         <select id="dashRouterSelect" class="traffic-select" onchange="onDashRouterChange()">
             <option value="">🔌 اختر الراوتر...</option>
             {% for r in routers %}
@@ -595,6 +593,9 @@
                    oninput="dashFilterInterfaces()"
                    onfocus="dashShowDropdown()">
             <i class="bi bi-search search-icon"></i>
+            <button class="clear-btn" id="dashClearBtn" onclick="dashClearSearch()" type="button">
+                <i class="bi bi-x-circle-fill"></i>
+            </button>
             <div class="traffic-dropdown" id="dashInterfaceDropdown"></div>
         </div>
 
@@ -602,11 +603,11 @@
 
         <button id="dashDirectionBtn" class="traffic-direction-btn" onclick="dashToggleDirection()">
             <i class="bi bi-arrow-left-right"></i>
-            <span id="dashDirectionText">الاتجاه: تلقائي</span>
+            <span id="dashDirectionText">تلقائي</span>
         </button>
 
         <button id="dashStartBtn" class="btn-traffic-start" onclick="dashStartMonitoring()">
-            <i class="bi bi-play-fill"></i> بدء المراقبة
+            <i class="bi bi-play-fill"></i> بدء
         </button>
         <button id="dashStopBtn" class="btn-traffic-stop" onclick="dashStopMonitoring()" style="display: none;">
             <i class="bi bi-stop-fill"></i> إيقاف
@@ -614,29 +615,29 @@
     </div>
 
     <!-- حالة الاتصال -->
-    <div id="dashStatus" class="mb-3" style="display: none;">
-        <span class="badge bg-success bg-opacity-10 text-success border border-success px-3 py-2 rounded-pill" style="font-size: 0.8rem;">
-            <span class="pulse-dot" style="width: 6px; height: 6px;"></span>
+    <div id="dashStatus" class="mb-2" style="display: none;">
+        <span class="badge bg-success bg-opacity-10 text-success border border-success px-2 py-1 rounded-pill" style="font-size: 0.7rem;">
+            <span class="pulse-dot" style="width: 5px; height: 5px;"></span>
             <span id="dashStatusText">جاري الاتصال...</span>
         </span>
     </div>
 
-    <!-- محتوى الترافيك: إما حالة فارغة أو بطاقات -->
+    <!-- حالة فارغة -->
     <div id="trafficEmptyState" class="traffic-empty">
         <i class="bi bi-bar-chart-line"></i>
-        <h6 class="mb-2">لا توجد مراقبة نشطة</h6>
-        <p class="text-muted small mb-0">اختر الراوتر والمنفذ ثم اضغط "بدء المراقبة" لعرض البيانات المباشرة</p>
+        <h6>لا توجد مراقبة نشطة</h6>
+        <p>اختر الراوتر والمنفذ ثم اضغط "بدء"</p>
     </div>
 
-    <div id="trafficContent" class="row g-3" style="display: none;">
-        <!-- بطاقة الرفع -->
+    <!-- محتوى الترافيك -->
+    <div id="trafficContent" class="row g-2" style="display: none;">
         <div class="col-md-6">
             <div class="traffic-mini-card upload">
                 <div class="traffic-mini-header">
                     <div class="traffic-mini-label upload">
-                        <i class="bi bi-arrow-up-circle-fill"></i> رفع (Upload)
+                        <i class="bi bi-arrow-up-circle-fill"></i> رفع
                     </div>
-                    <span class="badge" id="dashUploadBadge" style="background: rgba(245, 158, 11, 0.1); color: #f59e0b; border: 1px solid rgba(245, 158, 11, 0.3); font-size: 0.75rem;">0 Mbps</span>
+                    <span class="badge" id="dashUploadBadge" style="background: rgba(245, 158, 11, 0.1); color: #f59e0b; border: 1px solid rgba(245, 158, 11, 0.3); font-size: 0.65rem;">0 Mbps</span>
                 </div>
                 <div class="traffic-mini-rate upload">
                     <span id="dashUploadRate">0.00</span>
@@ -646,7 +647,7 @@
                     <div class="traffic-mini-progress-bar upload" id="dashUploadProgress" style="width: 0%;"></div>
                 </div>
                 <div class="traffic-mini-total">
-                    <span><i class="bi bi-hdd-stack"></i> إجمالي الرفع:</span>
+                    <span><i class="bi bi-hdd-stack"></i> إجمالي:</span>
                     <span id="dashUploadTotal" class="fw-bold">0 GB</span>
                 </div>
                 <div class="traffic-mini-chart">
@@ -654,15 +655,13 @@
                 </div>
             </div>
         </div>
-
-        <!-- بطاقة التحميل -->
         <div class="col-md-6">
             <div class="traffic-mini-card download">
                 <div class="traffic-mini-header">
                     <div class="traffic-mini-label download">
-                        <i class="bi bi-arrow-down-circle-fill"></i> تحميل (Download)
+                        <i class="bi bi-arrow-down-circle-fill"></i> تحميل
                     </div>
-                    <span class="badge" id="dashDownloadBadge" style="background: rgba(34, 197, 94, 0.1); color: #22c55e; border: 1px solid rgba(34, 197, 94, 0.3); font-size: 0.75rem;">0 Mbps</span>
+                    <span class="badge" id="dashDownloadBadge" style="background: rgba(34, 197, 94, 0.1); color: #22c55e; border: 1px solid rgba(34, 197, 94, 0.3); font-size: 0.65rem;">0 Mbps</span>
                 </div>
                 <div class="traffic-mini-rate download">
                     <span id="dashDownloadRate">0.00</span>
@@ -672,7 +671,7 @@
                     <div class="traffic-mini-progress-bar download" id="dashDownloadProgress" style="width: 0%;"></div>
                 </div>
                 <div class="traffic-mini-total">
-                    <span><i class="bi bi-hdd-stack"></i> إجمالي التحميل:</span>
+                    <span><i class="bi bi-hdd-stack"></i> إجمالي:</span>
                     <span id="dashDownloadTotal" class="fw-bold">0 GB</span>
                 </div>
                 <div class="traffic-mini-chart">
@@ -683,17 +682,17 @@
     </div>
 </div>
 
-<!-- ✅ الصف الثالث: الأحداث + سجل التلجرام -->
-<div class="row g-4 mb-4">
+<!-- الصف الثالث: الأحداث + تلجرام -->
+<div class="row g-3 mb-3">
     <div class="col-lg-8">
         <div class="dashboard-card p-0 overflow-hidden">
-            <div class="d-flex justify-content-between align-items-center p-4 border-bottom" style="border-color: var(--bg-hover) !important;">
-                <h6 class="mb-0 fw-bold text-accent">
+            <div class="d-flex justify-content-between align-items-center p-3 border-bottom" style="border-color: var(--bg-hover) !important;">
+                <h6 class="mb-0 fw-bold text-accent" style="font-size: 0.9rem;">
                     <i class="bi bi-activity"></i> آخر الأحداث
                 </h6>
-                <span class="badge bg-secondary bg-opacity-25">{{ events|length }} حدث</span>
+                <span class="badge bg-secondary bg-opacity-25" style="font-size: 0.7rem;">{{ events|length }} حدث</span>
             </div>
-            <div class="table-responsive" style="max-height: 380px; overflow-y: auto;">
+            <div class="table-responsive" style="max-height: 300px; overflow-y: auto;">
                 <table class="table table-hover table-clean mb-0 text-center">
                     <thead>
                         <tr>
@@ -707,17 +706,17 @@
                     <tbody>
                         {% for e in events %}
                         <tr>
-                            <td class="text-muted small">{{ e.created_at | localtime('%H:%M:%S') }}</td>
-                            <td><span class="badge bg-info bg-opacity-10 text-info">{{ e.admin_name or 'النظام' }}</span></td>
+                            <td class="text-muted">{{ e.created_at | localtime('%H:%M:%S') }}</td>
+                            <td><span class="badge bg-info bg-opacity-10 text-info" style="font-size: 0.68rem;">{{ e.admin_name or 'النظام' }}</span></td>
                             <td class="fw-bold">{{ e.action }}</td>
                             <td>{{ e.target or '-' }}</td>
-                            <td class="text-muted small">{{ e.details or '-' }}</td>
+                            <td class="text-muted">{{ e.details or '-' }}</td>
                         </tr>
                         {% else %}
                         <tr>
-                            <td colspan="5" class="text-center py-5 text-muted">
-                                <i class="bi bi-inbox fs-2 d-block mb-2"></i>
-                                لا توجد أحداث مسجلة
+                            <td colspan="5" class="text-center py-4 text-muted">
+                                <i class="bi bi-inbox" style="font-size: 1.5rem;"></i>
+                                <div style="font-size: 0.75rem; margin-top: 4px;">لا توجد أحداث</div>
                             </td>
                         </tr>
                         {% endfor %}
@@ -728,42 +727,42 @@
     </div>
 
     <div class="col-lg-4">
-        <div class="dashboard-card p-0 overflow-hidden d-flex flex-column">
-            <div class="d-flex justify-content-between align-items-center p-4 border-bottom" style="border-color: var(--bg-hover) !important;">
-                <h6 class="mb-0 fw-bold text-accent d-flex align-items-center gap-2">
+        <div class="dashboard-card p-0 overflow-hidden">
+            <div class="d-flex justify-content-between align-items-center p-3 border-bottom" style="border-color: var(--bg-hover) !important;">
+                <h6 class="mb-0 fw-bold text-accent d-flex align-items-center gap-2" style="font-size: 0.9rem;">
                     <i class="bi bi-telegram" style="color: #229ED9;"></i>
                     سجل الإشعارات
                 </h6>
                 {% if telegram_status and telegram_status.enabled %}
-                    <span class="badge bg-success bg-opacity-10 text-success border border-success">
-                        <span class="pulse-dot" style="width: 6px; height: 6px;"></span> نشط
+                    <span class="badge bg-success bg-opacity-10 text-success border border-success" style="font-size: 0.65rem;">
+                        <span class="pulse-dot" style="width: 5px; height: 5px;"></span> نشط
                     </span>
                 {% else %}
-                    <span class="badge bg-secondary">معطل</span>
+                    <span class="badge bg-secondary" style="font-size: 0.65rem;">معطل</span>
                 {% endif %}
             </div>
-            <div class="flex-grow-1" style="max-height: 380px; overflow-y: auto;">
+            <div style="max-height: 300px; overflow-y: auto;">
                 {% for log in recent_telegram_logs %}
-                <div class="p-3 border-bottom" style="border-color: var(--bg-hover) !important;">
+                <div class="p-2 border-bottom" style="border-color: var(--bg-hover) !important;">
                     <div class="d-flex justify-content-between align-items-center mb-1">
-                        <div class="d-flex align-items-center gap-2">
+                        <div class="d-flex align-items-center gap-1">
                             {% if log.status == 'success' %}
-                                <i class="bi bi-check-circle-fill text-success"></i>
+                                <i class="bi bi-check-circle-fill text-success" style="font-size: 0.7rem;"></i>
                             {% else %}
-                                <i class="bi bi-x-circle-fill text-danger"></i>
+                                <i class="bi bi-x-circle-fill text-danger" style="font-size: 0.7rem;"></i>
                             {% endif %}
-                            <small class="text-muted fw-bold">{{ log.message_type }}</small>
+                            <small class="text-muted fw-bold" style="font-size: 0.7rem;">{{ log.message_type }}</small>
                         </div>
-                        <small class="text-muted">{{ log.created_at | localtime('%m-%d %H:%M') }}</small>
+                        <small class="text-muted" style="font-size: 0.65rem;">{{ log.created_at | localtime('%m-%d %H:%M') }}</small>
                     </div>
-                    <div class="text-muted small" style="font-size: 0.8rem;">
-                        {{ log.message[:80] }}{% if log.message|length > 80 %}...{% endif %}
+                    <div class="text-muted" style="font-size: 0.7rem;">
+                        {{ log.message[:60] }}{% if log.message|length > 60 %}...{% endif %}
                     </div>
                 </div>
                 {% else %}
-                <div class="p-5 text-center text-muted">
-                    <i class="bi bi-bell-slash fs-2 d-block mb-2"></i>
-                    لا توجد إشعارات
+                <div class="p-4 text-center text-muted">
+                    <i class="bi bi-bell-slash" style="font-size: 1.5rem;"></i>
+                    <div style="font-size: 0.75rem; margin-top: 4px;">لا توجد إشعارات</div>
                 </div>
                 {% endfor %}
             </div>
@@ -771,65 +770,55 @@
     </div>
 </div>
 
-<!-- ✅ الصف الرابع: إعدادات المدير -->
-<div class="row g-4 mb-4">
+<!-- إعدادات المدير -->
+<div class="row g-3 mb-3">
     <div class="col-12">
         <div class="dashboard-card">
-            <h6 class="fw-bold text-accent mb-4">
+            <h6 class="fw-bold text-accent mb-2" style="font-size: 0.9rem;">
                 <i class="bi bi-shield-lock"></i> إعدادات حساب المدير
             </h6>
-            <p class="text-muted small mb-4">يمكنك تغيير اسم المستخدم أو كلمة المرور الخاصة بحسابك من هنا.</p>
-            <button class="btn btn-outline-warning w-100 py-3 rounded-3" data-bs-toggle="modal" data-bs-target="#changeCredentialsModal">
+            <p class="text-muted mb-2" style="font-size: 0.75rem;">يمكنك تغيير اسم المستخدم أو كلمة المرور.</p>
+            <button class="btn btn-outline-warning w-100 py-2 rounded-3" style="font-size: 0.8rem;" data-bs-toggle="modal" data-bs-target="#changeCredentialsModal">
                 <i class="bi bi-key-fill"></i> تغيير بيانات الدخول
             </button>
         </div>
     </div>
 </div>
 
-<!-- ==================== النوافذ المنبثقة (Modals) ==================== -->
+<!-- ==================== النوافذ ==================== -->
 
-<!-- MikroTik Modal -->
 <div class="modal fade" id="mikrotikDetailsModal" tabindex="-1">
     <div class="modal-dialog modal-dialog-centered modal-lg">
-        <div class="modal-content border-0 shadow-lg" style="border-radius: 16px; background-color: var(--bg-card);">
+        <div class="modal-content border-0 shadow-lg" style="border-radius: 12px; background-color: var(--bg-card);">
             <div class="modal-header mikrotik-modal-header">
-                <h5 class="modal-title fw-bold">
-                    <i class="bi bi-router"></i> تفاصيل سيرفرات MikroTik
-                </h5>
+                <h5 class="modal-title fw-bold" style="font-size: 1rem;"><i class="bi bi-router"></i> تفاصيل سيرفرات MikroTik</h5>
                 <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
             </div>
-            <div class="modal-body p-4">
-                <div class="row g-3 mb-4 text-center">
+            <div class="modal-body p-3">
+                <div class="row g-2 mb-3 text-center">
                     <div class="col-4">
-                        <div class="p-3 rounded-3" style="background-color: var(--bg-main); border: 1px solid var(--bg-hover);">
-                            <h4 class="fw-bold text-accent mb-0">{{ routers_count }}</h4>
-                            <small class="text-muted">إجمالي</small>
+                        <div class="p-2 rounded-3" style="background-color: var(--bg-main); border: 1px solid var(--bg-hover);">
+                            <h5 class="fw-bold text-accent mb-0">{{ routers_count }}</h5>
+                            <small class="text-muted" style="font-size: 0.7rem;">إجمالي</small>
                         </div>
                     </div>
                     <div class="col-4">
-                        <div class="p-3 rounded-3" style="background-color: var(--bg-main); border: 1px solid var(--bg-hover);">
-                            <h4 class="fw-bold text-success mb-0">{{ routers_online }}</h4>
-                            <small class="text-muted">متصل</small>
+                        <div class="p-2 rounded-3" style="background-color: var(--bg-main); border: 1px solid var(--bg-hover);">
+                            <h5 class="fw-bold text-success mb-0">{{ routers_online }}</h5>
+                            <small class="text-muted" style="font-size: 0.7rem;">متصل</small>
                         </div>
                     </div>
                     <div class="col-4">
-                        <div class="p-3 rounded-3" style="background-color: var(--bg-main); border: 1px solid var(--bg-hover);">
-                            <h4 class="fw-bold text-danger mb-0">{{ routers_count - routers_online }}</h4>
-                            <small class="text-muted">متوقف</small>
+                        <div class="p-2 rounded-3" style="background-color: var(--bg-main); border: 1px solid var(--bg-hover);">
+                            <h5 class="fw-bold text-danger mb-0">{{ routers_count - routers_online }}</h5>
+                            <small class="text-muted" style="font-size: 0.7rem;">متوقف</small>
                         </div>
                     </div>
                 </div>
-                <div class="table-responsive" style="max-height: 300px; overflow-y: auto; border: 1px solid var(--bg-hover); border-radius: 10px;">
+                <div class="table-responsive" style="max-height: 300px; overflow-y: auto; border: 1px solid var(--bg-hover); border-radius: 8px;">
                     <table class="table table-hover table-clean mb-0 text-center">
                         <thead>
-                            <tr>
-                                <th>#</th>
-                                <th>الاسم</th>
-                                <th>IP</th>
-                                <th>SSH</th>
-                                <th>API</th>
-                                <th>الحالة</th>
-                            </tr>
+                            <tr><th>#</th><th>الاسم</th><th>IP</th><th>SSH</th><th>API</th><th>الحالة</th></tr>
                         </thead>
                         <tbody>
                             {% for r in routers %}
@@ -841,50 +830,39 @@
                                 <td><span class="text-info fw-bold">{{ r.api_port or 13 }}</span></td>
                                 <td>
                                     {% if r.is_active %}
-                                        <span class="badge bg-success bg-opacity-10 text-success border border-success">🟢 متصل</span>
+                                        <span class="badge bg-success bg-opacity-10 text-success border border-success">🟢</span>
                                     {% else %}
-                                        <span class="badge bg-danger bg-opacity-10 text-danger border border-danger">🔴 متوقف</span>
+                                        <span class="badge bg-danger bg-opacity-10 text-danger border border-danger">🔴</span>
                                     {% endif %}
                                 </td>
                             </tr>
                             {% else %}
-                            <tr><td colspan="6" class="text-center py-4 text-muted">لا توجد سيرفرات</td></tr>
+                            <tr><td colspan="6" class="text-center py-3 text-muted">لا توجد سيرفرات</td></tr>
                             {% endfor %}
                         </tbody>
                     </table>
                 </div>
             </div>
-            <div class="modal-footer border-top" style="border-color: var(--bg-hover) !important; background-color: var(--bg-hover); border-radius: 0 0 16px 16px;">
-                <a href="{{ url_for('routers') }}" class="btn btn-outline-info rounded-3">
-                    <i class="bi bi-gear"></i> الإدارة الكاملة
-                </a>
-                <button type="button" class="btn btn-secondary rounded-3" data-bs-dismiss="modal">إغلاق</button>
+            <div class="modal-footer border-top" style="border-color: var(--bg-hover) !important; background-color: var(--bg-hover); border-radius: 0 0 12px 12px;">
+                <a href="{{ url_for('routers') }}" class="btn btn-outline-info btn-sm rounded-3">الإدارة الكاملة</a>
+                <button type="button" class="btn btn-secondary btn-sm rounded-3" data-bs-dismiss="modal">إغلاق</button>
             </div>
         </div>
     </div>
 </div>
 
-<!-- Subscribers Modal -->
 <div class="modal fade" id="subscribersDetailsModal" tabindex="-1">
     <div class="modal-dialog modal-dialog-centered modal-lg">
-        <div class="modal-content border-0 shadow-lg" style="border-radius: 16px; background-color: var(--bg-card);">
+        <div class="modal-content border-0 shadow-lg" style="border-radius: 12px; background-color: var(--bg-card);">
             <div class="modal-header subscribers-modal-header">
-                <h5 class="modal-title fw-bold">
-                    <i class="bi bi-people-fill"></i> الحسابات المنتهية والمتوقفة
-                </h5>
+                <h5 class="modal-title fw-bold" style="font-size: 1rem;"><i class="bi bi-people-fill"></i> الحسابات المنتهية والمتوقفة</h5>
                 <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
             </div>
-            <div class="modal-body p-4">
-                <div class="table-responsive" style="max-height: 350px; overflow-y: auto; border: 1px solid var(--bg-hover); border-radius: 10px;">
+            <div class="modal-body p-3">
+                <div class="table-responsive" style="max-height: 350px; overflow-y: auto; border: 1px solid var(--bg-hover); border-radius: 8px;">
                     <table class="table table-hover table-clean mb-0 text-center">
                         <thead>
-                            <tr>
-                                <th>#</th>
-                                <th>الاسم</th>
-                                <th>المستخدم</th>
-                                <th>الحالة</th>
-                                <th>ينتهي</th>
-                            </tr>
+                            <tr><th>#</th><th>الاسم</th><th>المستخدم</th><th>الحالة</th><th>ينتهي</th></tr>
                         </thead>
                         <tbody>
                             {% for sub in inactive_subs %}
@@ -894,79 +872,77 @@
                                 <td class="text-muted">{{ sub.username }}</td>
                                 <td>
                                     {% if sub.status == 'expired' %}
-                                        <span class="badge bg-danger bg-opacity-10 text-danger border border-danger">🔴 منتهي</span>
+                                        <span class="badge bg-danger bg-opacity-10 text-danger border border-danger">منتهي</span>
                                     {% elif sub.status == 'paused' %}
-                                        <span class="badge bg-warning bg-opacity-10 text-warning border border-warning">⏸ موقوف</span>
+                                        <span class="badge bg-warning bg-opacity-10 text-warning border border-warning">موقوف</span>
                                     {% endif %}
                                 </td>
-                                <td class="text-muted small">{{ sub.expires_at.strftime('%Y-%m-%d') if sub.expires_at else '-' }}</td>
+                                <td class="text-muted">{{ sub.expires_at.strftime('%Y-%m-%d') if sub.expires_at else '-' }}</td>
                             </tr>
                             {% else %}
-                            <tr><td colspan="5" class="text-center py-4 text-muted">لا توجد حسابات</td></tr>
+                            <tr><td colspan="5" class="text-center py-3 text-muted">لا توجد حسابات</td></tr>
                             {% endfor %}
                         </tbody>
                     </table>
                 </div>
             </div>
-            <div class="modal-footer border-top" style="border-color: var(--bg-hover) !important; background-color: var(--bg-hover); border-radius: 0 0 16px 16px;">
-                <a href="{{ url_for('subscribers') }}" class="btn btn-outline-info rounded-3">الإدارة الكاملة</a>
-                <button type="button" class="btn btn-secondary rounded-3" data-bs-dismiss="modal">إغلاق</button>
+            <div class="modal-footer border-top" style="border-color: var(--bg-hover) !important; background-color: var(--bg-hover); border-radius: 0 0 12px 12px;">
+                <a href="{{ url_for('subscribers') }}" class="btn btn-outline-info btn-sm rounded-3">الإدارة الكاملة</a>
+                <button type="button" class="btn btn-secondary btn-sm rounded-3" data-bs-dismiss="modal">إغلاق</button>
             </div>
         </div>
     </div>
 </div>
 
-<!-- Revenue Modal -->
 <div class="modal fade" id="revenueDetailsModal" tabindex="-1">
     <div class="modal-dialog modal-dialog-centered modal-lg">
-        <div class="modal-content border-0 shadow-lg" style="border-radius: 16px; background-color: var(--bg-card);">
+        <div class="modal-content border-0 shadow-lg" style="border-radius: 12px; background-color: var(--bg-card);">
             <div class="modal-header revenue-modal-header">
-                <h5 class="modal-title fw-bold"><i class="bi bi-cash-coin"></i> تفاصيل الإيرادات</h5>
+                <h5 class="modal-title fw-bold" style="font-size: 1rem;"><i class="bi bi-cash-coin"></i> تفاصيل الإيرادات</h5>
                 <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
             </div>
-            <div class="modal-body p-4">
-                <div class="row g-3 mb-4">
+            <div class="modal-body p-3">
+                <div class="row g-2">
                     <div class="col-md-4">
                         <div class="revenue-box">
-                            <h6 class="text-muted mb-1">مبيعات اليوم</h6>
-                            <h3 class="fw-bold text-warning mb-0">{{ today_revenue }}</h3>
-                            <small class="text-muted">ل.س</small>
+                            <h6 class="text-muted mb-1" style="font-size: 0.75rem;">مبيعات اليوم</h6>
+                            <h4 class="fw-bold text-warning mb-0">{{ today_revenue }}</h4>
+                            <small class="text-muted" style="font-size: 0.7rem;">ل.س</small>
                         </div>
                     </div>
                     <div class="col-md-4">
                         <div class="revenue-box">
-                            <h6 class="text-muted mb-1">مبيعات الشهر</h6>
-                            <h3 class="fw-bold text-info mb-0">{{ monthly_revenue|default(0) }}</h3>
-                            <small class="text-muted">ل.س</small>
+                            <h6 class="text-muted mb-1" style="font-size: 0.75rem;">مبيعات الشهر</h6>
+                            <h4 class="fw-bold text-info mb-0">{{ monthly_revenue|default(0) }}</h4>
+                            <small class="text-muted" style="font-size: 0.7rem;">ل.س</small>
                         </div>
                     </div>
                     <div class="col-md-4">
                         <div class="revenue-box">
-                            <h6 class="text-muted mb-1">مبيعات السنة</h6>
-                            <h3 class="fw-bold mb-0" style="color: #a855f7;">{{ yearly_revenue|default(0) }}</h3>
-                            <small class="text-muted">ل.س</small>
+                            <h6 class="text-muted mb-1" style="font-size: 0.75rem;">مبيعات السنة</h6>
+                            <h4 class="fw-bold mb-0" style="color: #a855f7;">{{ yearly_revenue|default(0) }}</h4>
+                            <small class="text-muted" style="font-size: 0.7rem;">ل.س</small>
                         </div>
                     </div>
                 </div>
             </div>
-            <div class="modal-footer border-top" style="border-color: var(--bg-hover) !important; background-color: var(--bg-hover); border-radius: 0 0 16px 16px;">
-                <a href="{{ url_for('payments') }}" class="btn btn-outline-warning rounded-3">سجل الدفعات</a>
-                <button type="button" class="btn btn-secondary rounded-3" data-bs-dismiss="modal">إغلاق</button>
+            <div class="modal-footer border-top" style="border-color: var(--bg-hover) !important; background-color: var(--bg-hover); border-radius: 0 0 12px 12px;">
+                <a href="{{ url_for('payments') }}" class="btn btn-outline-warning btn-sm rounded-3">سجل الدفعات</a>
+                <button type="button" class="btn btn-secondary btn-sm rounded-3" data-bs-dismiss="modal">إغلاق</button>
             </div>
         </div>
     </div>
 </div>
 
-<!-- Telegram Modal -->
 <div class="modal fade" id="telegramDetailsModal" tabindex="-1">
     <div class="modal-dialog modal-dialog-centered modal-lg">
-        <div class="modal-content border-0 shadow-lg" style="border-radius: 16px; background-color: var(--bg-card);">
+        <div class="modal-content border-0 shadow-lg" style="border-radius: 12px; background-color: var(--bg-card);">
             <div class="modal-header telegram-modal-header">
-                <h5 class="modal-title fw-bold"><i class="bi bi-telegram"></i> تفاصيل الإشعارات</h5>
+                <h5 class="modal-title fw-bold" style="font-size: 1rem;"><i class="bi bi-telegram"></i> تفاصيل الإشعارات</h5>
                 <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
             </div>
-            <div class="modal-body p-4">
-                <div class="table-responsive" style="max-height: 300px; overflow-y: auto; border: 1px solid var(--bg-hover); border-radius: 10px;">
+            <div class="modal-body p-3">
+                <div class="table-responsive" style="max-height: 300px; overflow-y: auto; border: 1px solid var(--bg-hover); border-radius: 8px;">
                     <table class="table table-hover table-clean mb-0">
                         <thead>
                             <tr><th>الوقت</th><th>النوع</th><th>الحالة</th><th>الرسالة</th></tr>
@@ -974,8 +950,8 @@
                         <tbody>
                             {% for log in recent_telegram_logs %}
                             <tr>
-                                <td class="text-muted small">{{ log.created_at | localtime('%m-%d %H:%M') }}</td>
-                                <td><span class="badge bg-secondary">{{ log.message_type }}</span></td>
+                                <td class="text-muted">{{ log.created_at | localtime('%m-%d %H:%M') }}</td>
+                                <td><span class="badge bg-secondary" style="font-size: 0.68rem;">{{ log.message_type }}</span></td>
                                 <td>
                                     {% if log.status == 'success' %}
                                         <i class="bi bi-check-circle-fill text-success"></i>
@@ -983,61 +959,60 @@
                                         <i class="bi bi-x-circle-fill text-danger"></i>
                                     {% endif %}
                                 </td>
-                                <td class="text-muted small">{{ log.message[:50] }}</td>
+                                <td class="text-muted">{{ log.message[:50] }}</td>
                             </tr>
                             {% else %}
-                            <tr><td colspan="4" class="text-center py-4 text-muted">لا توجد إشعارات</td></tr>
+                            <tr><td colspan="4" class="text-center py-3 text-muted">لا توجد إشعارات</td></tr>
                             {% endfor %}
                         </tbody>
                     </table>
                 </div>
             </div>
-            <div class="modal-footer border-top" style="border-color: var(--bg-hover) !important; background-color: var(--bg-hover); border-radius: 0 0 16px 16px;">
-                <a href="{{ url_for('admin_settings') }}" class="btn btn-outline-info rounded-3">الإعدادات الكاملة</a>
-                <button type="button" class="btn btn-secondary rounded-3" data-bs-dismiss="modal">إغلاق</button>
+            <div class="modal-footer border-top" style="border-color: var(--bg-hover) !important; background-color: var(--bg-hover); border-radius: 0 0 12px 12px;">
+                <a href="{{ url_for('admin_settings') }}" class="btn btn-outline-info btn-sm rounded-3">الإعدادات الكاملة</a>
+                <button type="button" class="btn btn-secondary btn-sm rounded-3" data-bs-dismiss="modal">إغلاق</button>
             </div>
         </div>
     </div>
 </div>
 
-<!-- Modal تغيير بيانات المدير -->
 <div class="modal fade" id="changeCredentialsModal" tabindex="-1">
     <div class="modal-dialog modal-dialog-centered">
-        <div class="modal-content border-0 shadow-lg" style="border-radius: 16px; background-color: var(--bg-card);">
+        <div class="modal-content border-0 shadow-lg" style="border-radius: 12px; background-color: var(--bg-card);">
             <form method="POST" action="{{ url_for('change_admin_credentials') }}">
-                <div class="modal-header border-bottom" style="border-color: var(--bg-hover) !important; background-color: var(--bg-hover); border-radius: 16px 16px 0 0;">
-                    <h5 class="modal-title text-accent fw-bold"><i class="bi bi-shield-lock"></i> تغيير بيانات الدخول</h5>
+                <div class="modal-header border-bottom" style="border-color: var(--bg-hover) !important; background-color: var(--bg-hover); border-radius: 12px 12px 0 0;">
+                    <h5 class="modal-title text-accent fw-bold" style="font-size: 1rem;"><i class="bi bi-shield-lock"></i> تغيير بيانات الدخول</h5>
                     <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
                 </div>
-                <div class="modal-body p-4">
-                    <div class="mb-3">
-                        <label class="form-label fw-bold text-muted">اسم المستخدم الجديد</label>
-                        <input type="text" name="new_username" class="form-control" style="background-color: var(--bg-main); color: var(--text-main); border: 1px solid var(--bg-hover);">
+                <div class="modal-body p-3">
+                    <div class="mb-2">
+                        <label class="form-label fw-bold text-muted" style="font-size: 0.78rem;">اسم المستخدم الجديد</label>
+                        <input type="text" name="new_username" class="form-control" style="background-color: var(--bg-main); color: var(--text-main); border: 1px solid var(--bg-hover); font-size: 0.85rem;">
                     </div>
-                    <div class="mb-3">
-                        <label class="form-label fw-bold text-muted">كلمة المرور الحالية *</label>
-                        <input type="password" name="current_password" class="form-control" style="background-color: var(--bg-main); color: var(--text-main); border: 1px solid var(--bg-hover);" required>
+                    <div class="mb-2">
+                        <label class="form-label fw-bold text-muted" style="font-size: 0.78rem;">كلمة المرور الحالية *</label>
+                        <input type="password" name="current_password" class="form-control" style="background-color: var(--bg-main); color: var(--text-main); border: 1px solid var(--bg-hover); font-size: 0.85rem;" required>
                     </div>
                     <hr style="border-color: var(--bg-hover);">
-                    <div class="mb-3">
-                        <label class="form-label fw-bold text-muted">كلمة المرور الجديدة</label>
-                        <input type="password" name="new_password" class="form-control" style="background-color: var(--bg-main); color: var(--text-main); border: 1px solid var(--bg-hover);">
+                    <div class="mb-2">
+                        <label class="form-label fw-bold text-muted" style="font-size: 0.78rem;">كلمة المرور الجديدة</label>
+                        <input type="password" name="new_password" class="form-control" style="background-color: var(--bg-main); color: var(--text-main); border: 1px solid var(--bg-hover); font-size: 0.85rem;">
                     </div>
-                    <div class="mb-3">
-                        <label class="form-label fw-bold text-muted">تأكيد كلمة المرور</label>
-                        <input type="password" name="confirm_password" class="form-control" style="background-color: var(--bg-main); color: var(--text-main); border: 1px solid var(--bg-hover);">
+                    <div class="mb-2">
+                        <label class="form-label fw-bold text-muted" style="font-size: 0.78rem;">تأكيد كلمة المرور</label>
+                        <input type="password" name="confirm_password" class="form-control" style="background-color: var(--bg-main); color: var(--text-main); border: 1px solid var(--bg-hover); font-size: 0.85rem;">
                     </div>
                 </div>
-                <div class="modal-footer border-top" style="border-color: var(--bg-hover) !important; background-color: var(--bg-hover); border-radius: 0 0 16px 16px;">
-                    <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal" style="color: var(--text-main); border-color: var(--text-muted);">إلغاء</button>
-                    <button type="submit" class="btn btn-primary"><i class="bi bi-save"></i> حفظ</button>
+                <div class="modal-footer border-top" style="border-color: var(--bg-hover) !important; background-color: var(--bg-hover); border-radius: 0 0 12px 12px;">
+                    <button type="button" class="btn btn-outline-secondary btn-sm" data-bs-dismiss="modal" style="color: var(--text-main); border-color: var(--text-muted);">إلغاء</button>
+                    <button type="submit" class="btn btn-primary btn-sm"><i class="bi bi-save"></i> حفظ</button>
                 </div>
             </form>
         </div>
     </div>
 </div>
 
-<!-- ==================== JavaScript للترافيك ==================== -->
+<!-- ==================== JavaScript ==================== -->
 <script>
     let dashUploadChart, dashDownloadChart;
     let dashMonitoringInterval = null;
@@ -1054,7 +1029,20 @@
     let dashDownloadData = [];
     let dashLabels = [];
 
-    // ============ الاتجاه ============
+    // ✅ دالة escape لتفادي مشاكل HTML في أسماء المنافذ
+    function escapeHtml(str) {
+        if (str === null || str === undefined) return '';
+        return String(str).replace(/[&<>"']/g, function(m) {
+            return {
+                '&': '&amp;',
+                '<': '&lt;',
+                '>': '&gt;',
+                '"': '&quot;',
+                "'": '&#39;'
+            }[m];
+        });
+    }
+
     function dashLoadDirection() {
         try {
             dashIsDirectionReversed = localStorage.getItem(DASH_DIRECTION_KEY) === 'true';
@@ -1067,10 +1055,10 @@
         const text = document.getElementById('dashDirectionText');
         if (dashIsDirectionReversed) {
             btn.classList.add('reversed');
-            text.textContent = 'الاتجاه: معكوس';
+            text.textContent = 'معكوس';
         } else {
             btn.classList.remove('reversed');
-            text.textContent = 'الاتجاه: تلقائي';
+            text.textContent = 'تلقائي';
         }
     }
 
@@ -1098,7 +1086,6 @@
         }
     }
 
-    // ============ حفظ الحالة ============
     function dashSaveState(routerId, iface, isMonitoring) {
         try {
             localStorage.setItem(DASH_STORAGE_KEY, JSON.stringify({
@@ -1114,7 +1101,6 @@
         } catch(e) { return null; }
     }
 
-    // ============ الرسوم البيانية ============
     function dashInitCharts() {
         const ctxU = document.getElementById('dashUploadChart').getContext('2d');
         const ctxD = document.getElementById('dashDownloadChart').getContext('2d');
@@ -1129,12 +1115,12 @@
                 y: {
                     beginAtZero: true,
                     grid: { color: 'rgba(255,255,255,0.05)' },
-                    ticks: { color: '#94a3b8', font: { size: 9 }, maxTicksLimit: 4 }
+                    ticks: { color: '#94a3b8', font: { size: 8 }, maxTicksLimit: 3 }
                 }
             },
             elements: {
                 point: { radius: 0 },
-                line: { tension: 0.4, borderWidth: 2 }
+                line: { tension: 0.4, borderWidth: 1.8 }
             }
         };
 
@@ -1151,55 +1137,72 @@
         });
     }
 
-    // ============ جلب المنافذ ============
     function dashFetchInterfaces(routerId, callback) {
         const input = document.getElementById('dashInterfaceSearch');
         input.value = '';
         input.placeholder = '⏳ جاري الجلب...';
         input.disabled = true;
         document.getElementById('dashStatus').style.display = 'block';
-        document.getElementById('dashStatusText').textContent = 'جاري الاتصال بالـ API...';
+        document.getElementById('dashStatusText').textContent = 'جاري الاتصال...';
 
         fetch(`/api/traffic/interfaces/${routerId}`)
-            .then(r => r.json())
+            .then(res => {
+                if (!res.ok) {
+                    return res.text().then(t => { throw new Error(`HTTP ${res.status}`); });
+                }
+                return res.json();
+            })
             .then(data => {
                 if (data.ok) {
-                    dashAllInterfaces = data.interfaces;
+                    dashAllInterfaces = data.interfaces || [];
                     input.disabled = false;
-                    input.placeholder = `🔍 ابحث عن منفذ... (${data.interfaces.length})`;
-                    document.getElementById('dashStatusText').textContent = `✅ ${data.interfaces.length} منفذ متاح`;
+                    input.placeholder = `🔍 ابحث... (${dashAllInterfaces.length})`;
+                    document.getElementById('dashStatusText').textContent = `✅ ${dashAllInterfaces.length} منفذ`;
                     dashRenderDropdown(dashAllInterfaces);
                     if (callback) callback();
                 } else {
                     input.placeholder = '❌ خطأ';
                     document.getElementById('dashStatusText').textContent = '❌ ' + (data.error || 'فشل');
+                    input.disabled = false;
                 }
             })
-            .catch(() => {
+            .catch(err => {
+                console.error('❌ Fetch Error:', err);
                 input.placeholder = '❌ فشل';
                 document.getElementById('dashStatusText').textContent = '❌ فشل الاتصال';
+                input.disabled = false;
             });
     }
 
+    // ✅ عرض المنافذ بشكل صحيح مع escape HTML
     function dashRenderDropdown(interfaces) {
         const dd = document.getElementById('dashInterfaceDropdown');
         if (interfaces.length === 0) {
-            dd.innerHTML = '<div style="padding: 15px; text-align: center; color: var(--text-muted); font-size: 0.8rem;">لا توجد نتائج</div>';
+            dd.innerHTML = '<div style="padding: 12px; text-align: center; color: var(--text-muted); font-size: 0.75rem;">لا توجد نتائج</div>';
             return;
         }
         dd.innerHTML = interfaces.map(i => {
             const cls = i.running ? 'iface-running' : 'iface-idle';
-            const txt = i.running ? '🟢' : '⚪';
-            return `<div class="traffic-dropdown-item" onclick="dashSelectInterface('${i.name.replace(/'/g, "\\'")}')">
-                <span style="font-family: monospace;">${i.name}</span>
-                <span class="${cls}" style="font-size: 0.7rem;">${txt}</span>
+            const txt = i.running ? '🟢 يعمل' : '⚪ متوقف';
+            const safeName = escapeHtml(i.name);
+            const isSel = i.name === dashSelectedInterface ? 'selected' : '';
+            return `<div class="traffic-dropdown-item ${isSel}" onclick="dashSelectInterface('${escapeHtml(i.name).replace(/'/g, "\\'")}')">
+                <span class="iface-name" title="${safeName}">${safeName}</span>
+                <span class="iface-status-badge ${cls}">${txt}</span>
             </div>`;
         }).join('');
     }
 
     function dashFilterInterfaces() {
         const q = document.getElementById('dashInterfaceSearch').value.toLowerCase().trim();
-        const filtered = q ? dashAllInterfaces.filter(i => i.name.toLowerCase().includes(q) || (i.type && i.type.toLowerCase().includes(q))) : dashAllInterfaces;
+        const clearBtn = document.getElementById('dashClearBtn');
+        clearBtn.style.display = q ? 'block' : 'none';
+        
+        const filtered = q ? dashAllInterfaces.filter(i => 
+            i.name.toLowerCase().includes(q) || 
+            (i.type && i.type.toLowerCase().includes(q))
+        ) : dashAllInterfaces;
+        
         dashRenderDropdown(filtered);
         document.getElementById('dashInterfaceDropdown').classList.add('show');
     }
@@ -1210,10 +1213,18 @@
         }
     }
 
+    function dashClearSearch() {
+        document.getElementById('dashInterfaceSearch').value = '';
+        document.getElementById('dashClearBtn').style.display = 'none';
+        dashRenderDropdown(dashAllInterfaces);
+        document.getElementById('dashInterfaceDropdown').classList.add('show');
+    }
+
     function dashSelectInterface(name) {
         dashSelectedInterface = name;
         document.getElementById('dashInterfaceSelect').value = name;
         document.getElementById('dashInterfaceSearch').value = name;
+        document.getElementById('dashClearBtn').style.display = 'block';
         document.getElementById('dashInterfaceDropdown').classList.remove('show');
         const routerId = document.getElementById('dashRouterSelect').value;
         dashSaveState(routerId, name, false);
@@ -1233,7 +1244,7 @@
         if (!rid) {
             input.value = '';
             input.disabled = true;
-            input.placeholder = '🔍 ابحث عن منفذ...';
+            input.placeholder = '🔍 ابحث...';
             document.getElementById('dashInterfaceDropdown').classList.remove('show');
             document.getElementById('dashStatus').style.display = 'none';
             dashAllInterfaces = [];
@@ -1247,7 +1258,6 @@
         dashFetchInterfaces(rid, null);
     }
 
-    // ============ بدء/إيقاف ============
     function dashStartMonitoring() {
         const rid = document.getElementById('dashRouterSelect').value;
         const iface = dashSelectedInterface;
@@ -1292,8 +1302,8 @@
                 const s = data.stats;
                 const rx = dashParseMbps(s.rx_rate);
                 const tx = dashParseMbps(s.tx_rate);
-                const rxB = parseInt(s.rx_byte);
-                const txB = parseInt(s.tx_byte);
+                const rxB = parseInt(s.rx_byte) || 0;
+                const txB = parseInt(s.tx_byte) || 0;
 
                 let upRate, downRate, upByte, downByte;
                 if (dashIsDirectionReversed) {
@@ -1343,7 +1353,6 @@
         return isNaN(n) ? 0 : n / 1000000;
     }
 
-    // ============ استعادة الحالة ============
     window.addEventListener('DOMContentLoaded', function() {
         dashLoadDirection();
         const state = dashLoadState();
