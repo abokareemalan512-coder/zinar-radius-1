@@ -147,6 +147,10 @@ class Subscriber(db.Model):
     current_ip = db.Column(db.String(50))
     ip_updated_at = db.Column(db.DateTime)
     last_seen_at = db.Column(db.DateTime)
+    session_uptime = db.Column(db.String(50))
+    session_rx_bytes = db.Column(db.BigInteger, default=0)
+    session_tx_bytes = db.Column(db.BigInteger, default=0)
+    connected_at = db.Column(db.DateTime)
 
 
 class Payment(db.Model):
@@ -288,7 +292,28 @@ def _safe_int(value, default=0):
         return default
 
 
-# ============ فك ترميز MikroTik ============
+def _calculate_connected_at(uptime_str):
+    """تحويل uptime من MikroTik مثل '1h30m25s' إلى datetime"""
+    try:
+        if not uptime_str:
+            return None
+        total_seconds = 0
+        m = re.search(r'(\d+)w', uptime_str)
+        if m: total_seconds += int(m.group(1)) * 604800
+        m = re.search(r'(\d+)d', uptime_str)
+        if m: total_seconds += int(m.group(1)) * 86400
+        m = re.search(r'(\d+)h', uptime_str)
+        if m: total_seconds += int(m.group(1)) * 3600
+        m = re.search(r'(\d+)m', uptime_str)
+        if m: total_seconds += int(m.group(1)) * 60
+        m = re.search(r'(\d+)s', uptime_str)
+        if m: total_seconds += int(m.group(1))
+        return datetime.utcnow() - timedelta(seconds=total_seconds)
+    except Exception:
+        return None
+
+
+# ============ MikroTik Escape Decoder ============
 
 def decode_mikrotik_escapes(text):
     if not text or '\\' not in text:
@@ -673,7 +698,7 @@ def background_router_monitor():
                             notify_router_status_change(r.name, r.ip_address, current_state)
                     except Exception as db_err:
                         db.session.rollback()
-                        logger.warning(f"⚠️ خطأ قاعدة بيانات: {db_err}")
+                        logger.warning(f"⚠️ خطأ: {db_err}")
         except Exception as e:
             logger.warning(f"⚠️ خطأ في مراقبة الراوترات: {e}")
         finally:
@@ -701,7 +726,7 @@ def get_mikrotik_api(router):
         raise Exception(f"فشل الاتصال بالـ API على المنفذ {router.api_port}: {str(e)}")
 
 
-# ============ Background IP Updater ============
+# ============ Background IP + Session Updater ============
 
 def fetch_active_ips_from_router(router):
     if not LIBROUTEROS_AVAILABLE:
@@ -716,8 +741,12 @@ def fetch_active_ips_from_router(router):
                 addr = _safe_str(ppp.get('address'))
                 if uname and addr and addr != '0.0.0.0':
                     result[uname] = {
-                        'ip': addr, 'uptime': _safe_str(ppp.get('uptime', '')),
-                        'type': 'pppoe', 'router_id': router.id
+                        'ip': addr,
+                        'uptime': _safe_str(ppp.get('uptime', '')),
+                        'rx_bytes': _safe_int(ppp.get('bytes-in', 0), 0),
+                        'tx_bytes': _safe_int(ppp.get('bytes-out', 0), 0),
+                        'type': 'pppoe',
+                        'router_id': router.id
                     }
         except Exception as e:
             logger.warning(f"⚠️ فشل جلب PPP active من {router.name}: {e}")
@@ -729,8 +758,12 @@ def fetch_active_ips_from_router(router):
                     if ':' in addr:
                         addr = addr.split(':')[0]
                     result[uname] = {
-                        'ip': addr, 'uptime': _safe_str(hs.get('uptime', '')),
-                        'type': 'hotspot', 'router_id': router.id
+                        'ip': addr,
+                        'uptime': _safe_str(hs.get('uptime', '')),
+                        'rx_bytes': _safe_int(hs.get('bytes-in', 0), 0),
+                        'tx_bytes': _safe_int(hs.get('bytes-out', 0), 0),
+                        'type': 'hotspot',
+                        'router_id': router.id
                     }
         except Exception as e:
             logger.warning(f"⚠️ فشل جلب Hotspot active من {router.name}: {e}")
@@ -769,6 +802,11 @@ def background_ip_updater():
                                 if sub.router_id != router.id:
                                     sub.router_id = router.id
                                     changed = True
+                                sub.session_uptime = info.get('uptime', '')
+                                sub.session_rx_bytes = info.get('rx_bytes', 0)
+                                sub.session_tx_bytes = info.get('tx_bytes', 0)
+                                if info.get('uptime'):
+                                    sub.connected_at = _calculate_connected_at(info['uptime'])
                                 sub.ip_updated_at = datetime.utcnow()
                                 sub.last_seen_at = datetime.utcnow()
                                 if changed:
@@ -887,6 +925,10 @@ def ensure_columns():
                         ('current_ip', "ALTER TABLE subscribers ADD COLUMN current_ip VARCHAR(50)"),
                         ('ip_updated_at', "ALTER TABLE subscribers ADD COLUMN ip_updated_at TIMESTAMP"),
                         ('last_seen_at', "ALTER TABLE subscribers ADD COLUMN last_seen_at TIMESTAMP"),
+                        ('session_uptime', "ALTER TABLE subscribers ADD COLUMN session_uptime VARCHAR(50)"),
+                        ('session_rx_bytes', "ALTER TABLE subscribers ADD COLUMN session_rx_bytes BIGINT DEFAULT 0"),
+                        ('session_tx_bytes', "ALTER TABLE subscribers ADD COLUMN session_tx_bytes BIGINT DEFAULT 0"),
+                        ('connected_at', "ALTER TABLE subscribers ADD COLUMN connected_at TIMESTAMP"),
                     ]:
                         if col not in cols:
                             conn.execute(text(sql))
@@ -914,7 +956,7 @@ ip_updater_thread = threading.Thread(target=background_ip_updater, daemon=True)
 ip_updater_thread.start()
 
 
-# ============ API Routes ============
+# ============ API للميكروتيك ============
 
 @app.route('/api/auth', methods=['GET', 'POST'])
 def api_auth():
@@ -1112,7 +1154,7 @@ def api_import_packages():
         return jsonify({'ok': False, 'error': str(e)}), 500
 
 
-# ============ Traffic Monitor API ============
+# ============ Traffic API ============
 
 @app.route('/api/traffic/interfaces/<int:router_id>')
 def api_get_interfaces(router_id):
@@ -1133,12 +1175,9 @@ def api_get_interfaces(router_id):
             running = _safe_bool(iface.get('running'), False)
             interfaces.append({'name': name, 'type': iface_type, 'running': running})
         interfaces.sort(key=lambda x: x['name'])
-        return jsonify({
-            'ok': True, 'interfaces': interfaces, 'method': 'API', 'count': len(interfaces)
-        })
+        return jsonify({'ok': True, 'interfaces': interfaces, 'method': 'API', 'count': len(interfaces)})
     except Exception as e:
         logger.error(f"❌ خطأ جلب المنافذ: {e}")
-        logger.error(traceback.format_exc())
         return jsonify({'ok': False, 'error': str(e)}), 500
     finally:
         if api:
@@ -1203,8 +1242,6 @@ def api_get_traffic_stats(router_id, interface):
                 pass
 
 
-# ============ Dashboard Data API ============
-
 @app.route('/api/dashboard_data')
 def api_dashboard_data():
     try:
@@ -1234,6 +1271,9 @@ def api_dashboard_data():
             'routers_online': Router.query.filter_by(is_active=True).count(),
             'sub_count': Subscriber.query.count(),
             'active_subs': Subscriber.query.filter_by(status='active').count(),
+            'online_count': Subscriber.query.filter(
+                Subscriber.current_ip.isnot(None), Subscriber.current_ip != ''
+            ).count(),
             'today_revenue': f"{today_revenue:.0f}",
             'new_users_today': new_users_today,
             'events': events_data, 'telegram_logs': logs_data
@@ -1476,6 +1516,7 @@ def dashboard():
             Subscriber.current_ip.isnot(None),
             Subscriber.current_ip != ''
         ).order_by(Subscriber.last_seen_at.desc()).all()
+        top_online_subs = online_subs[:10]
 
         return render_template(
             'dashboard.html',
@@ -1501,6 +1542,7 @@ def dashboard():
             recent_payments=recent_payments,
             recent_routers=recent_routers,
             online_subs=online_subs,
+            top_online_subs=top_online_subs,
         )
     except Exception as e:
         db.session.rollback()
@@ -1723,8 +1765,6 @@ def subscribers():
     )
 
 
-# ============ مزامنة فورية من MikroTik ============
-
 @app.route('/subscribers/sync-now', methods=['POST'])
 def sync_subscribers_now():
     try:
@@ -1748,6 +1788,11 @@ def sync_subscribers_now():
                         if sub.router_id != router.id:
                             sub.router_id = router.id
                             changed = True
+                        sub.session_uptime = info.get('uptime', '')
+                        sub.session_rx_bytes = info.get('rx_bytes', 0)
+                        sub.session_tx_bytes = info.get('tx_bytes', 0)
+                        if info.get('uptime'):
+                            sub.connected_at = _calculate_connected_at(info['uptime'])
                         sub.ip_updated_at = datetime.utcnow()
                         sub.last_seen_at = datetime.utcnow()
                         if changed:
@@ -1766,8 +1811,6 @@ def sync_subscribers_now():
         logger.error(f"❌ Sync error: {e}")
         return jsonify({'ok': False, 'error': str(e)}), 500
 
-
-# ============ إدارة المشتركين ============
 
 @app.route('/add-subscriber', methods=['GET', 'POST'])
 @app.route('/subscribers/add', methods=['GET', 'POST'])
@@ -2150,8 +2193,6 @@ def export_subscribers(format):
     return redirect(url_for('subscribers'))
 
 
-# ============ الباقات ============
-
 @app.route('/packages', methods=['GET', 'POST'])
 def packages():
     if request.method == 'POST':
@@ -2218,8 +2259,6 @@ def delete_package(pkg_id):
         flash(f'❌ {str(e)}', 'danger')
     return redirect(url_for('packages'))
 
-
-# ============ إعدادات التلجرام ============
 
 @app.route('/admin-settings', methods=['GET'])
 def admin_settings():
