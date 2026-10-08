@@ -109,6 +109,122 @@
         box-shadow: 0 0 0 0.2rem var(--accent-glow);
     }
 
+    /* ✅ خانة البحث للمنافذ */
+    .interface-search-wrapper {
+        position: relative;
+        width: 250px;
+    }
+    .interface-search-wrapper input {
+        width: 100%;
+        padding: 10px 40px 10px 14px;
+        background-color: var(--bg-card);
+        color: var(--text-main);
+        border: 1px solid var(--bg-hover);
+        border-radius: 10px;
+        font-weight: 500;
+        transition: all 0.2s;
+    }
+    .interface-search-wrapper input:focus {
+        background-color: var(--bg-card);
+        color: var(--text-main);
+        border-color: var(--accent);
+        box-shadow: 0 0 0 0.2rem var(--accent-glow);
+        outline: none;
+    }
+    .interface-search-wrapper input::placeholder {
+        color: var(--text-muted);
+    }
+    .interface-search-wrapper .search-icon {
+        position: absolute;
+        right: 14px;
+        top: 50%;
+        transform: translateY(-50%);
+        color: var(--text-muted);
+        pointer-events: none;
+    }
+    .interface-search-wrapper .clear-btn {
+        position: absolute;
+        left: 14px;
+        top: 50%;
+        transform: translateY(-50%);
+        background: none;
+        border: none;
+        color: var(--text-muted);
+        cursor: pointer;
+        display: none;
+        padding: 0;
+        font-size: 1.1rem;
+    }
+    .interface-search-wrapper .clear-btn:hover {
+        color: #ef4444;
+    }
+
+    /* ✅ قائمة المنافذ المنسدلة مع البحث */
+    .interface-dropdown {
+        position: absolute;
+        top: 100%;
+        right: 0;
+        left: 0;
+        margin-top: 5px;
+        background-color: var(--bg-card);
+        border: 1px solid var(--bg-hover);
+        border-radius: 10px;
+        max-height: 350px;
+        overflow-y: auto;
+        z-index: 1000;
+        box-shadow: 0 10px 25px rgba(0,0,0,0.3);
+        display: none;
+    }
+    .interface-dropdown.show {
+        display: block;
+    }
+    .interface-item {
+        padding: 10px 14px;
+        cursor: pointer;
+        border-bottom: 1px solid var(--bg-hover);
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        transition: all 0.15s;
+        color: var(--text-main);
+    }
+    .interface-item:last-child {
+        border-bottom: none;
+    }
+    .interface-item:hover {
+        background-color: rgba(56, 189, 248, 0.1);
+        color: var(--accent);
+    }
+    .interface-item.selected {
+        background-color: rgba(56, 189, 248, 0.15);
+        color: var(--accent);
+        font-weight: 600;
+    }
+    .interface-item .iface-name {
+        font-family: monospace;
+        font-size: 0.9rem;
+    }
+    .interface-item .iface-meta {
+        font-size: 0.75rem;
+        color: var(--text-muted);
+    }
+    .interface-item .iface-status {
+        display: inline-flex;
+        align-items: center;
+        gap: 4px;
+        font-size: 0.7rem;
+        padding: 2px 8px;
+        border-radius: 10px;
+    }
+    .iface-running {
+        background: rgba(34, 197, 94, 0.1);
+        color: #22c55e;
+    }
+    .iface-idle {
+        background: rgba(148, 163, 184, 0.1);
+        color: #94a3b8;
+    }
+
     /* ✅ زر تبديل الاتجاه */
     .direction-toggle {
         display: inline-flex;
@@ -166,6 +282,7 @@
     </div>
 
     <div class="d-flex gap-2 flex-wrap align-items-center">
+        <!-- الراوتر -->
         <select id="routerSelect" class="control-select" onchange="onRouterChange()">
             <option value="">🔌 اختر الراوتر...</option>
             {% for r in routers %}
@@ -173,11 +290,27 @@
             {% endfor %}
         </select>
 
-        <select id="interfaceSelect" class="control-select" disabled onchange="onInterfaceChange()">
-            <option value="">📡 اختر المنفذ...</option>
-        </select>
+        <!-- ✅ خانة البحث عن منفذ -->
+        <div class="interface-search-wrapper">
+            <input type="text" id="interfaceSearch" placeholder="🔍 ابحث عن منفذ..." 
+                   autocomplete="off" disabled
+                   oninput="filterInterfaces()"
+                   onfocus="showInterfaceDropdown()">
+            <i class="bi bi-search search-icon"></i>
+            <button class="clear-btn" id="clearSearchBtn" onclick="clearInterfaceSearch()" type="button">
+                <i class="bi bi-x-circle-fill"></i>
+            </button>
+            
+            <!-- قائمة المنافذ المنسدلة -->
+            <div class="interface-dropdown" id="interfaceDropdown">
+                <!-- سيتم تعبئتها بـ JavaScript -->
+            </div>
+        </div>
 
-        <!-- ✅ زر تبديل الاتجاه -->
+        <!-- حقل مخفي يحمل اسم المنفذ المختار -->
+        <input type="hidden" id="interfaceSelect" value="">
+
+        <!-- زر تبديل الاتجاه -->
         <button id="directionBtn" class="direction-toggle" onclick="toggleDirection()" title="تبديل اتجاه الرفع والتحميل">
             <i class="bi bi-arrow-left-right" id="directionIcon"></i>
             <span id="directionText">الاتجاه: تلقائي</span>
@@ -208,7 +341,6 @@
 
 <!-- منطقة المراقبة -->
 <div class="row g-4" id="monitoringArea" style="display: none;">
-    <!-- التحميل -->
     <div class="col-md-6">
         <div class="traffic-card">
             <div class="traffic-header">
@@ -235,7 +367,6 @@
         </div>
     </div>
 
-    <!-- الرفع -->
     <div class="col-md-6">
         <div class="traffic-card">
             <div class="traffic-header">
@@ -269,8 +400,8 @@
     <div>
         <strong>كيف تستخدم زر الاتجاه؟</strong>
         <ul class="mb-0 mt-1" style="padding-right: 20px;">
-            <li>إذا كان <strong>التحميل أعلى من الرفع</strong> (يوجد تحميل للفيديوهات والملفات) — الاتجاه صحيح ✅</li>
-            <li>إذا كان <strong>الرفع أعلى من التحميل</strong> (وهذا غير منطقي لمستخدمي الإنترنت) — اضغط زر <strong>الاتجاه</strong> لتبديله 🔄</li>
+            <li>إذا كان <strong>التحميل أعلى من الرفع</strong> — الاتجاه صحيح ✅</li>
+            <li>إذا كان <strong>الرفع أعلى من التحميل</strong> — اضغط زر <strong>الاتجاه</strong> لتبديله 🔄</li>
         </ul>
     </div>
 </div>
@@ -288,10 +419,11 @@
     let downloadData = [];
     let labels = [];
 
-    // ✅ حالة الاتجاه: false = طبيعي (rx=download)، true = معكوس (rx=upload)
     let isDirectionReversed = false;
+    let allInterfaces = [];  // ✅ قائمة جميع المنافذ
+    let selectedInterface = '';  // ✅ المنفذ المختار
 
-    // ✅ تحميل حالة الاتجاه من localStorage
+    // ============ الاتجاه ============
     function loadDirection() {
         try {
             const saved = localStorage.getItem(DIRECTION_KEY);
@@ -329,7 +461,6 @@
         saveDirection();
         updateDirectionUI();
 
-        // مسح البيانات الحالية وإعادة الرسم
         uploadData.length = 0;
         downloadData.length = 0;
         labels.length = 0;
@@ -345,14 +476,13 @@
             downloadChart.update();
         }
 
-        // إعادة جلب البيانات فوراً
         const routerId = document.getElementById('routerSelect').value;
-        const interfaceName = document.getElementById('interfaceSelect').value;
-        if (routerId && interfaceName && monitoringInterval) {
-            fetchTrafficData(routerId, interfaceName);
+        if (routerId && selectedInterface && monitoringInterval) {
+            fetchTrafficData(routerId, selectedInterface);
         }
     }
 
+    // ============ حفظ الحالة ============
     function saveState(routerId, interfaceName, isMonitoring) {
         try {
             localStorage.setItem(STORAGE_KEY, JSON.stringify({
@@ -374,6 +504,7 @@
         try { localStorage.removeItem(STORAGE_KEY); } catch(e) {}
     }
 
+    // ============ الرسوم البيانية ============
     function initCharts() {
         const ctxUpload = document.getElementById('uploadChart').getContext('2d');
         const ctxDownload = document.getElementById('downloadChart').getContext('2d');
@@ -426,12 +557,14 @@
         });
     }
 
+    // ============ جلب المنافذ ============
     function fetchInterfaces(routerId, callback) {
-        const interfaceSelect = document.getElementById('interfaceSelect');
+        const searchInput = document.getElementById('interfaceSearch');
         const statusDiv = document.getElementById('connectionStatus');
 
-        interfaceSelect.innerHTML = '<option value="">⏳ جاري الجلب...</option>';
-        interfaceSelect.disabled = true;
+        searchInput.value = '';
+        searchInput.placeholder = '⏳ جاري الجلب...';
+        searchInput.disabled = true;
         statusDiv.style.display = 'block';
         document.getElementById('statusText').textContent = 'جاري الاتصال بالـ API...';
 
@@ -439,60 +572,137 @@
             .then(res => res.json())
             .then(data => {
                 if (data.ok) {
-                    interfaceSelect.innerHTML = '<option value="">📡 اختر المنفذ...</option>';
-                    data.interfaces.forEach(iface => {
-                        const opt = document.createElement('option');
-                        opt.value = iface.name;
-                        let label = iface.name;
-                        if (iface.running) {
-                            label += ' 🟢';
-                        } else if (iface.type) {
-                            label += ' ⚪';
-                        }
-                        if (iface.type) {
-                            label += ` (${iface.type})`;
-                        }
-                        opt.textContent = label;
-                        interfaceSelect.appendChild(opt);
-                    });
-                    interfaceSelect.disabled = false;
+                    allInterfaces = data.interfaces;
+                    searchInput.disabled = false;
+                    searchInput.placeholder = `🔍 ابحث عن منفذ... (${data.interfaces.length})`;
                     document.getElementById('statusText').textContent = `✅ تم جلب ${data.interfaces.length} منفذ عبر API`;
+                    renderInterfaceDropdown(allInterfaces);
+
                     if (callback) callback();
                 } else {
-                    interfaceSelect.innerHTML = '<option value="">❌ خطأ</option>';
+                    searchInput.placeholder = '❌ خطأ في الجلب';
                     document.getElementById('statusText').textContent = '❌ ' + (data.error || 'فشل الاتصال');
                 }
             })
             .catch(err => {
-                interfaceSelect.innerHTML = '<option value="">❌ فشل</option>';
+                searchInput.placeholder = '❌ فشل الاتصال';
                 document.getElementById('statusText').textContent = '❌ فشل الاتصال بالسيرفر';
             });
     }
 
+    // ============ عرض قائمة المنافذ ============
+    function renderInterfaceDropdown(interfaces) {
+        const dropdown = document.getElementById('interfaceDropdown');
+        
+        if (interfaces.length === 0) {
+            dropdown.innerHTML = '<div style="padding: 20px; text-align: center; color: var(--text-muted);">لا توجد نتائج</div>';
+            return;
+        }
+
+        dropdown.innerHTML = interfaces.map(iface => {
+            const statusClass = iface.running ? 'iface-running' : 'iface-idle';
+            const statusText = iface.running ? '🟢 يعمل' : '⚪ متوقف';
+            const isSelected = iface.name === selectedInterface;
+            
+            return `
+                <div class="interface-item ${isSelected ? 'selected' : ''}" 
+                     onclick="selectInterface('${iface.name.replace(/'/g, "\\'")}')">
+                    <div>
+                        <div class="iface-name">${iface.name}</div>
+                        <div class="iface-meta">${iface.type || 'unknown'}</div>
+                    </div>
+                    <span class="iface-status ${statusClass}">${statusText}</span>
+                </div>
+            `;
+        }).join('');
+    }
+
+    // ============ فلترة المنافذ ============
+    function filterInterfaces() {
+        const query = document.getElementById('interfaceSearch').value.toLowerCase().trim();
+        const clearBtn = document.getElementById('clearSearchBtn');
+        
+        if (query) {
+            clearBtn.style.display = 'block';
+        } else {
+            clearBtn.style.display = 'none';
+        }
+
+        const filtered = query 
+            ? allInterfaces.filter(iface => 
+                iface.name.toLowerCase().includes(query) || 
+                (iface.type && iface.type.toLowerCase().includes(query))
+            )
+            : allInterfaces;
+
+        renderInterfaceDropdown(filtered);
+        document.getElementById('interfaceDropdown').classList.add('show');
+    }
+
+    function showInterfaceDropdown() {
+        if (allInterfaces.length > 0) {
+            document.getElementById('interfaceDropdown').classList.add('show');
+        }
+    }
+
+    function clearInterfaceSearch() {
+        document.getElementById('interfaceSearch').value = '';
+        document.getElementById('clearSearchBtn').style.display = 'none';
+        renderInterfaceDropdown(allInterfaces);
+    }
+
+    // ============ اختيار منفذ ============
+    function selectInterface(name) {
+        selectedInterface = name;
+        document.getElementById('interfaceSelect').value = name;
+        document.getElementById('interfaceSearch').value = name;
+        document.getElementById('clearSearchBtn').style.display = 'block';
+        document.getElementById('interfaceDropdown').classList.remove('show');
+
+        const routerId = document.getElementById('routerSelect').value;
+        saveState(routerId, name, false);
+    }
+
+    // ✅ إغلاق القائمة عند النقر خارجها
+    document.addEventListener('click', function(e) {
+        const wrapper = document.querySelector('.interface-search-wrapper');
+        if (wrapper && !wrapper.contains(e.target)) {
+            document.getElementById('interfaceDropdown').classList.remove('show');
+        }
+    });
+
+    // ============ تغيير الراوتر ============
     function onRouterChange() {
         const routerId = document.getElementById('routerSelect').value;
+        const searchInput = document.getElementById('interfaceSearch');
+        
         if (!routerId) {
-            document.getElementById('interfaceSelect').innerHTML = '<option value="">📡 اختر المنفذ...</option>';
-            document.getElementById('interfaceSelect').disabled = true;
+            searchInput.value = '';
+            searchInput.disabled = true;
+            searchInput.placeholder = '🔍 ابحث عن منفذ...';
+            document.getElementById('interfaceDropdown').classList.remove('show');
             document.getElementById('connectionStatus').style.display = 'none';
             document.getElementById('directionInfo').style.display = 'none';
+            allInterfaces = [];
+            selectedInterface = '';
             clearState();
             return;
         }
+        
+        // مسح الاختيار السابق
+        selectedInterface = '';
+        document.getElementById('interfaceSelect').value = '';
+        document.getElementById('interfaceDropdown').innerHTML = '';
+        
         document.getElementById('directionInfo').style.display = 'block';
         saveState(routerId, '', false);
         fetchInterfaces(routerId, null);
     }
 
-    function onInterfaceChange() {
-        const routerId = document.getElementById('routerSelect').value;
-        const iface = document.getElementById('interfaceSelect').value;
-        saveState(routerId, iface, false);
-    }
-
+    // ============ بدء / إيقاف المراقبة ============
     function startMonitoring() {
         const routerId = document.getElementById('routerSelect').value;
-        const interfaceName = document.getElementById('interfaceSelect').value;
+        const interfaceName = selectedInterface;
 
         if (!routerId || !interfaceName) {
             alert('⚠️ الرجاء اختيار الراوتر والمنفذ أولاً');
@@ -524,11 +734,10 @@
         document.getElementById('stopBtn').style.display = 'none';
         document.getElementById('connectionStatus').style.display = 'none';
         const routerId = document.getElementById('routerSelect').value;
-        const iface = document.getElementById('interfaceSelect').value;
-        saveState(routerId, iface, false);
+        saveState(routerId, selectedInterface, false);
     }
 
-    // ✅ جلب البيانات مع تطبيق الاتجاه
+    // ============ جلب البيانات ============
     function fetchTrafficData(routerId, interfaceName) {
         fetch(`/api/traffic/stats/${routerId}/${interfaceName}`)
             .then(res => res.json())
@@ -539,26 +748,19 @@
                 }
 
                 const stats = data.stats;
+                const rx_rate_val = parseSpeedToMbps(stats.rx_rate);
+                const tx_rate_val = parseSpeedToMbps(stats.tx_rate);
+                const rx_byte_val = parseInt(stats.rx_byte);
+                const tx_byte_val = parseInt(stats.tx_byte);
 
-                // القيم الأصلية من الراوتر
-                const rx_rate_val = parseSpeedToMbps(stats.rx_rate);   // من الراوتر (rx)
-                const tx_rate_val = parseSpeedToMbps(stats.tx_rate);   // إلى الراوتر (tx)
-                const rx_byte_val = parseInt(stats.rx_byte);            // إجمالي مستلم
-                const tx_byte_val = parseInt(stats.tx_byte);            // إجمالي مرسل
-
-                // ✅ تطبيق الاتجاه
                 let uploadRateVal, downloadRateVal, uploadByteVal, downloadByteVal;
 
                 if (isDirectionReversed) {
-                    // الاتجاه المعكوس (LAN):
-                    // rx = رفع (من المستخدمين)، tx = تحميل (للمستخدمين)
                     uploadRateVal = rx_rate_val;
                     downloadRateVal = tx_rate_val;
                     uploadByteVal = rx_byte_val;
                     downloadByteVal = tx_byte_val;
                 } else {
-                    // الاتجاه الطبيعي (WAN):
-                    // rx = تحميل (من الإنترنت)، tx = رفع (للإنترنت)
                     uploadRateVal = tx_rate_val;
                     downloadRateVal = rx_rate_val;
                     uploadByteVal = tx_byte_val;
@@ -568,21 +770,17 @@
                 const uploadGB = (uploadByteVal / (1024 * 1024 * 1024)).toFixed(2);
                 const downloadGB = (downloadByteVal / (1024 * 1024 * 1024)).toFixed(2);
 
-                // تحديث الأرقام الرئيسية
                 document.getElementById('uploadRate').textContent = uploadRateVal.toFixed(2);
                 document.getElementById('downloadRate').textContent = downloadRateVal.toFixed(2);
                 document.getElementById('uploadTotal').textContent = uploadGB + ' GB';
                 document.getElementById('downloadTotal').textContent = downloadGB + ' GB';
 
-                // تحديث الشارات
                 document.getElementById('uploadRateBadge').textContent = uploadRateVal.toFixed(2) + ' Mbps';
                 document.getElementById('downloadRateBadge').textContent = downloadRateVal.toFixed(2) + ' Mbps';
 
-                // أشرطة التقدم
                 document.getElementById('uploadProgress').style.width = Math.min((uploadRateVal / 100) * 100, 100) + '%';
                 document.getElementById('downloadProgress').style.width = Math.min((downloadRateVal / 100) * 100, 100) + '%';
 
-                // تحديث الرسوم البيانية
                 const now = new Date().toLocaleTimeString('ar-EG', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
                 labels.push(now);
                 uploadData.push(uploadRateVal);
@@ -610,7 +808,7 @@
         return isNaN(num) ? 0 : num / 1000000;
     }
 
-    // ✅ استعادة الحالة عند التحميل
+    // ============ استعادة الحالة ============
     window.addEventListener('DOMContentLoaded', function() {
         loadDirection();
 
@@ -624,10 +822,9 @@
 
         fetchInterfaces(state.routerId, function() {
             if (state.interfaceName) {
-                const ifaceSelect = document.getElementById('interfaceSelect');
-                ifaceSelect.value = state.interfaceName;
+                selectInterface(state.interfaceName);
 
-                if (state.isMonitoring && ifaceSelect.value === state.interfaceName) {
+                if (state.isMonitoring) {
                     setTimeout(() => startMonitoring(), 500);
                 }
             }
