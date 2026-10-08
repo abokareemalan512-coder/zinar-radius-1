@@ -22,8 +22,8 @@
         cursor: pointer;
     }
     .dashboard-card.clickable:hover {
-        background-color: rgba(245, 158, 11, 0.05); /* لمسة لون ذهبي عند المرور */
-        border-color: #f59e0b;
+        background-color: rgba(56, 189, 248, 0.05);
+        border-color: var(--accent);
     }
     .icon-circle {
         width: 64px;
@@ -115,6 +115,15 @@
         transform: scale(1.02);
         border-color: #f59e0b;
     }
+    /* ✅ تنسيق أزرار عرض التفاصيل */
+    .details-btn {
+        transition: all 0.3s ease;
+        font-weight: 600;
+    }
+    .details-btn:hover {
+        transform: scale(1.05);
+        box-shadow: 0 0 15px rgba(255, 255, 255, 0.1);
+    }
 </style>
 
 <!-- ✅ ترحيب ووقت -->
@@ -167,8 +176,12 @@
                 <span><i class="bi bi-check-circle-fill text-success"></i> متصل: {{ routers_online }}</span>
                 <span><i class="bi bi-x-circle-fill text-danger"></i> متوقف: {{ routers_count - routers_online }}</span>
             </div>
-            <div class="text-center mt-2">
-                <small class="text-info"><i class="bi bi-info-circle"></i> اضغط لعرض التفاصيل</small>
+            
+            <!-- ✅ زر عرض التفاصيل -->
+            <div class="d-grid gap-2 mt-3">
+                <button class="btn btn-sm btn-outline-info rounded-pill details-btn">
+                    <i class="bi bi-info-circle"></i> عرض تفاصيل السيرفرات
+                </button>
             </div>
         </div>
     </div>
@@ -195,17 +208,20 @@
                 <span><i class="bi bi-pause-circle text-warning"></i> موقوف: {{ sub_count - active_subs }}</span>
                 <span><i class="bi bi-calendar-check text-info"></i> اليوم: {{ new_users_today }}</span>
             </div>
-            <div class="text-center mt-2">
-                <small class="text-success"><i class="bi bi-info-circle"></i> اضغط لعرض المنتهين والمتوقفين</small>
+            
+            <!-- ✅ زر عرض التفاصيل -->
+            <div class="d-grid gap-2 mt-3">
+                <button class="btn btn-sm btn-outline-success rounded-pill details-btn">
+                    <i class="bi bi-info-circle"></i> عرض المنتهين والمتوقفين
+                </button>
             </div>
         </div>
     </div>
 
-    <!-- ✅ بطاقة إيرادات اليوم (قابلة للضغط) -->
+    <!-- بطاقة إيرادات اليوم -->
     <div class="col-xl-3 col-md-6">
         <div class="dashboard-card text-center clickable" data-bs-toggle="modal" data-bs-target="#revenueDetailsModal">
             <div class="icon-circle mx-auto" style="background: rgba(245, 158, 11, 0.1); border: 1px solid rgba(245, 158, 11, 0.3);">
-                <!-- ✅ أيقونة محفظة ونقود حقيقية (SVG) -->
                 <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" fill="#f59e0b" viewBox="0 0 16 16">
                     <path d="M12.136.326A1.5 1.5 0 0 1 14 1.78V3h.5A1.5 1.5 0 0 1 16 4.5v9a1.5 1.5 0 0 1-1.5 1.5h-13A1.5 1.5 0 0 1 0 13.5v-9a1.5 1.5 0 0 1 1.432-1.499L12.136.326zM5.562 3a.5.5 0 0 0 0 .5V5h2V3.5a.5.5 0 0 0-.5-.5H5.562zM4 4.5V3.5A1.5 1.5 0 0 1 5.5 2h2A1.5 1.5 0 0 1 9 3.5V5h2.5A1.5 1.5 0 0 1 13 6.5v9a.5.5 0 0 1-.5.5h-13a.5.5 0 0 1-.5-.5v-9A1.5 1.5 0 0 1 1.5 5H4v-.5z"/>
                     <circle cx="12.5" cy="9.5" r="1.5" fill="#0f172a"/>
@@ -223,8 +239,12 @@
             <div class="d-flex justify-content-between text-muted small border-top pt-3" style="border-color: var(--bg-hover) !important;">
                 <span><i class="bi bi-hourglass-split text-info"></i> معلقة: {{ pending_pays }}</span>
             </div>
-            <div class="text-center mt-2">
-                <small class="text-warning"><i class="bi bi-info-circle"></i> اضغط لعرض المبيعات اليومية والشهرية والسنوية</small>
+            
+            <!-- ✅ زر عرض التفاصيل -->
+            <div class="d-grid gap-2 mt-3">
+                <button class="btn btn-sm btn-outline-warning rounded-pill details-btn">
+                    <i class="bi bi-info-circle"></i> عرض المبيعات والتفاصيل
+                </button>
             </div>
         </div>
     </div>
@@ -248,12 +268,19 @@
             
             <div class="d-flex justify-content-center mb-3">
                 <span class="badge bg-info bg-opacity-10 text-info border border-info px-3 py-2 rounded-pill">
-                    <i class="bi bi-info-circle"></i> عرض التفاصيل
+                    <i class="bi bi-bell"></i> الإشعارات: {{ recent_telegram_logs|length }}
                 </span>
             </div>
             
             <div class="d-flex justify-content-between text-muted small border-top pt-3" style="border-color: var(--bg-hover) !important;">
-                <span><i class="bi bi-bell"></i> الإشعارات: {{ recent_telegram_logs|length }}</span>
+                <span><i class="bi bi-gear"></i> الإعدادات</span>
+            </div>
+            
+            <!-- ✅ زر عرض التفاصيل -->
+            <div class="d-grid gap-2 mt-3">
+                <button class="btn btn-sm btn-outline-info rounded-pill details-btn">
+                    <i class="bi bi-info-circle"></i> عرض تفاصيل الإشعارات
+                </button>
             </div>
         </div>
     </div>
@@ -364,7 +391,7 @@
     </div>
 </div>
 
-<!-- ✅ نافذة تفاصيل إيرادات اليوم (جديدة) -->
+<!-- ✅ نافذة تفاصيل إيرادات اليوم -->
 <div class="modal fade" id="revenueDetailsModal" tabindex="-1">
     <div class="modal-dialog modal-dialog-centered modal-lg">
         <div class="modal-content border-0 shadow-lg" style="border-radius: 16px; background-color: var(--bg-card);">
@@ -378,8 +405,6 @@
                 <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
             </div>
             <div class="modal-body p-4">
-                
-                <!-- ✅ بطاقات المبيعات (يومي / شهري / سنوي) -->
                 <div class="row g-3 mb-4">
                     <div class="col-md-4">
                         <div class="revenue-box">
@@ -412,13 +437,9 @@
                         </div>
                     </div>
                 </div>
-
-                <!-- ملاحظة إضافية -->
                 <div class="alert alert-info bg-opacity-10 border-info small d-flex align-items-center gap-2">
                     <i class="bi bi-info-circle-fill fs-5"></i>
-                    <div>
-                        يتم احتساب هذه الإيرادات بناءً على الدفعات المكتملة (Completed) فقط.
-                    </div>
+                    <div>يتم احتساب هذه الإيرادات بناءً على الدفعات المكتملة (Completed) فقط.</div>
                 </div>
             </div>
             <div class="modal-footer border-top" style="border-color: var(--bg-hover) !important; background-color: var(--bg-hover); border-radius: 0 0 16px 16px;">
@@ -551,8 +572,6 @@
                 <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
             </div>
             <div class="modal-body p-4">
-                
-                <!-- إحصائيات سريعة -->
                 <div class="row g-3 mb-4 text-center">
                     <div class="col-4">
                         <div class="p-3 rounded-3" style="background-color: var(--bg-main); border: 1px solid var(--bg-hover);">
