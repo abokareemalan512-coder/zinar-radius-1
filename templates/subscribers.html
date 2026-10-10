@@ -114,6 +114,9 @@
     .ip-online { background: rgba(34, 197, 94, 0.12); color: #22c55e; border: 1px solid rgba(34, 197, 94, 0.35); }
     .ip-offline { background: rgba(148, 163, 184, 0.1); color: #94a3b8; border: 1px solid rgba(148, 163, 184, 0.3); }
     .ip-time { display: block; font-size: 0.62rem; opacity: 0.7; margin-top: 2px; font-family: 'Tajawal', sans-serif; }
+
+    /* ✅ إضافة: للزر المعطّل أثناء المزامنة */
+    .sync-btn-loading { pointer-events: none; opacity: 0.7; }
 </style>
 
 <div class="d-flex justify-content-between align-items-center mb-4 flex-wrap gap-3">
@@ -125,11 +128,13 @@
         <a href="{{ url_for('bulk_add') }}" class="btn btn-warning shadow-sm rounded-3 px-3 text-dark">
             <i class="bi bi-people-fill"></i> إضافة جماعية
         </a>
-        <button type="button" class="btn btn-info shadow-sm rounded-3 px-3" id="syncBtn" onclick="syncFromMikroTik()">
+        <!-- ✅ إصلاح: type=button صريح -->
+        <button type="button" class="btn btn-info shadow-sm rounded-3 px-3" id="syncBtn">
             <i class="bi bi-arrow-clockwise"></i> مزامنة من MikroTik
         </button>
         <form method="POST" action="{{ url_for('delete_expired_subscribers') }}" style="display: inline;"
-              onsubmit="return confirm('⚠️ سيتم حذف المنتهين من قاعدة البيانات فقط. متابعة؟')">
+              class="js-confirm-form"
+              data-confirm-msg="⚠️ سيتم حذف المنتهين من قاعدة البيانات فقط. متابعة؟">
             <button type="submit" class="btn btn-outline-danger shadow-sm rounded-3 px-3">
                 <i class="bi bi-hourglass-bottom"></i> حذف المنتهية
             </button>
@@ -140,7 +145,7 @@
 <div class="alert alert-info border-0 shadow-sm rounded-4 small d-flex align-items-center gap-2">
     <i class="bi bi-info-circle-fill fs-5"></i>
     <div>
-        <strong>ملاحظة:</strong> عمود "IP الراوتر" يُحدَّث تلقائياً كل دقيقتين من MikroTik. اضغط زر <strong>"مزامنة من MikroTik"</strong> للتحديث الفوري.
+        <strong>ملاحظة:</strong> عمود "IP المشترك" يُحدَّث تلقائياً كل دقيقتين من MikroTik. اضغط زر <strong>"مزامنة من MikroTik"</strong> للتحديث الفوري.
     </div>
 </div>
 
@@ -166,13 +171,16 @@
         </div>
         <div class="col-md-3">
             <div class="dropdown w-100">
-                <button class="btn btn-outline-info w-100 dropdown-toggle rounded-3" data-bs-toggle="dropdown">
+                <button type="button" class="btn btn-outline-info w-100 dropdown-toggle rounded-3" data-bs-toggle="dropdown">
                     <i class="bi bi-download"></i> تصدير البيانات
                 </button>
                 <ul class="dropdown-menu shadow">
-                    <li><a class="dropdown-item" href="{{ url_for('export_subscribers', format='csv', type=filter_type) }}">📊 ملف CSV</a></li>
-                    <li><a class="dropdown-item" href="{{ url_for('export_subscribers', format='txt', type=filter_type) }}">📄 ملف TXT</a></li>
-                    <li><a class="dropdown-item" href="{{ url_for('export_subscribers', format='print', type=filter_type) }}" target="_blank">🖨️ طباعة</a></li>
+                    <!-- ✅ إصلاح: عرض CSV فقط لأن الـ backend يدعمه فقط -->
+                    <li>
+                        <a class="dropdown-item" href="{{ url_for('export_subscribers', format='csv', type=filter_type) }}">
+                            📊 تصدير CSV (كامل)
+                        </a>
+                    </li>
                 </ul>
             </div>
         </div>
@@ -184,11 +192,10 @@
     <div class="d-flex justify-content-between align-items-center flex-wrap gap-2">
         <div class="fw-bold fs-5"><i class="bi bi-check2-square"></i> تم تحديد <span id="selectedCount">0</span> مشترك</div>
         <div class="d-flex gap-2 flex-wrap">
-            <button class="btn btn-light btn-sm fw-bold text-primary rounded-3 px-3" onclick="printSelected()">🖨️ طباعة</button>
-            <button class="btn btn-light btn-sm fw-bold text-success rounded-3 px-3" onclick="exportSelected('csv')">📊 CSV</button>
-            <button class="btn btn-light btn-sm fw-bold text-info rounded-3 px-3" onclick="exportSelected('txt')">📄 TXT</button>
-            <button class="btn btn-danger btn-sm fw-bold rounded-3 px-3" onclick="deleteSelected()">🗑 حذف المحدد</button>
-            <button class="btn btn-outline-light btn-sm rounded-3 px-3" onclick="clearSelection()">✖ إلغاء</button>
+            <!-- ✅ إصلاح: إزالة الطباعة والتنسيقات غير المدعومة من الـ backend -->
+            <button type="button" class="btn btn-light btn-sm fw-bold text-success rounded-3 px-3" onclick="exportSelected('csv')">📊 تصدير CSV</button>
+            <button type="button" class="btn btn-danger btn-sm fw-bold rounded-3 px-3" onclick="deleteSelected()">🗑 حذف المحدد</button>
+            <button type="button" class="btn btn-outline-light btn-sm rounded-3 px-3" onclick="clearSelection()">✖ إلغاء</button>
         </div>
     </div>
 </div>
@@ -199,7 +206,7 @@
         <table class="table table-hover mb-0 text-center">
             <thead class="table-light">
                 <tr>
-                    <th style="width: 40px;"><input type="checkbox" id="selectAll" class="form-check-input" onchange="toggleAll(this)"></th>
+                    <th style="width: 40px;"><input type="checkbox" id="selectAll" class="form-check-input"></th>
                     <th class="text-nowrap">#</th>
                     <th class="text-nowrap">اسم المشترك</th>
                     <th class="text-nowrap">اسم المستخدم</th>
@@ -217,14 +224,21 @@
             <tbody>
                 {% for sub in subscribers %}
                 <tr>
-                    <td><input type="checkbox" class="form-check-input sub-checkbox" value="{{ sub.id }}" onchange="updateBulkBar()"></td>
+                    <!-- ✅ إصلاح: إزالة onchange واستخدام event listener -->
+                    <td><input type="checkbox" class="form-check-input sub-checkbox" value="{{ sub.id }}"></td>
                     <td class="text-muted fw-bold">#{{ sub.id }}</td>
                     <td class="fw-bold text-primary">{{ sub.name or '-' }}</td>
                     <td class="text-muted">{{ sub.username }}</td>
                     <td>
+                        <!-- ✅ إصلاح: استخدام data-password بدل تمريرها في onclick -->
                         <div class="d-flex align-items-center justify-content-center gap-1">
-                            <span class="password-field font-monospace" data-id="{{ sub.id }}">••••••</span>
-                            <button class="btn btn-sm btn-link text-muted p-0" onclick="togglePassword({{ sub.id }}, '{{ sub.password|e }}')">
+                            <span class="password-field font-monospace"
+                                  data-id="{{ sub.id }}"
+                                  data-password="{{ sub.password }}">••••••</span>
+                            <button type="button"
+                                    class="btn btn-sm btn-link text-muted p-0 js-toggle-password"
+                                    data-id="{{ sub.id }}"
+                                    aria-label="عرض كلمة المرور">
                                 <i class="bi bi-eye" id="eye-{{ sub.id }}"></i>
                             </button>
                         </div>
@@ -238,7 +252,6 @@
                     </td>
                     <td><span class="fw-medium">{{ sub.package or '-' }}</span></td>
 
-                    <!-- IP الراوتر المتصل به المشترك -->
                     <td>
                         {% if sub.router_id and sub.router_id in routers %}
                             <span class="badge bg-secondary bg-opacity-10 text-secondary border border-secondary" style="font-family: monospace; font-size: 0.75rem;">
@@ -249,7 +262,6 @@
                         {% endif %}
                     </td>
 
-                    <!-- ✅ IP المشترك الحقيقي من MikroTik -->
                     <td>
                         {% if sub.current_ip %}
                             <span class="ip-badge ip-online">
@@ -303,7 +315,7 @@
                     </td>
                     <td>
                         <div class="dropdown">
-                            <button class="btn btn-sm btn-light border btn-icon shadow-sm" type="button" data-bs-toggle="dropdown" aria-expanded="false" title="الإجراءات">
+                            <button type="button" class="btn btn-sm btn-light border btn-icon shadow-sm" data-bs-toggle="dropdown" aria-expanded="false" title="الإجراءات">
                                 <i class="bi bi-three-dots-vertical fs-5 text-secondary"></i>
                             </button>
                             <ul class="dropdown-menu dropdown-menu-end text-end">
@@ -317,22 +329,35 @@
                                     </a>
                                 </li>
                                 <li>
-                                    <a class="dropdown-item btn-mikrotik-style" href="{{ url_for('reset_subscriber', sub_id=sub.id) }}" onclick="return confirm('تصفير الباقة؟')">
+                                    <!-- ✅ إصلاح: استخدام data-confirm-msg بدل onclick inline -->
+                                    <a class="dropdown-item btn-mikrotik-style js-confirm-link"
+                                       data-confirm-msg="تصفير الباقة؟"
+                                       href="{{ url_for('reset_subscriber', sub_id=sub.id) }}">
                                         <i class="bi bi-arrow-counterclockwise text-info fs-5"></i> تصفير الباقة
                                     </a>
                                 </li>
                                 <li>
-                                    <a class="dropdown-item btn-mikrotik-style" href="{{ url_for('extend_subscriber', sub_id=sub.id) }}" onclick="return confirm('تمديد 30 يوم؟')">
+                                    <a class="dropdown-item btn-mikrotik-style js-confirm-link"
+                                       data-confirm-msg="تمديد 30 يوم؟"
+                                       href="{{ url_for('extend_subscriber', sub_id=sub.id) }}">
                                         <i class="bi bi-plus-circle-fill text-primary fs-5"></i> تمديد 30 يوم
                                     </a>
                                 </li>
                                 <li>
-                                    <button class="dropdown-item btn-mikrotik-style" onclick='openEditSub({{ sub.id }}, "{{ (sub.name or sub.username)|e }}", "{{ sub.username|e }}", "{{ sub.package|e }}")'>
+                                    <!-- ✅ إصلاح: استخدام data-* بدل onclick inline -->
+                                    <button type="button"
+                                            class="dropdown-item btn-mikrotik-style js-edit-sub"
+                                            data-sub-id="{{ sub.id }}"
+                                            data-sub-name="{{ sub.name or sub.username }}"
+                                            data-sub-username="{{ sub.username }}"
+                                            data-sub-package="{{ sub.package or '' }}">
                                         <i class="bi bi-pencil-square text-secondary fs-5"></i> تعديل البيانات
                                     </button>
                                 </li>
                                 <li>
-                                    <a class="dropdown-item btn-mikrotik-style delete-style" href="{{ url_for('delete_subscriber', sub_id=sub.id) }}" onclick="return confirm('تأكيد الحذف من قاعدة البيانات؟')">
+                                    <a class="dropdown-item btn-mikrotik-style delete-style js-confirm-link"
+                                       data-confirm-msg="تأكيد الحذف من قاعدة البيانات؟"
+                                       href="{{ url_for('delete_subscriber', sub_id=sub.id) }}">
                                         <i class="bi bi-trash-fill fs-5"></i> حذف المشترك
                                     </a>
                                 </li>
@@ -389,34 +414,34 @@
 </div>
 
 <!-- Modal تعديل -->
-<div class="modal fade" id="editSubModal" tabindex="-1">
+<div class="modal fade" id="editSubModal" tabindex="-1" aria-hidden="true">
     <div class="modal-dialog modal-dialog-centered">
         <div class="modal-content border-0 shadow-lg">
-            <form method="POST" id="editSubForm">
+            <form method="POST" id="editSubForm" autocomplete="off">
                 <div class="modal-header border-bottom" style="border-color: var(--bg-hover) !important;">
                     <h5 class="modal-title text-accent fw-bold"><i class="bi bi-pencil-square"></i> تعديل بيانات المشترك</h5>
-                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="إغلاق"></button>
                 </div>
                 <div class="modal-body p-4">
                     <div class="mb-3">
                         <label class="form-label fw-bold text-muted">اسم المشترك</label>
-                        <input type="text" name="name" id="sub_name" class="form-control" style="background-color: var(--bg-main); color: var(--text-main); border: 1px solid var(--bg-hover);">
+                        <input type="text" name="name" id="sub_name" class="form-control" maxlength="100">
                     </div>
                     <div class="mb-3">
                         <label class="form-label fw-bold text-muted">اسم المستخدم</label>
-                        <input type="text" name="username" id="sub_username" class="form-control" style="background-color: var(--bg-main); color: var(--text-main); border: 1px solid var(--bg-hover);" required>
+                        <input type="text" name="username" id="sub_username" class="form-control" required maxlength="100">
                     </div>
                     <div class="mb-3">
                         <label class="form-label fw-bold text-muted">كلمة المرور</label>
-                        <input type="text" name="password" id="sub_password" class="form-control" style="background-color: var(--bg-main); color: var(--text-main); border: 1px solid var(--bg-hover);" placeholder="اتركها فارغة للإبقاء عليها">
+                        <input type="text" name="password" id="sub_password" class="form-control" placeholder="اتركها فارغة للإبقاء عليها" maxlength="150" autocomplete="new-password">
                     </div>
                     <div class="mb-3">
                         <label class="form-label fw-bold text-muted">تفعيل الأيام (تمديد الباقة)</label>
-                        <input type="number" name="days_to_add" id="sub_days" class="form-control" style="background-color: var(--bg-main); color: var(--text-main); border: 1px solid var(--bg-hover);" placeholder="أدخل عدد الأيام (مثال: 30)" min="1">
+                        <input type="number" name="days_to_add" id="sub_days" class="form-control" placeholder="أدخل عدد الأيام (مثال: 30)" min="1">
                     </div>
                     <div class="mb-3">
                         <label class="form-label fw-bold text-muted">الباقة</label>
-                        <select name="package" id="sub_package" class="form-select" style="background-color: var(--bg-main); color: var(--text-main); border: 1px solid var(--bg-hover);">
+                        <select name="package" id="sub_package" class="form-select">
                             <option value="">— بلا تغيير —</option>
                             {% for pkg in packages %}
                             <option value="{{ pkg.name }}">{{ pkg.name }}</option>
@@ -425,7 +450,7 @@
                     </div>
                 </div>
                 <div class="modal-footer border-top" style="border-color: var(--bg-hover) !important;">
-                    <button type="button" class="btn btn-outline-secondary rounded-3" data-bs-dismiss="modal" style="color: var(--text-main); border-color: var(--text-muted);">إلغاء</button>
+                    <button type="button" class="btn btn-outline-secondary rounded-3" data-bs-dismiss="modal">إلغاء</button>
                     <button type="submit" class="btn btn-primary rounded-3 px-4"><i class="bi bi-save"></i> حفظ التعديلات</button>
                 </div>
             </form>
@@ -439,66 +464,141 @@
 </form>
 
 <script>
-// ✅ مزامنة من MikroTik
-function syncFromMikroTik() {
-    const btn = document.getElementById('syncBtn');
-    const originalHTML = btn.innerHTML;
-    btn.disabled = true;
-    btn.innerHTML = '<span class="spinner-border spinner-border-sm"></span> جاري المزامنة...';
-    fetch('/subscribers/sync-now', { method: 'POST' })
-        .then(r => r.json())
-        .then(data => {
-            if (data.ok) {
-                let msg = `✅ تم المزامنة بنجاح!\n\n📊 عدد الراوترات: ${data.routers}\n🔍 تم فحص: ${data.checked} مشترك\n🟢 متصل الآن: ${data.online}\n🔄 تم تحديث: ${data.updated}`;
-                if (data.errors && data.errors.length > 0) { msg += `\n\n⚠️ أخطاء:\n${data.errors.slice(0, 3).join('\n')}`; }
-                alert(msg);
-                location.reload();
+document.addEventListener('DOMContentLoaded', function () {
+
+    // ==========================================
+    // ✅ مزامنة من MikroTik
+    // ==========================================
+    const syncBtn = document.getElementById('syncBtn');
+    syncBtn.addEventListener('click', function () {
+        const originalHTML = this.innerHTML;
+        this.disabled = true;
+        this.innerHTML = '<span class="spinner-border spinner-border-sm"></span> جاري المزامنة...';
+
+        fetch('/subscribers/sync-now', { method: 'POST' })
+            .then(r => r.json())
+            .then(data => {
+                if (data.ok) {
+                    let msg = `✅ تم المزامنة بنجاح!\n\n📊 عدد الراوترات: ${data.routers}\n🔍 تم فحص: ${data.checked} مشترك\n🟢 متصل الآن: ${data.online}\n🔄 تم تحديث: ${data.updated}`;
+                    if (data.errors && data.errors.length > 0) {
+                        msg += `\n\n⚠️ أخطاء:\n${data.errors.slice(0, 3).join('\n')}`;
+                    }
+                    alert(msg);
+                    location.reload();
+                } else {
+                    alert('❌ فشل المزامنة: ' + (data.error || 'خطأ غير معروف'));
+                }
+            })
+            .catch(err => alert('❌ خطأ في الاتصال: ' + err.message))
+            .finally(() => {
+                syncBtn.disabled = false;
+                syncBtn.innerHTML = originalHTML;
+            });
+    });
+
+    // ==========================================
+    // ✅ عرض/إخفاء كلمة المرور
+    // ==========================================
+    document.querySelectorAll('.js-toggle-password').forEach(btn => {
+        btn.addEventListener('click', function () {
+            const id = this.dataset.id;
+            const span = document.querySelector(`.password-field[data-id="${id}"]`);
+            const eye = document.getElementById(`eye-${id}`);
+            if (!span || !eye) return;
+
+            if (span.textContent === '••••••') {
+                span.textContent = span.dataset.password || '';
+                eye.className = 'bi bi-eye-slash text-primary';
             } else {
-                alert('❌ فشل المزامنة: ' + (data.error || 'خطأ غير معروف'));
+                span.textContent = '••••••';
+                eye.className = 'bi bi-eye text-muted';
             }
-        })
-        .catch(err => alert('❌ خطأ في الاتصال: ' + err.message))
-        .finally(() => { btn.disabled = false; btn.innerHTML = originalHTML; });
-}
+        });
+    });
 
-function togglePassword(id, password) {
-    const span = document.querySelector(`.password-field[data-id="${id}"]`);
-    const eye = document.getElementById(`eye-${id}`);
-    if (span.textContent === '••••••') {
-        span.textContent = password;
-        eye.className = 'bi bi-eye-slash text-primary';
-    } else {
-        span.textContent = '••••••';
-        eye.className = 'bi bi-eye text-muted';
-    }
-}
+    // ==========================================
+    // ✅ فتح نموذج التعديل
+    // ==========================================
+    document.querySelectorAll('.js-edit-sub').forEach(btn => {
+        btn.addEventListener('click', function () {
+            const id = this.dataset.subId;
+            const name = this.dataset.subName;
+            const username = this.dataset.subUsername;
+            const pkg = this.dataset.subPackage;
 
-function openEditSub(id, name, username, pkg) {
-    document.getElementById('editSubForm').action = '/subscribers/update/' + id;
-    document.getElementById('sub_name').value = name;
-    document.getElementById('sub_username').value = username;
-    document.getElementById('sub_password').value = '';
-    document.getElementById('sub_days').value = '';
-    document.getElementById('sub_package').value = pkg || '';
-    new bootstrap.Modal(document.getElementById('editSubModal')).show();
-}
+            const form = document.getElementById('editSubForm');
+            form.action = '/subscribers/update/' + id;
+            document.getElementById('sub_name').value = name;
+            document.getElementById('sub_username').value = username;
+            document.getElementById('sub_password').value = '';
+            document.getElementById('sub_days').value = '';
+            document.getElementById('sub_package').value = pkg || '';
 
-function toggleAll(source) {
-    document.querySelectorAll('.sub-checkbox').forEach(cb => { cb.checked = source.checked; });
-    updateBulkBar();
-}
+            new bootstrap.Modal(document.getElementById('editSubModal')).show();
+        });
+    });
 
+    // ==========================================
+    // ✅ تحديد الكل
+    // ==========================================
+    const selectAll = document.getElementById('selectAll');
+    selectAll.addEventListener('change', function () {
+        document.querySelectorAll('.sub-checkbox').forEach(cb => {
+            cb.checked = this.checked;
+        });
+        updateBulkBar();
+    });
+
+    // ==========================================
+    // ✅ تحديث الشريط عند تغيير أي checkbox
+    // ==========================================
+    document.querySelectorAll('.sub-checkbox').forEach(cb => {
+        cb.addEventListener('change', updateBulkBar);
+    });
+
+    // ==========================================
+    // ✅ تأكيدات الحذف/التصفير/التمديد
+    // ==========================================
+    document.querySelectorAll('.js-confirm-link').forEach(link => {
+        link.addEventListener('click', function (e) {
+            const msg = this.dataset.confirmMsg || 'هل أنت متأكد؟';
+            if (!confirm(msg)) {
+                e.preventDefault();
+                return false;
+            }
+        });
+    });
+
+    document.querySelectorAll('.js-confirm-form').forEach(form => {
+        form.addEventListener('submit', function (e) {
+            const msg = this.dataset.confirmMsg || 'هل أنت متأكد؟';
+            if (!confirm(msg)) {
+                e.preventDefault();
+                return false;
+            }
+        });
+    });
+});
+
+// ==========================================
+// ✅ دوال الشريط الجماعي (تُستدعى من onclick)
+// ==========================================
 function updateBulkBar() {
     const checked = document.querySelectorAll('.sub-checkbox:checked');
     const bar = document.getElementById('bulkBar');
     const cnt = document.getElementById('selectedCount');
-    if (checked.length > 0) { bar.style.display = 'block'; cnt.textContent = checked.length; }
-    else { bar.style.display = 'none'; }
+    if (checked.length > 0) {
+        bar.style.display = 'block';
+        cnt.textContent = checked.length;
+    } else {
+        bar.style.display = 'none';
+    }
 }
 
 function clearSelection() {
-    document.querySelectorAll('.sub-checkbox').forEach(cb => cb.checked = false);
-    document.getElementById('selectAll').checked = false;
+    document.querySelectorAll('.sub-checkbox').forEach(cb => { cb.checked = false; });
+    const sa = document.getElementById('selectAll');
+    if (sa) sa.checked = false;
     updateBulkBar();
 }
 
@@ -508,15 +608,12 @@ function getSelectedIds() {
     return ids;
 }
 
-function printSelected() {
-    const ids = getSelectedIds();
-    if (ids.length === 0) return;
-    window.open('/subscribers/export/print?ids=' + ids.join(','), '_blank');
-}
-
 function exportSelected(format) {
     const ids = getSelectedIds();
-    if (ids.length === 0) return;
+    if (ids.length === 0) {
+        alert('⚠️ الرجاء تحديد مشترك واحد على الأقل');
+        return;
+    }
     window.location.href = `/subscribers/export/${format}?ids=` + ids.join(',');
 }
 
