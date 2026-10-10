@@ -116,7 +116,7 @@ class Router(db.Model):
     username = db.Column(db.String(50), nullable=False)
     password = db.Column(db.String(150), nullable=False)
     port = db.Column(db.Integer, default=22)
-    api_port = db.Column(db.Integer, default=13)
+    api_port = db.Column(db.Integer, default=8728)
     is_master = db.Column(db.Boolean, default=False)
     is_active = db.Column(db.Boolean, default=True)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
@@ -816,7 +816,7 @@ def get_mikrotik_api(router):
     if not LIBROUTEROS_AVAILABLE:
         raise Exception("مكتبة librouteros غير مثبتة")
     try:
-        api_port = router.api_port or 13
+        api_port = router.api_port or 8728
         logger.info(f"🔌 اتصال API: {router.ip_address}:{api_port} (user={router.username})")
         api = connect(
             username=router.username, password=router.password,
@@ -1043,7 +1043,7 @@ def ensure_columns():
                     if 'is_active' not in cols:
                         conn.execute(text("ALTER TABLE routers ADD COLUMN is_active BOOLEAN DEFAULT TRUE"))
                     if 'api_port' not in cols:
-                        conn.execute(text("ALTER TABLE routers ADD COLUMN api_port INTEGER DEFAULT 13"))
+                        conn.execute(text("ALTER TABLE routers ADD COLUMN api_port INTEGER DEFAULT 8728"))
                 if 'telegram_settings' in tables:
                     cols = [c['name'] for c in insp.get_columns('telegram_settings')]
                     if 'notify_router_status' not in cols:
@@ -1445,13 +1445,12 @@ def api_telegram_data():
         return jsonify({'error': str(e)}), 500
 
 
-# ============ ✅ استقبال بيانات MikroTik Push (جديد) ============
+# ============ استقبال بيانات MikroTik Push ============
 
 @app.route('/api/mikrotik/push', methods=['POST'])
 def mikrotik_push():
     """
     يستقبل بيانات المستخدمين النشطين من MikroTik مباشرة
-    MikroTik يرسلها كل 5 ثواني تلقائياً
     """
     try:
         api_key = request.args.get('key')
@@ -1687,8 +1686,6 @@ def my_account_refresh():
         logger.error(f"❌ Refresh error: {e}")
         return jsonify({'ok': False, 'error': str(e)}), 500
 
-
-# ============ ✅ السرعة الحية (تُقرأ من Cache الذي يعبّئه MikroTik Push) ============
 
 @app.route('/my-account/live-speed', methods=['POST'])
 def my_account_live_speed():
@@ -2008,7 +2005,7 @@ def routers():
         un = request.form.get('username', '').strip()
         pw = request.form.get('password', '').strip()
         port = request.form.get('port', '22').strip()
-        api_port = request.form.get('api_port', '13').strip()
+        api_port = request.form.get('api_port', '8728').strip()
         is_master = request.form.get('is_master') == 'on'
         if not name or not ip:
             flash('❌ الاسم و IP مطلوبان', 'danger')
@@ -2023,7 +2020,7 @@ def routers():
         try:
             api_port = int(api_port)
         except ValueError:
-            api_port = 13
+            api_port = 8728
         try:
             if is_master:
                 Router.query.update({Router.is_master: False}, synchronize_session=False)
@@ -2073,7 +2070,7 @@ def update_router(router_id):
         un = request.form.get('username', '').strip()
         pw = request.form.get('password', '').strip()
         port = request.form.get('port', '22').strip()
-        api_port = request.form.get('api_port', '13').strip()
+        api_port = request.form.get('api_port', '8728').strip()
         if not name or not ip:
             flash('❌ الاسم و IP مطلوبان', 'danger')
             return redirect(url_for('routers'))
@@ -2092,7 +2089,7 @@ def update_router(router_id):
         try:
             r.api_port = int(api_port)
         except ValueError:
-            r.api_port = 13
+            r.api_port = 8728
         db.session.commit()
         log_event('تعديل راوتر', name, f'IP: {ip} | SSH: {r.port} | API: {r.api_port}')
         try:
