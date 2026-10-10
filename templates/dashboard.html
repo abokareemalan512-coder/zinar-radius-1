@@ -2,300 +2,997 @@
 {% block title %}لوحة التحكم{% endblock %}
 
 {% block content %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
 <style>
+    body { font-family: 'Tajawal', sans-serif; }
+
     .dashboard-card {
         background-color: var(--bg-card);
         border: 1px solid var(--bg-hover);
-        border-radius: 16px;
-        padding: 24px;
+        border-radius: 12px;
+        padding: 14px;
         transition: all 0.3s ease;
         height: 100%;
     }
     .dashboard-card:hover {
-        transform: translateY(-5px);
+        transform: translateY(-3px);
         border-color: var(--accent);
-        box-shadow: 0 10px 25px -5px rgba(56, 189, 248, 0.15);
+        box-shadow: 0 8px 20px -5px rgba(56, 189, 248, 0.15);
     }
     .dashboard-card.clickable { cursor: pointer; }
     .dashboard-card.clickable:hover {
         background-color: rgba(56, 189, 248, 0.05);
         border-color: var(--accent);
     }
+
     .icon-circle {
-        width: 64px; height: 64px;
-        display: inline-flex; align-items: center; justify-content: center;
-        border-radius: 50%; font-size: 28px; margin-bottom: 15px;
+        width: 38px;
+        height: 38px;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        border-radius: 50%;
+        font-size: 17px;
+        margin-bottom: 8px;
     }
     .stat-number {
-        font-size: 2.5rem; font-weight: 800;
-        color: var(--text-main); line-height: 1; margin: 5px 0;
+        font-size: 1.6rem;
+        font-weight: 800;
+        color: var(--text-main);
+        line-height: 1;
+        margin: 3px 0;
     }
     .stat-label {
-        color: var(--text-muted); font-size: 1rem;
-        font-weight: 500; margin-bottom: 15px;
+        color: var(--text-muted);
+        font-size: 0.75rem;
+        font-weight: 500;
+        margin-bottom: 6px;
     }
     .pulse-dot {
-        width: 10px; height: 10px; border-radius: 50%;
-        background-color: currentColor; display: inline-block;
+        width: 6px;
+        height: 6px;
+        border-radius: 50%;
+        background-color: currentColor;
+        display: inline-block;
         animation: pulse-animation 1.5s infinite;
     }
     @keyframes pulse-animation {
         0% { box-shadow: 0 0 0 0 currentColor; opacity: 1; }
-        70% { box-shadow: 0 0 0 10px transparent; opacity: 0.7; }
+        70% { box-shadow: 0 0 0 8px transparent; opacity: 0.7; }
         100% { box-shadow: 0 0 0 0 transparent; opacity: 1; }
     }
+
+    .stat-badge {
+        display: inline-flex;
+        align-items: center;
+        gap: 5px;
+        padding: 5px 12px;
+        border-radius: 20px;
+        font-weight: 700;
+        font-size: 0.7rem;
+        color: #ffffff !important;
+        text-shadow: 0 1px 2px rgba(0,0,0,0.2);
+        box-shadow: 0 2px 6px rgba(0,0,0,0.15);
+    }
+    .stat-badge.success { background: linear-gradient(135deg, #22c55e, #16a34a); }
+    .stat-badge.danger { background: linear-gradient(135deg, #ef4444, #dc2626); }
+    .stat-badge.warning { background: linear-gradient(135deg, #f59e0b, #d97706); }
+    .stat-badge.info { background: linear-gradient(135deg, #0ea5e9, #0284c7); }
+    .stat-badge.secondary { background: linear-gradient(135deg, #64748b, #475569); }
+
+    .details-hint {
+        margin-top: 8px;
+        font-size: 0.68rem;
+        color: var(--accent);
+        font-weight: 600;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 4px;
+        opacity: 0.85;
+        transition: opacity 0.3s;
+    }
+    .dashboard-card:hover .details-hint { opacity: 1; color: #7dd3fc; }
+    .details-hint i { font-size: 0.7rem; }
+
+    .mini-events-list {
+        display: flex;
+        flex-direction: column;
+        gap: 3px;
+        margin-top: 6px;
+        margin-bottom: 2px;
+        max-height: 135px;
+        overflow-y: auto;
+    }
+    .mini-events-list::-webkit-scrollbar { width: 3px; }
+    .mini-events-list::-webkit-scrollbar-thumb {
+        background: var(--bg-hover);
+        border-radius: 2px;
+    }
+    .mini-event-item {
+        display: flex;
+        align-items: center;
+        gap: 5px;
+        background-color: var(--bg-main);
+        border: 1px solid var(--bg-hover);
+        border-radius: 6px;
+        padding: 4px 8px;
+        font-size: 0.65rem;
+        transition: all 0.2s;
+        text-align: right;
+        overflow: hidden;
+    }
+    .mini-event-item:hover {
+        border-color: var(--accent);
+        background-color: rgba(56, 189, 248, 0.05);
+    }
+    .mini-event-icon {
+        font-size: 0.7rem;
+        flex-shrink: 0;
+    }
+    .mini-event-text {
+        flex: 1;
+        color: var(--text-main);
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        font-weight: 500;
+    }
+    .mini-event-meta {
+        color: var(--text-muted);
+        font-size: 0.58rem;
+        flex-shrink: 0;
+        opacity: 0.75;
+        font-weight: 600;
+        font-family: monospace;
+    }
+
     .table-clean th {
-        font-size: 0.85rem; text-transform: uppercase;
-        color: var(--text-muted) !important; font-weight: 700;
-        border-bottom: 1px solid var(--bg-hover) !important; padding: 12px;
+        font-size: 0.72rem;
+        text-transform: uppercase;
+        color: var(--text-muted) !important;
+        font-weight: 700;
+        border-bottom: 1px solid var(--bg-hover) !important;
+        padding: 7px;
     }
     .table-clean td {
-        font-size: 0.9rem; color: var(--text-main);
+        font-size: 0.78rem;
+        color: var(--text-main);
         border-bottom: 1px solid var(--bg-hover) !important;
-        padding: 12px; vertical-align: middle;
+        padding: 7px;
+        vertical-align: middle;
     }
+
     .welcome-box {
         background: linear-gradient(135deg, rgba(56, 189, 248, 0.1), rgba(14, 165, 233, 0.02));
         border: 1px solid rgba(56, 189, 248, 0.2);
-        border-radius: 16px; padding: 24px;
+        border-radius: 10px;
+        padding: 10px 14px;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 12px;
+        flex-wrap: wrap;
+        gap: 8px;
     }
-    .telegram-modal-header {
-        background: linear-gradient(135deg, #229ED9, #1c7fb0);
-        border-radius: 16px 16px 0 0; color: white;
+    .welcome-text h5 {
+        font-size: 0.9rem;
+        margin: 0;
+        font-weight: 700;
+        color: var(--accent);
     }
-    .mikrotik-modal-header {
-        background: linear-gradient(135deg, #38bdf8, #0ea5e9);
-        border-radius: 16px 16px 0 0; color: #0f172a;
+    .welcome-text p {
+        font-size: 0.68rem;
+        margin: 0;
+        color: var(--text-muted);
     }
-    .subscribers-modal-header {
-        background: linear-gradient(135deg, #22c55e, #16a34a);
-        border-radius: 16px 16px 0 0; color: white;
+    .time-badge {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        background: linear-gradient(135deg, #0ea5e9, #0284c7);
+        color: #ffffff !important;
+        padding: 6px 14px;
+        border-radius: 8px;
+        font-weight: 700;
+        font-size: 0.75rem;
+        box-shadow: 0 3px 10px rgba(14, 165, 233, 0.35);
+        border: 1px solid rgba(255, 255, 255, 0.15);
     }
-    .revenue-modal-header {
-        background: linear-gradient(135deg, #f59e0b, #d97706);
-        border-radius: 16px 16px 0 0; color: white;
-    }
+    .time-badge i { font-size: 0.85rem; }
+
+    .mikrotik-modal-header { background: linear-gradient(135deg, #38bdf8, #0ea5e9); border-radius: 12px 12px 0 0; color: #0f172a; }
+    .subscribers-modal-header { background: linear-gradient(135deg, #22c55e, #16a34a); border-radius: 12px 12px 0 0; color: white; }
+    .online-modal-header { background: linear-gradient(135deg, #22c55e, #16a34a); border-radius: 12px 12px 0 0; color: white; }
+    .revenue-modal-header { background: linear-gradient(135deg, #f59e0b, #d97706); border-radius: 12px 12px 0 0; color: white; }
+    .telegram-modal-header { background: linear-gradient(135deg, #229ED9, #1c7fb0); border-radius: 12px 12px 0 0; color: white; }
+
     .revenue-box {
         background-color: var(--bg-main);
         border: 1px solid var(--bg-hover);
-        border-radius: 12px; padding: 20px;
-        text-align: center; transition: transform 0.2s;
+        border-radius: 10px;
+        padding: 12px;
+        text-align: center;
     }
-    .revenue-box:hover { transform: scale(1.02); border-color: #f59e0b; }
-    .details-btn { transition: all 0.3s ease; font-weight: 600; }
-    .details-btn:hover {
-        transform: scale(1.05);
-        box-shadow: 0 0 15px rgba(255, 255, 255, 0.1);
+    .revenue-box:hover { border-color: #f59e0b; }
+
+    .quick-actions-card {
+        background-color: var(--bg-card);
+        border: 1px solid var(--bg-hover);
+        border-radius: 12px;
+        padding: 12px;
+        height: 100%;
+        transition: all 0.3s;
     }
+    .quick-actions-card:hover {
+        border-color: #f59e0b;
+        box-shadow: 0 8px 20px -5px rgba(245, 158, 11, 0.15);
+    }
+    .quick-actions-header {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        font-weight: 700;
+        font-size: 0.82rem;
+        color: var(--text-main);
+        margin-bottom: 10px;
+        padding-bottom: 8px;
+        border-bottom: 1px solid var(--bg-hover);
+    }
+    .quick-actions-header .lightning {
+        color: #f59e0b;
+        font-size: 0.95rem;
+        animation: lightning-pulse 2s infinite;
+    }
+    @keyframes lightning-pulse {
+        0%, 100% { transform: scale(1); opacity: 1; }
+        50% { transform: scale(1.15); opacity: 0.85; }
+    }
+
+    .quick-action-btn {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 6px;
+        padding: 8px 12px;
+        margin-bottom: 6px;
+        background: linear-gradient(135deg, #38bdf8, #0ea5e9);
+        color: #0f172a !important;
+        border: none;
+        border-radius: 8px;
+        font-weight: 700;
+        font-size: 0.72rem;
+        text-decoration: none;
+        transition: all 0.3s ease;
+        cursor: pointer;
+        box-shadow: 0 2px 8px rgba(56, 189, 248, 0.25);
+        position: relative;
+        overflow: hidden;
+    }
+    .quick-action-btn:last-child { margin-bottom: 0; }
+    .quick-action-btn:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 5px 15px rgba(56, 189, 248, 0.4);
+        color: #0f172a !important;
+    }
+    .quick-action-btn i { font-size: 0.85rem; }
+
+    .traffic-section {
+        background-color: var(--bg-card);
+        border: 1px solid var(--bg-hover);
+        border-radius: 12px;
+        padding: 12px;
+        position: relative;
+        overflow: visible;
+        height: 100%;
+    }
+    .traffic-section::before {
+        content: '';
+        position: absolute;
+        top: 0; right: 0; left: 0;
+        height: 2px;
+        background: linear-gradient(90deg, #f59e0b, #22c55e, #38bdf8, #a855f7);
+        border-radius: 12px 12px 0 0;
+    }
+    .traffic-section-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 10px;
+        flex-wrap: wrap;
+        gap: 8px;
+    }
+    .traffic-section-title {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        font-weight: 700;
+        font-size: 0.82rem;
+        color: var(--text-main);
+    }
+    .traffic-section-title i { color: var(--accent); font-size: 0.95rem; }
+
     .live-badge {
+        display: inline-flex;
+        align-items: center;
+        gap: 4px;
+        padding: 2px 7px;
+        border-radius: 10px;
+        background: rgba(239, 68, 68, 0.1);
+        color: #ef4444;
+        border: 1px solid rgba(239, 68, 68, 0.3);
+        font-size: 0.58rem;
+        font-weight: 700;
+    }
+    .live-dot {
+        width: 5px;
+        height: 5px;
+        border-radius: 50%;
+        background-color: #ef4444;
+        animation: live-pulse 1.2s infinite;
+    }
+    @keyframes live-pulse {
+        0% { opacity: 1; transform: scale(1); }
+        50% { opacity: 0.5; transform: scale(1.3); }
+        100% { opacity: 1; transform: scale(1); }
+    }
+
+    .traffic-controls {
+        display: flex;
+        gap: 5px;
+        flex-wrap: wrap;
+        align-items: center;
+    }
+    .traffic-select {
+        background-color: var(--bg-main);
+        color: var(--text-main);
+        border: 1px solid var(--bg-hover);
+        padding: 5px 9px;
+        border-radius: 7px;
+        font-weight: 500;
+        font-size: 0.72rem;
+        max-width: 140px;
+    }
+    .traffic-select:focus {
+        border-color: var(--accent);
+        box-shadow: 0 0 0 0.15rem var(--accent-glow);
+        outline: none;
+    }
+
+    .traffic-search-wrapper {
+        position: relative;
+        width: 150px;
+    }
+    .traffic-search-wrapper input {
+        width: 100%;
+        padding: 5px 24px 5px 10px;
+        background-color: var(--bg-main);
+        color: var(--text-main);
+        border: 1px solid var(--bg-hover);
+        border-radius: 7px;
+        font-weight: 500;
+        font-size: 0.72rem;
+    }
+    .traffic-search-wrapper input:focus {
+        border-color: var(--accent);
+        box-shadow: 0 0 0 0.15rem var(--accent-glow);
+        outline: none;
+    }
+    .traffic-search-wrapper input::placeholder { color: var(--text-muted); }
+    .traffic-search-wrapper .search-icon {
+        position: absolute;
+        right: 7px;
+        top: 50%;
+        transform: translateY(-50%);
+        color: var(--text-muted);
+        pointer-events: none;
+        font-size: 0.72rem;
+    }
+    .traffic-search-wrapper .clear-btn {
+        position: absolute;
+        left: 5px;
+        top: 50%;
+        transform: translateY(-50%);
+        background: none;
+        border: none;
+        color: var(--text-muted);
+        cursor: pointer;
+        padding: 0;
+        font-size: 0.8rem;
+        display: none;
+    }
+    .traffic-search-wrapper .clear-btn:hover { color: #ef4444; }
+
+    .traffic-dropdown {
+        position: absolute;
+        top: 100%;
+        right: 0;
+        left: 0;
+        margin-top: 4px;
+        background-color: var(--bg-card);
+        border: 1px solid var(--bg-hover);
+        border-radius: 7px;
+        max-height: 250px;
+        overflow-y: auto;
+        z-index: 2000;
+        box-shadow: 0 8px 20px rgba(0,0,0,0.4);
+        display: none;
+        min-width: 230px;
+    }
+    .traffic-dropdown.show { display: block; }
+    .traffic-dropdown-item {
+        padding: 6px 9px;
+        cursor: pointer;
+        border-bottom: 1px solid var(--bg-hover);
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        gap: 8px;
+        transition: all 0.15s;
+        font-size: 0.72rem;
+        color: var(--text-main);
+    }
+    .traffic-dropdown-item:last-child { border-bottom: none; }
+    .traffic-dropdown-item:hover {
+        background-color: rgba(56, 189, 248, 0.1);
+        color: var(--accent);
+    }
+    .traffic-dropdown-item.selected {
+        background-color: rgba(56, 189, 248, 0.15);
+        color: var(--accent);
+    }
+    .iface-name {
+        font-family: 'Courier New', monospace;
+        font-weight: 600;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        max-width: 160px;
+    }
+    .iface-status-badge {
+        font-size: 0.55rem;
+        padding: 2px 5px;
+        border-radius: 6px;
+        font-weight: 700;
+        white-space: nowrap;
+    }
+    .iface-running { background: rgba(34, 197, 94, 0.15); color: #22c55e; }
+    .iface-idle { background: rgba(148, 163, 184, 0.15); color: #94a3b8; }
+
+    .traffic-direction-btn {
+        display: inline-flex;
+        align-items: center;
+        gap: 4px;
+        padding: 5px 9px;
+        border-radius: 7px;
+        font-weight: 600;
+        font-size: 0.68rem;
+        cursor: pointer;
+        border: none;
+        color: white;
+        background: linear-gradient(135deg, #a855f7, #9333ea);
+        transition: all 0.3s;
+    }
+    .traffic-direction-btn:hover {
+        transform: translateY(-1px);
+        box-shadow: 0 4px 10px rgba(168, 85, 247, 0.4);
+        color: white;
+    }
+    .traffic-direction-btn.reversed {
+        background: linear-gradient(135deg, #f59e0b, #d97706);
+    }
+
+    .btn-traffic-start {
         background: linear-gradient(135deg, #22c55e, #16a34a);
-        color: white; padding: 6px 14px; border-radius: 20px;
-        font-size: 0.8rem; font-weight: 600;
-        display: inline-flex; align-items: center; gap: 6px;
+        color: white;
+        border: none;
+        padding: 5px 11px;
+        border-radius: 7px;
+        font-weight: 700;
+        font-size: 0.72rem;
+        cursor: pointer;
+        display: inline-flex;
+        align-items: center;
+        gap: 4px;
+        transition: all 0.3s;
     }
-    .live-badge .dot {
-        width: 8px; height: 8px; border-radius: 50%;
-        background: white; animation: pulse-animation 1.5s infinite;
+    .btn-traffic-start:hover {
+        transform: translateY(-1px);
+        box-shadow: 0 4px 10px rgba(34, 197, 94, 0.4);
+        color: white;
     }
-    .flash-update {
-        animation: flash 0.6s ease-in-out;
+    .btn-traffic-stop {
+        background: linear-gradient(135deg, #ef4444, #dc2626);
+        color: white;
+        border: none;
+        padding: 5px 11px;
+        border-radius: 7px;
+        font-weight: 700;
+        font-size: 0.72rem;
+        cursor: pointer;
+        display: inline-flex;
+        align-items: center;
+        gap: 4px;
     }
-    @keyframes flash {
-        0% { background-color: rgba(56, 189, 248, 0.3); }
-        100% { background-color: transparent; }
+
+    .traffic-mini-card {
+        background-color: var(--bg-main);
+        border: 1px solid var(--bg-hover);
+        border-radius: 9px;
+        padding: 10px;
+        height: 100%;
+        position: relative;
+        overflow: hidden;
+    }
+    .traffic-mini-card.upload { border-right: 3px solid #f59e0b; }
+    .traffic-mini-card.download { border-right: 3px solid #22c55e; }
+
+    .traffic-mini-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 4px;
+    }
+    .traffic-mini-label {
+        display: flex;
+        align-items: center;
+        gap: 4px;
+        font-weight: 700;
+        font-size: 0.72rem;
+    }
+    .traffic-mini-label.upload { color: #f59e0b; }
+    .traffic-mini-label.download { color: #22c55e; }
+    .traffic-mini-label i { font-size: 0.8rem; }
+
+    .traffic-mini-rate {
+        font-size: 1.2rem;
+        font-weight: 800;
+        line-height: 1;
+        margin: 4px 0;
+    }
+    .traffic-mini-rate.upload { color: #f59e0b; }
+    .traffic-mini-rate.download { color: #22c55e; }
+    .traffic-mini-rate-unit {
+        font-size: 0.6rem;
+        font-weight: 500;
+        opacity: 0.8;
+    }
+
+    .traffic-mini-progress {
+        height: 4px;
+        background-color: var(--bg-hover);
+        border-radius: 2px;
+        overflow: hidden;
+        margin: 5px 0;
+    }
+    .traffic-mini-progress-bar {
+        height: 100%;
+        border-radius: 2px;
+        transition: width 0.5s ease;
+    }
+    .traffic-mini-progress-bar.upload { background: linear-gradient(90deg, #f59e0b, #fbbf24); }
+    .traffic-mini-progress-bar.download { background: linear-gradient(90deg, #22c55e, #4ade80); }
+
+    .traffic-mini-total {
+        display: flex;
+        justify-content: space-between;
+        font-size: 0.62rem;
+        color: var(--text-muted);
+        margin-bottom: 5px;
+    }
+    .traffic-mini-chart {
+        position: relative;
+        height: 60px;
+        width: 100%;
+    }
+
+    .traffic-empty {
+        text-align: center;
+        padding: 15px 10px;
+        color: var(--text-muted);
+    }
+    .traffic-empty i {
+        font-size: 1.6rem;
+        color: var(--bg-hover);
+        display: block;
+        margin-bottom: 5px;
+    }
+    .traffic-empty h6 { font-size: 0.75rem; margin-bottom: 3px; }
+    .traffic-empty p { font-size: 0.65rem; margin: 0; }
+
+    .traffic-full-link {
+        display: inline-flex;
+        align-items: center;
+        gap: 4px;
+        padding: 4px 9px;
+        background-color: rgba(139, 92, 246, 0.1);
+        color: #a855f7;
+        border: 1px solid rgba(139, 92, 246, 0.3);
+        border-radius: 7px;
+        font-size: 0.65rem;
+        font-weight: 600;
+        text-decoration: none;
+        transition: all 0.3s;
+    }
+    .traffic-full-link:hover {
+        background-color: rgba(139, 92, 246, 0.2);
+        color: #a855f7;
+        transform: translateY(-1px);
+    }
+    .traffic-full-link i { font-size: 0.72rem; }
+
+    /* IP Badge */
+    .ip-badge {
+        display: inline-flex;
+        align-items: center;
+        gap: 4px;
+        padding: 4px 8px;
+        border-radius: 6px;
+        font-size: 0.7rem;
+        font-weight: 700;
+        font-family: 'Courier New', monospace;
+    }
+    .ip-online { background: rgba(34, 197, 94, 0.12); color: #22c55e; border: 1px solid rgba(34, 197, 94, 0.35); }
+    .ip-offline { background: rgba(148, 163, 184, 0.1); color: #94a3b8; border: 1px solid rgba(148, 163, 184, 0.3); }
+
+    /* زر الدفعات الصغير */
+    .payments-quick-btn {
+        display: inline-flex;
+        align-items: center;
+        gap: 5px;
+        padding: 6px 12px;
+        background: linear-gradient(135deg, #f59e0b, #d97706);
+        color: #ffffff !important;
+        border: none;
+        border-radius: 8px;
+        font-weight: 700;
+        font-size: 0.7rem;
+        text-decoration: none;
+        transition: all 0.3s;
+        box-shadow: 0 2px 8px rgba(245, 158, 11, 0.3);
+        margin-top: 8px;
+        width: 100%;
+        justify-content: center;
+    }
+    .payments-quick-btn:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 5px 15px rgba(245, 158, 11, 0.5);
+        color: #ffffff !important;
+    }
+    .payments-quick-btn i { font-size: 0.8rem; }
+
+    /* Badge للتحميل والرفع */
+    .speed-badge {
+        display: inline-flex;
+        align-items: center;
+        gap: 4px;
+        padding: 4px 9px;
+        border-radius: 6px;
+        font-size: 0.68rem;
+        font-weight: 700;
+        font-family: monospace;
+    }
+    .speed-down { background: rgba(34, 197, 94, 0.12); color: #22c55e; border: 1px solid rgba(34, 197, 94, 0.35); }
+    .speed-up { background: rgba(245, 158, 11, 0.12); color: #f59e0b; border: 1px solid rgba(245, 158, 11, 0.35); }
+
+    /* صفوف قابلة للضغط */
+    #onlineSubsModal tbody tr {
+        cursor: pointer;
+        transition: all 0.2s;
+    }
+    #onlineSubsModal tbody tr:hover {
+        background-color: rgba(34, 197, 94, 0.1) !important;
+    }
+    #onlineSubsModal tbody tr:hover td {
+        color: #22c55e !important;
     }
 </style>
 
-<!-- ✅ ترحيب ووقت مع مؤشر مباشر -->
-<div class="welcome-box mb-4 d-flex justify-content-between align-items-center flex-wrap gap-3">
-    <div>
-        <h4 class="fw-bold mb-1 text-accent">
-            <i class="bi bi-speedometer2"></i> مرحباً بك، {{ admin_name }}
-        </h4>
-        <p class="text-muted mb-0 small">نظرة عامة على أداء النظام والشبكة</p>
+<!-- صندوق ترحيب -->
+<div class="welcome-box">
+    <div class="welcome-text">
+        <h5><i class="bi bi-speedometer2"></i> مرحباً، {{ admin_name }}</h5>
+        <p>نظرة عامة على أداء النظام والشبكة</p>
     </div>
-    <div class="d-flex align-items-center gap-3">
-        <span class="live-badge">
-            <span class="dot"></span> مباشر
-        </span>
-        <span class="badge bg-info bg-opacity-10 text-info border border-info px-4 py-3 rounded-3 fs-6" id="liveClock">
-            <i class="bi bi-clock-history"></i> {{ current_time }}
+    <div>
+        <span class="time-badge">
+            <i class="bi bi-clock-fill"></i>
+            {{ current_time }}
         </span>
     </div>
 </div>
 
 <!-- ✅ الصف الأول: بطاقات الإحصائيات -->
-<div class="row g-4 mb-4">
+<div class="row g-3 mb-3">
     
-    <!-- بطاقة سيرفرات MikroTik -->
+    <!-- 1. MikroTik -->
     <div class="col-xl-3 col-md-6">
         <div class="dashboard-card text-center clickable" data-bs-toggle="modal" data-bs-target="#mikrotikDetailsModal">
             <div class="icon-circle mx-auto" style="background: rgba(56, 189, 248, 0.1); border: 1px solid rgba(56, 189, 248, 0.3);">
-                <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" fill="#38bdf8" viewBox="0 0 16 16">
-                    <path d="M5.5 0a.5.5 0 0 1 .5.5V3h4V.5a.5.5 0 0 1 1 0V3h2a2 2 0 0 1 2 2v6a2 2 0 0 1-2 2H2a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h2V.5a.5.5 0 0 1 .5-.5zM2 4a1 1 0 0 0-1 1v6a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1V5a1 1 0 0 0-1-1H2z"/>
-                    <circle cx="4" cy="7" r="1.5" fill="#38bdf8"/>
-                    <circle cx="8" cy="7" r="1.5" fill="#38bdf8"/>
-                    <circle cx="12" cy="7" r="1.5" fill="#38bdf8"/>
-                </svg>
+                <i class="bi bi-router text-accent"></i>
             </div>
-            <div class="stat-number" id="routersCount">{{ routers_count }}</div>
+            <div class="stat-number">{{ routers_count }}</div>
             <div class="stat-label">سيرفرات MikroTik</div>
-            
-            <div class="d-flex justify-content-center mb-3">
-                <span class="badge bg-success bg-opacity-10 text-success border border-success px-3 py-2 rounded-pill d-flex align-items-center gap-2" id="routersOnlineBadge">
-                    <span class="pulse-dot"></span>
-                    <span id="routersOnlineText">{{ routers_online }} متصل</span>
-                </span>
+            <div class="d-flex justify-content-center mb-2">
+                {% if routers_online > 0 %}
+                    <span class="stat-badge success"><span class="pulse-dot"></span> {{ routers_online }} متصل</span>
+                {% else %}
+                    <span class="stat-badge danger"><i class="bi bi-x-circle-fill"></i> 0 متصل</span>
+                {% endif %}
             </div>
-            
-            <div class="d-flex justify-content-between text-muted small border-top pt-3" style="border-color: var(--bg-hover) !important;">
-                <span><i class="bi bi-check-circle-fill text-success"></i> متصل: <b id="routersOnlineNum">{{ routers_online }}</b></span>
-                <span><i class="bi bi-x-circle-fill text-danger"></i> متوقف: <b id="routersOfflineNum">{{ routers_count - routers_online }}</b></span>
-            </div>
-            
-            <div class="d-grid gap-2 mt-3">
-                <button class="btn btn-sm btn-outline-info rounded-pill details-btn">
-                    <i class="bi bi-info-circle"></i> عرض تفاصيل السيرفرات
-                </button>
-            </div>
+            {% if recent_routers %}
+                <div class="mini-events-list">
+                    {% for r in recent_routers[:5] %}
+                    <div class="mini-event-item">
+                        {% if r.is_active %}
+                            <i class="bi bi-check-circle-fill text-success mini-event-icon"></i>
+                        {% else %}
+                            <i class="bi bi-x-circle-fill text-danger mini-event-icon"></i>
+                        {% endif %}
+                        <span class="mini-event-text" title="{{ r.name }}">{{ r.name }}</span>
+                        <span class="mini-event-meta">{{ r.ip_address }}</span>
+                    </div>
+                    {% endfor %}
+                </div>
+            {% endif %}
+            <div class="details-hint"><i class="bi bi-info-circle"></i> اضغط لعرض التفاصيل</div>
         </div>
     </div>
 
-    <!-- بطاقة المشتركين -->
+    <!-- 2. المشتركين -->
     <div class="col-xl-3 col-md-6">
         <div class="dashboard-card text-center clickable" data-bs-toggle="modal" data-bs-target="#subscribersDetailsModal">
             <div class="icon-circle mx-auto" style="background: rgba(34, 197, 94, 0.1); border: 1px solid rgba(34, 197, 94, 0.2);">
-                <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" fill="#22c55e" viewBox="0 0 16 16">
-                    <path d="M7 14s-1 0-1-1 1-4 5-4 5 3 5 4-1 1-1 1H7zm4-6a3 3 0 1 0 0-6 3 3 0 0 0 0 6z"/>
-                    <path fill-rule="evenodd" d="M5.216 14A2.238 2.238 0 0 1 5 13c0-1.355.68-2.75 1.936-3.72A6.325 6.325 0 0 0 5 9c-4 0-5 3-5 4s1 1 1 1h4.216zM4.5 8a2.5 2.5 0 1 0 0-5 2.5 2.5 0 0 0 0 5z"/>
-                </svg>
+                <i class="bi bi-people-fill text-success"></i>
             </div>
-            <div class="stat-number" id="subCount">{{ sub_count }}</div>
+            <div class="stat-number">{{ sub_count }}</div>
             <div class="stat-label">إجمالي المشتركين</div>
-            
-            <div class="d-flex justify-content-center mb-3">
-                <span class="badge bg-success bg-opacity-10 text-success border border-success px-3 py-2 rounded-pill">
-                    <i class="bi bi-check-circle"></i> <span id="activeSubsText">{{ active_subs }} نشط</span>
-                </span>
+            <div class="d-flex justify-content-center mb-2">
+                <span class="stat-badge success"><i class="bi bi-check-circle-fill"></i> {{ active_subs }} نشط</span>
             </div>
-            
-            <div class="d-flex justify-content-between text-muted small border-top pt-3" style="border-color: var(--bg-hover) !important;">
-                <span><i class="bi bi-pause-circle text-warning"></i> موقوف: <b id="pausedSubsNum">{{ sub_count - active_subs }}</b></span>
-                <span><i class="bi bi-wifi text-info"></i> متصل الآن: <b id="onlineNowNum">{{ online_subs|length }}</b></span>
-            </div>
-            
-            <div class="d-grid gap-2 mt-3">
-                <button class="btn btn-sm btn-outline-success rounded-pill details-btn">
-                    <i class="bi bi-info-circle"></i> عرض المنتهين والمتوقفين
-                </button>
-            </div>
+            {% if recent_subs %}
+                <div class="mini-events-list">
+                    {% for sub in recent_subs[:5] %}
+                    <div class="mini-event-item">
+                        <i class="bi bi-person-plus-fill text-success mini-event-icon"></i>
+                        <span class="mini-event-text" title="{{ sub.name or sub.username }}">{{ sub.name or sub.username }}</span>
+                        <span class="mini-event-meta">{{ sub.created_at | localtime('%H:%M') }}</span>
+                    </div>
+                    {% endfor %}
+                </div>
+            {% endif %}
+            <div class="details-hint"><i class="bi bi-info-circle"></i> اضغط لعرض التفاصيل</div>
         </div>
     </div>
 
-    <!-- بطاقة إيرادات اليوم -->
+    <!-- 3. المتصلون الآن -->
     <div class="col-xl-3 col-md-6">
-        <div class="dashboard-card text-center clickable" data-bs-toggle="modal" data-bs-target="#revenueDetailsModal">
-            <div class="icon-circle mx-auto" style="background: rgba(245, 158, 11, 0.1); border: 1px solid rgba(245, 158, 11, 0.3);">
-                <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" fill="#f59e0b" viewBox="0 0 16 16">
-                    <path d="M12.136.326A1.5 1.5 0 0 1 14 1.78V3h.5A1.5 1.5 0 0 1 16 4.5v9a1.5 1.5 0 0 1-1.5 1.5h-13A1.5 1.5 0 0 1 0 13.5v-9a1.5 1.5 0 0 1 1.432-1.499L12.136.326zM5.562 3a.5.5 0 0 0 0 .5V5h2V3.5a.5.5 0 0 0-.5-.5H5.562zM4 4.5V3.5A1.5 1.5 0 0 1 5.5 2h2A1.5 1.5 0 0 1 9 3.5V5h2.5A1.5 1.5 0 0 1 13 6.5v9a.5.5 0 0 1-.5.5h-13a.5.5 0 0 1-.5-.5v-9A1.5 1.5 0 0 1 1.5 5H4v-.5z"/>
-                    <circle cx="12.5" cy="9.5" r="1.5" fill="#0f172a"/>
-                </svg>
+        <div class="dashboard-card text-center">
+            <div class="clickable" data-bs-toggle="modal" data-bs-target="#onlineSubsModal">
+                <div class="icon-circle mx-auto" style="background: rgba(34, 197, 94, 0.1); border: 1px solid rgba(34, 197, 94, 0.3);">
+                    <i class="bi bi-wifi" style="color: #22c55e;"></i>
+                </div>
+                <div class="stat-number" style="color: #22c55e;">{{ online_subs|length }}</div>
+                <div class="stat-label">المتصلون الآن</div>
+                <div class="d-flex justify-content-center mb-2">
+                    {% if online_subs|length > 0 %}
+                        <span class="stat-badge success"><span class="pulse-dot"></span> مباشر</span>
+                    {% else %}
+                        <span class="stat-badge secondary"><i class="bi bi-wifi-off"></i> لا يوجد</span>
+                    {% endif %}
+                </div>
+                {% if top_online_subs %}
+                    <div class="mini-events-list">
+                        {% for sub in top_online_subs[:10] %}
+                        <div class="mini-event-item">
+                            <i class="bi bi-person-fill text-success mini-event-icon"></i>
+                            <span class="mini-event-text" title="{{ sub.name or sub.username }}">
+                                {{ sub.name or sub.username }}
+                            </span>
+                            <span class="mini-event-meta">{{ sub.current_ip }}</span>
+                        </div>
+                        {% endfor %}
+                    </div>
+                {% endif %}
+                <div class="details-hint"><i class="bi bi-info-circle"></i> اضغط لعرض التفاصيل</div>
             </div>
-            <div class="stat-number" id="todayRevenue">{{ today_revenue }}</div>
-            <div class="stat-label">إيرادات اليوم (ل.س)</div>
-            
-            <div class="d-flex justify-content-center mb-3">
-                <span class="badge bg-warning bg-opacity-10 text-warning border border-warning px-3 py-2 rounded-pill">
-                    <i class="bi bi-graph-up-arrow"></i> إيراد يومي
-                </span>
-            </div>
-            
-            <div class="d-flex justify-content-between text-muted small border-top pt-3" style="border-color: var(--bg-hover) !important;">
-                <span><i class="bi bi-hourglass-split text-info"></i> معلقة: <b id="pendingPays">{{ pending_pays }}</b></span>
-                <span><i class="bi bi-cart-check text-success"></i> اليوم: <b id="newUsersToday">{{ new_users_today }}</b></span>
-            </div>
-            
-            <div class="d-grid gap-2 mt-3">
-                <button class="btn btn-sm btn-outline-warning rounded-pill details-btn">
-                    <i class="bi bi-info-circle"></i> عرض المبيعات والتفاصيل
-                </button>
-            </div>
+            <button class="payments-quick-btn" data-bs-toggle="modal" data-bs-target="#revenueDetailsModal">
+                <i class="bi bi-cash-stack"></i> عرض الإيرادات والدفعات
+            </button>
         </div>
     </div>
 
-    <!-- بطاقة إعدادات التلجرام -->
+    <!-- 4. التلجرام -->
     <div class="col-xl-3 col-md-6">
         <div class="dashboard-card text-center clickable" data-bs-toggle="modal" data-bs-target="#telegramDetailsModal">
             <div class="icon-circle mx-auto" style="background: rgba(34, 158, 217, 0.1); border: 1px solid rgba(34, 158, 217, 0.3);">
-                <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" fill="#229ED9" viewBox="0 0 16 16">
-                    <path d="M16 8A8 8 0 1 1 0 8a8 8 0 0 1 16 0zM8.287 5.906c-.778.324-2.334.994-4.666 2.01-.378.15-.577.298-.595.442-.03.243.275.339.69.47l.175.055c.408.133.958.288 1.243.294.26.006.549-.1.868-.32 2.179-1.471 3.304-2.214 3.374-2.23.05-.012.12-.026.166.016.047.041.042.12.037.141-.03.129-1.227 1.241-1.846 1.817-.193.18-.33.307-.358.336a8.154 8.154 0 0 1-.188.186c-.38.366-.664.64.015 1.088.327.216.589.393.85.571.284.194.568.387.936.629.093.06.183.125.27.187.331.236.63.448.997.414.214-.02.435-.22.547-.82.265-1.417.786-4.486.906-5.751a1.426 1.426 0 0 0-.013-.315.337.337 0 0 0-.114-.217.526.526 0 0 0-.31-.093c-.3.005-.763.166-2.984 1.09z"/>
-                </svg>
+                <i class="bi bi-telegram" style="color: #229ED9;"></i>
             </div>
             <div class="stat-number">
                 {% if telegram_status and telegram_status.enabled %}
-                    <span class="text-success fs-3">مفعل</span>
+                    <span style="color: #22c55e; font-size: 1.2rem;">مفعل</span>
                 {% else %}
-                    <span class="text-danger fs-3">معطل</span>
+                    <span style="color: #ef4444; font-size: 1.2rem;">معطل</span>
                 {% endif %}
             </div>
             <div class="stat-label">إشعارات التلجرام</div>
-            
-            <div class="d-flex justify-content-center mb-3">
-                <span class="badge bg-info bg-opacity-10 text-info border border-info px-3 py-2 rounded-pill">
-                    <i class="bi bi-bell"></i> الإشعارات: <b id="telegramLogsCount">{{ recent_telegram_logs|length }}</b>
+            {% if recent_telegram_logs %}
+                <div class="mini-events-list">
+                    {% for log in recent_telegram_logs[:5] %}
+                    <div class="mini-event-item">
+                        {% if log.status == 'success' %}
+                            <i class="bi bi-check-circle-fill text-success mini-event-icon"></i>
+                        {% else %}
+                            <i class="bi bi-x-circle-fill text-danger mini-event-icon"></i>
+                        {% endif %}
+                        <span class="mini-event-text" title="{{ log.message }}">{{ log.message_type }}</span>
+                        <span class="mini-event-meta">{{ log.created_at | localtime('%H:%M') }}</span>
+                    </div>
+                    {% endfor %}
+                </div>
+            {% endif %}
+            <div class="details-hint"><i class="bi bi-info-circle"></i> اضغط لعرض التفاصيل</div>
+        </div>
+    </div>
+</div>
+
+<!-- ✅ الصف الثاني: إجراءات سريعة + مراقبة الترافيك -->
+<div class="row g-3 mb-3">
+    <div class="col-xl-3 col-md-6">
+        <div class="quick-actions-card">
+            <div class="quick-actions-header">
+                <i class="bi bi-lightning-charge-fill lightning"></i>
+                <span>إجراءات سريعة</span>
+            </div>
+            <a href="{{ url_for('add_subscriber') }}" class="quick-action-btn">
+                <i class="bi bi-plus-circle-fill"></i>
+                <span>إضافة مشترك جديد</span>
+            </a>
+            <a href="{{ url_for('routers') }}" class="quick-action-btn">
+                <i class="bi bi-router-fill"></i>
+                <span>إدارة الراوترات</span>
+            </a>
+            <a href="{{ url_for('payments') }}" class="quick-action-btn">
+                <i class="bi bi-cash-stack"></i>
+                <span>عرض الدفعات</span>
+            </a>
+        </div>
+    </div>
+
+    <div class="col-xl-9 col-md-6">
+        <div class="traffic-section">
+            <div class="traffic-section-header">
+                <div class="traffic-section-title">
+                    <i class="bi bi-activity"></i>
+                    <span>مراقبة الترافيك المباشر</span>
+                    <span class="live-badge" id="liveBadge" style="display: none;">
+                        <span class="live-dot"></span> LIVE
+                    </span>
+                </div>
+                <a href="{{ url_for('traffic_monitor_page') }}" class="traffic-full-link">
+                    <i class="bi bi-arrows-fullscreen"></i> الصفحة الكاملة
+                </a>
+            </div>
+
+            <div class="traffic-controls mb-2">
+                <select id="dashRouterSelect" class="traffic-select" onchange="onDashRouterChange()">
+                    <option value="">🔌 اختر الراوتر...</option>
+                    {% for r in routers %}
+                    <option value="{{ r.id }}">{{ r.name }}</option>
+                    {% endfor %}
+                </select>
+
+                <div class="traffic-search-wrapper">
+                    <input type="text" id="dashInterfaceSearch" placeholder="🔍 ابحث..." 
+                           autocomplete="off" disabled
+                           oninput="dashFilterInterfaces()"
+                           onfocus="dashShowDropdown()">
+                    <i class="bi bi-search search-icon"></i>
+                    <button class="clear-btn" id="dashClearBtn" onclick="dashClearSearch()" type="button">
+                        <i class="bi bi-x-circle-fill"></i>
+                    </button>
+                    <div class="traffic-dropdown" id="dashInterfaceDropdown"></div>
+                </div>
+
+                <input type="hidden" id="dashInterfaceSelect" value="">
+
+                <button id="dashDirectionBtn" class="traffic-direction-btn" onclick="dashToggleDirection()">
+                    <i class="bi bi-arrow-left-right"></i>
+                    <span id="dashDirectionText">تلقائي</span>
+                </button>
+
+                <button id="dashStartBtn" class="btn-traffic-start" onclick="dashStartMonitoring()">
+                    <i class="bi bi-play-fill"></i> بدء
+                </button>
+                <button id="dashStopBtn" class="btn-traffic-stop" onclick="dashStopMonitoring()" style="display: none;">
+                    <i class="bi bi-stop-fill"></i> إيقاف
+                </button>
+            </div>
+
+            <div id="dashStatus" class="mb-2" style="display: none;">
+                <span class="stat-badge success" style="font-size: 0.62rem; padding: 3px 10px;">
+                    <span class="pulse-dot" style="width: 5px; height: 5px;"></span>
+                    <span id="dashStatusText">جاري الاتصال...</span>
                 </span>
             </div>
-            
-            <div class="d-flex justify-content-between text-muted small border-top pt-3" style="border-color: var(--bg-hover) !important;">
-                <span><i class="bi bi-send-check text-info"></i> أوامر معلقة: <b id="pendingCommands">{{ pending_commands }}</b></span>
+
+            <div id="trafficEmptyState" class="traffic-empty">
+                <i class="bi bi-bar-chart-line"></i>
+                <h6>لا توجد مراقبة نشطة</h6>
+                <p>اختر الراوتر والمنفذ ثم اضغط "بدء"</p>
             </div>
-            
-            <div class="d-grid gap-2 mt-3">
-                <button class="btn btn-sm btn-outline-info rounded-pill details-btn">
-                    <i class="bi bi-info-circle"></i> عرض تفاصيل الإشعارات
-                </button>
+
+            <div id="trafficContent" class="row g-2" style="display: none;">
+                <div class="col-md-6">
+                    <div class="traffic-mini-card upload">
+                        <div class="traffic-mini-header">
+                            <div class="traffic-mini-label upload"><i class="bi bi-arrow-up-circle-fill"></i> رفع</div>
+                            <span class="stat-badge warning" id="dashUploadBadge" style="font-size: 0.58rem; padding: 2px 8px;">0 Mbps</span>
+                        </div>
+                        <div class="traffic-mini-rate upload">
+                            <span id="dashUploadRate">0.00</span>
+                            <span class="traffic-mini-rate-unit">Mbps</span>
+                        </div>
+                        <div class="traffic-mini-progress">
+                            <div class="traffic-mini-progress-bar upload" id="dashUploadProgress" style="width: 0%;"></div>
+                        </div>
+                        <div class="traffic-mini-total">
+                            <span><i class="bi bi-hdd-stack"></i> إجمالي:</span>
+                            <span id="dashUploadTotal" class="fw-bold">0 GB</span>
+                        </div>
+                        <div class="traffic-mini-chart"><canvas id="dashUploadChart"></canvas></div>
+                    </div>
+                </div>
+                <div class="col-md-6">
+                    <div class="traffic-mini-card download">
+                        <div class="traffic-mini-header">
+                            <div class="traffic-mini-label download"><i class="bi bi-arrow-down-circle-fill"></i> تحميل</div>
+                            <span class="stat-badge success" id="dashDownloadBadge" style="font-size: 0.58rem; padding: 2px 8px;">0 Mbps</span>
+                        </div>
+                        <div class="traffic-mini-rate download">
+                            <span id="dashDownloadRate">0.00</span>
+                            <span class="traffic-mini-rate-unit">Mbps</span>
+                        </div>
+                        <div class="traffic-mini-progress">
+                            <div class="traffic-mini-progress-bar download" id="dashDownloadProgress" style="width: 0%;"></div>
+                        </div>
+                        <div class="traffic-mini-total">
+                            <span><i class="bi bi-hdd-stack"></i> إجمالي:</span>
+                            <span id="dashDownloadTotal" class="fw-bold">0 GB</span>
+                        </div>
+                        <div class="traffic-mini-chart"><canvas id="dashDownloadChart"></canvas></div>
+                    </div>
+                </div>
             </div>
         </div>
     </div>
 </div>
 
-<!-- ✅ الصف الثاني: الأحداث + سجل التلجرام -->
-<div class="row g-4 mb-4">
+<!-- ✅ الصف الثالث: الأحداث + تلجرام -->
+<div class="row g-3 mb-3">
     <div class="col-lg-8">
         <div class="dashboard-card p-0 overflow-hidden">
-            <div class="d-flex justify-content-between align-items-center p-4 border-bottom" style="border-color: var(--bg-hover) !important;">
-                <h6 class="mb-0 fw-bold text-accent">
-                    <i class="bi bi-activity"></i> آخر الأحداث
-                </h6>
-                <span class="badge bg-secondary bg-opacity-25"><span id="eventsCount">{{ events|length }}</span> حدث</span>
+            <div class="d-flex justify-content-between align-items-center p-3 border-bottom" style="border-color: var(--bg-hover) !important;">
+                <h6 class="mb-0 fw-bold text-accent" style="font-size: 0.85rem;"><i class="bi bi-activity"></i> آخر الأحداث</h6>
+                <span class="badge bg-secondary bg-opacity-25" style="font-size: 0.68rem;">{{ events|length }} حدث</span>
             </div>
-            <div class="table-responsive" style="max-height: 380px; overflow-y: auto;">
+            <div class="table-responsive" style="max-height: 280px; overflow-y: auto;">
                 <table class="table table-hover table-clean mb-0 text-center">
                     <thead>
-                        <tr>
-                            <th>الوقت</th>
-                            <th>المدير</th>
-                            <th>الإجراء</th>
-                            <th>الهدف</th>
-                            <th>التفاصيل</th>
-                        </tr>
+                        <tr><th>الوقت</th><th>المدير</th><th>الإجراء</th><th>الهدف</th><th>التفاصيل</th></tr>
                     </thead>
-                    <tbody id="eventsTableBody">
+                    <tbody>
                         {% for e in events %}
                         <tr>
-                            <td class="text-muted small">{{ e.created_at | localtime('%H:%M:%S') }}</td>
-                            <td><span class="badge bg-info bg-opacity-10 text-info">{{ e.admin_name or 'النظام' }}</span></td>
+                            <td class="text-muted">{{ e.created_at | localtime('%H:%M:%S') }}</td>
+                            <td><span class="stat-badge info" style="font-size: 0.62rem; padding: 3px 8px;">{{ e.admin_name or 'النظام' }}</span></td>
                             <td class="fw-bold">{{ e.action }}</td>
                             <td>{{ e.target or '-' }}</td>
-                            <td class="text-muted small">{{ e.details or '-' }}</td>
+                            <td class="text-muted">{{ e.details or '-' }}</td>
                         </tr>
                         {% else %}
-                        <tr>
-                            <td colspan="5" class="text-center py-5 text-muted">
-                                <i class="bi bi-inbox fs-2 d-block mb-2"></i>
-                                لا توجد أحداث مسجلة
-                            </td>
-                        </tr>
+                        <tr><td colspan="5" class="text-center py-4 text-muted"><i class="bi bi-inbox" style="font-size: 1.3rem;"></i><div style="font-size: 0.72rem; margin-top: 4px;">لا توجد أحداث</div></td></tr>
                         {% endfor %}
                     </tbody>
                 </table>
@@ -304,169 +1001,73 @@
     </div>
 
     <div class="col-lg-4">
-        <div class="dashboard-card p-0 overflow-hidden d-flex flex-column">
-            <div class="d-flex justify-content-between align-items-center p-4 border-bottom" style="border-color: var(--bg-hover) !important;">
-                <h6 class="mb-0 fw-bold text-accent d-flex align-items-center gap-2">
-                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="#229ED9" viewBox="0 0 16 16">
-                        <path d="M16 8A8 8 0 1 1 0 8a8 8 0 0 1 16 0zM8.287 5.906c-.778.324-2.334.994-4.666 2.01-.378.15-.577.298-.595.442-.03.243.275.339.69.47l.175.055c.408.133.958.288 1.243.294.26.006.549-.1.868-.32 2.179-1.471 3.304-2.214 3.374-2.23.05-.012.12-.026.166.016.047.041.042.12.037.141-.03.129-1.227 1.241-1.846 1.817-.193.18-.33.307-.358.336a8.154 8.154 0 0 1-.188.186c-.38.366-.664.64.015 1.088.327.216.589.393.85.571.284.194.568.387.936.629.093.06.183.125.27.187.331.236.63.448.997.414.214-.02.435-.22.547-.82.265-1.417.786-4.486.906-5.751a1.426 1.426 0 0 0-.013-.315.337.337 0 0 0-.114-.217.526.526 0 0 0-.31-.093c-.3.005-.763.166-2.984 1.09z"/>
-                    </svg>
-                    سجل الإشعارات
+        <div class="dashboard-card p-0 overflow-hidden">
+            <div class="d-flex justify-content-between align-items-center p-3 border-bottom" style="border-color: var(--bg-hover) !important;">
+                <h6 class="mb-0 fw-bold text-accent d-flex align-items-center gap-2" style="font-size: 0.85rem;">
+                    <i class="bi bi-telegram" style="color: #229ED9;"></i> سجل الإشعارات
                 </h6>
                 {% if telegram_status and telegram_status.enabled %}
-                    <span class="badge bg-success bg-opacity-10 text-success border border-success">
-                        <span class="pulse-dot" style="width: 6px; height: 6px;"></span> نشط
-                    </span>
+                    <span class="stat-badge success" style="font-size: 0.62rem; padding: 3px 8px;"><span class="pulse-dot" style="width: 4px; height: 4px;"></span> نشط</span>
                 {% else %}
-                    <span class="badge bg-secondary">معطل</span>
+                    <span class="stat-badge secondary" style="font-size: 0.62rem; padding: 3px 8px;">معطل</span>
                 {% endif %}
             </div>
-            <div class="flex-grow-1" style="max-height: 380px; overflow-y: auto;" id="telegramLogsBody">
+            <div style="max-height: 280px; overflow-y: auto;">
                 {% for log in recent_telegram_logs %}
-                <div class="p-3 border-bottom" style="border-color: var(--bg-hover) !important;">
+                <div class="p-2 border-bottom" style="border-color: var(--bg-hover) !important;">
                     <div class="d-flex justify-content-between align-items-center mb-1">
-                        <div class="d-flex align-items-center gap-2">
+                        <div class="d-flex align-items-center gap-1">
                             {% if log.status == 'success' %}
-                                <i class="bi bi-check-circle-fill text-success"></i>
+                                <i class="bi bi-check-circle-fill text-success" style="font-size: 0.68rem;"></i>
                             {% else %}
-                                <i class="bi bi-x-circle-fill text-danger"></i>
+                                <i class="bi bi-x-circle-fill text-danger" style="font-size: 0.68rem;"></i>
                             {% endif %}
-                            <small class="text-muted fw-bold">{{ log.message_type }}</small>
+                            <small class="text-muted fw-bold" style="font-size: 0.68rem;">{{ log.message_type }}</small>
                         </div>
-                        <small class="text-muted">{{ log.created_at | localtime('%m-%d %H:%M') }}</small>
+                        <small class="text-muted" style="font-size: 0.62rem;">{{ log.created_at | localtime('%m-%d %H:%M') }}</small>
                     </div>
-                    <div class="text-muted small" style="font-size: 0.8rem;">
-                        {{ log.message[:80] }}{% if log.message|length > 80 %}...{% endif %}
-                    </div>
+                    <div class="text-muted" style="font-size: 0.68rem;">{{ log.message[:55] }}{% if log.message|length > 55 %}...{% endif %}</div>
                 </div>
                 {% else %}
-                <div class="p-5 text-center text-muted">
-                    <i class="bi bi-bell-slash fs-2 d-block mb-2"></i>
-                    لا توجد إشعارات
-                </div>
+                <div class="p-4 text-center text-muted"><i class="bi bi-bell-slash" style="font-size: 1.3rem;"></i><div style="font-size: 0.72rem; margin-top: 4px;">لا توجد إشعارات</div></div>
                 {% endfor %}
             </div>
         </div>
     </div>
 </div>
 
-<!-- ✅ الصف الثالث: إعدادات المدير -->
-<div class="row g-4">
+<!-- إعدادات المدير -->
+<div class="row g-3 mb-3">
     <div class="col-12">
         <div class="dashboard-card">
-            <h6 class="fw-bold text-accent mb-4">
-                <i class="bi bi-shield-lock"></i> إعدادات حساب المدير
-            </h6>
-            <p class="text-muted small mb-4">يمكنك تغيير اسم المستخدم أو كلمة المرور الخاصة بحسابك من هنا.</p>
-            <button class="btn btn-outline-warning w-100 py-3 rounded-3" data-bs-toggle="modal" data-bs-target="#changeCredentialsModal">
+            <h6 class="fw-bold text-accent mb-2" style="font-size: 0.85rem;"><i class="bi bi-shield-lock"></i> إعدادات حساب المدير</h6>
+            <p class="text-muted mb-2" style="font-size: 0.72rem;">يمكنك تغيير اسم المستخدم أو كلمة المرور.</p>
+            <button class="btn btn-outline-warning w-100 py-2 rounded-3" style="font-size: 0.78rem;" data-bs-toggle="modal" data-bs-target="#changeCredentialsModal">
                 <i class="bi bi-key-fill"></i> تغيير بيانات الدخول
             </button>
         </div>
     </div>
 </div>
 
-<!-- ✅ نافذة تفاصيل إيرادات اليوم -->
-<div class="modal fade" id="revenueDetailsModal" tabindex="-1">
-    <div class="modal-dialog modal-dialog-centered modal-lg">
-        <div class="modal-content border-0 shadow-lg" style="border-radius: 16px; background-color: var(--bg-card);">
-            <div class="modal-header revenue-modal-header">
-                <h5 class="modal-title fw-bold">
-                    <i class="bi bi-cash-stack"></i> تفاصيل الإيرادات والمبيعات
-                </h5>
-                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
-            </div>
-            <div class="modal-body p-4">
-                <div class="row g-3 mb-4">
-                    <div class="col-md-4">
-                        <div class="revenue-box">
-                            <i class="bi bi-calendar-day text-warning fs-1"></i>
-                            <h6 class="text-muted mb-1 mt-2">مبيعات اليوم</h6>
-                            <h3 class="fw-bold text-warning mb-0">{{ today_revenue }}</h3>
-                            <small class="text-muted">ل.س</small>
-                        </div>
-                    </div>
-                    <div class="col-md-4">
-                        <div class="revenue-box">
-                            <i class="bi bi-calendar-month text-info fs-1"></i>
-                            <h6 class="text-muted mb-1 mt-2">مبيعات الشهر</h6>
-                            <h3 class="fw-bold text-info mb-0">{{ monthly_revenue|default(0) }}</h3>
-                            <small class="text-muted">ل.س</small>
-                        </div>
-                    </div>
-                    <div class="col-md-4">
-                        <div class="revenue-box">
-                            <i class="bi bi-calendar-check fs-1" style="color: #a855f7;"></i>
-                            <h6 class="text-muted mb-1 mt-2">مبيعات السنة</h6>
-                            <h3 class="fw-bold mb-0" style="color: #a855f7;">{{ yearly_revenue|default(0) }}</h3>
-                            <small class="text-muted">ل.س</small>
-                        </div>
-                    </div>
-                </div>
-                <div class="alert alert-info bg-opacity-10 border-info small">
-                    <i class="bi bi-info-circle-fill"></i>
-                    يتم احتساب الإيرادات من الدفعات المكتملة فقط.
-                </div>
-            </div>
-            <div class="modal-footer border-top" style="border-color: var(--bg-hover) !important; background-color: var(--bg-hover); border-radius: 0 0 16px 16px;">
-                <a href="{{ url_for('payments') }}" class="btn btn-outline-warning rounded-3">
-                    <i class="bi bi-cash-stack"></i> سجل الدفعات الكامل
-                </a>
-                <button type="button" class="btn btn-secondary rounded-3" data-bs-dismiss="modal">إغلاق</button>
-            </div>
-        </div>
-    </div>
-</div>
+<!-- ==================== النوافذ ==================== -->
 
-<!-- ✅ نافذة تفاصيل سيرفرات MikroTik -->
+<!-- MikroTik Modal -->
 <div class="modal fade" id="mikrotikDetailsModal" tabindex="-1">
     <div class="modal-dialog modal-dialog-centered modal-lg">
-        <div class="modal-content border-0 shadow-lg" style="border-radius: 16px; background-color: var(--bg-card);">
+        <div class="modal-content border-0 shadow-lg" style="border-radius: 12px; background-color: var(--bg-card);">
             <div class="modal-header mikrotik-modal-header">
-                <h5 class="modal-title fw-bold">
-                    <i class="bi bi-router"></i> تفاصيل سيرفرات MikroTik
-                </h5>
+                <h5 class="modal-title fw-bold" style="font-size: 0.95rem;"><i class="bi bi-router"></i> تفاصيل سيرفرات MikroTik</h5>
                 <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
             </div>
-            <div class="modal-body p-4">
-                <div class="row g-3 mb-4 text-center">
-                    <div class="col-4">
-                        <div class="p-3 rounded-3" style="background-color: var(--bg-main); border: 1px solid var(--bg-hover);">
-                            <h4 class="fw-bold text-accent mb-0">{{ routers_count }}</h4>
-                            <small class="text-muted">إجمالي السيرفرات</small>
-                        </div>
-                    </div>
-                    <div class="col-4">
-                        <div class="p-3 rounded-3" style="background-color: var(--bg-main); border: 1px solid var(--bg-hover);">
-                            <h4 class="fw-bold text-success mb-0">{{ routers_online }}</h4>
-                            <small class="text-muted">متصل</small>
-                        </div>
-                    </div>
-                    <div class="col-4">
-                        <div class="p-3 rounded-3" style="background-color: var(--bg-main); border: 1px solid var(--bg-hover);">
-                            <h4 class="fw-bold text-danger mb-0">{{ routers_count - routers_online }}</h4>
-                            <small class="text-muted">متوقف</small>
-                        </div>
-                    </div>
+            <div class="modal-body p-3">
+                <div class="row g-2 mb-3 text-center">
+                    <div class="col-4"><div class="p-2 rounded-3" style="background-color: var(--bg-main); border: 1px solid var(--bg-hover);"><h5 class="fw-bold text-accent mb-0">{{ routers_count }}</h5><small class="text-muted" style="font-size: 0.68rem;">إجمالي</small></div></div>
+                    <div class="col-4"><div class="p-2 rounded-3" style="background-color: var(--bg-main); border: 1px solid var(--bg-hover);"><h5 class="fw-bold text-success mb-0">{{ routers_online }}</h5><small class="text-muted" style="font-size: 0.68rem;">متصل</small></div></div>
+                    <div class="col-4"><div class="p-2 rounded-3" style="background-color: var(--bg-main); border: 1px solid var(--bg-hover);"><h5 class="fw-bold text-danger mb-0">{{ routers_count - routers_online }}</h5><small class="text-muted" style="font-size: 0.68rem;">متوقف</small></div></div>
                 </div>
-
-                <div class="d-flex justify-content-between align-items-center mb-3">
-                    <h6 class="fw-bold text-accent mb-0"><i class="bi bi-list-ul"></i> قائمة السيرفرات</h6>
-                    <a href="{{ url_for('routers') }}" class="btn btn-sm btn-primary rounded-pill px-3">
-                        <i class="bi bi-plus-circle"></i> إضافة سيرفر جديد
-                    </a>
-                </div>
-                
-                <div class="table-responsive" style="max-height: 300px; overflow-y: auto; border: 1px solid var(--bg-hover); border-radius: 10px;">
+                <div class="table-responsive" style="max-height: 300px; overflow-y: auto; border: 1px solid var(--bg-hover); border-radius: 8px;">
                     <table class="table table-hover table-clean mb-0 text-center">
-                        <thead>
-                            <tr>
-                                <th>#</th>
-                                <th>الاسم</th>
-                                <th>عنوان IP</th>
-                                <th>المنفذ</th>
-                                <th>الحالة</th>
-                                <th>إجراءات</th>
-                            </tr>
-                        </thead>
+                        <thead><tr><th>#</th><th>الاسم</th><th>IP</th><th>SSH</th><th>API</th><th>الحالة</th></tr></thead>
                         <tbody>
                             {% for r in routers %}
                             <tr>
@@ -474,91 +1075,42 @@
                                 <td class="fw-bold text-accent">{{ r.name }}</td>
                                 <td><span class="font-monospace text-muted">{{ r.ip_address }}</span></td>
                                 <td>{{ r.port }}</td>
+                                <td><span class="text-info fw-bold">{{ r.api_port or 13 }}</span></td>
                                 <td>
                                     {% if r.is_active %}
-                                        <span class="badge bg-success bg-opacity-10 text-success border border-success">
-                                            <span class="pulse-dot" style="width: 6px; height: 6px;"></span> متصل
-                                        </span>
+                                        <span class="stat-badge success" style="font-size: 0.62rem; padding: 3px 8px;">🟢 متصل</span>
                                     {% else %}
-                                        <span class="badge bg-danger bg-opacity-10 text-danger border border-danger">
-                                            <i class="bi bi-x-circle-fill"></i> متوقف
-                                        </span>
+                                        <span class="stat-badge danger" style="font-size: 0.62rem; padding: 3px 8px;">🔴 متوقف</span>
                                     {% endif %}
-                                </td>
-                                <td>
-                                    <div class="d-flex justify-content-center gap-1">
-                                        <a href="{{ url_for('routers') }}" class="btn btn-sm btn-outline-info" title="تعديل">
-                                            <i class="bi bi-pencil"></i>
-                                        </a>
-                                        <a href="{{ url_for('delete_router', router_id=r.id) }}" class="btn btn-sm btn-outline-danger" title="حذف" onclick="return confirm('تأكيد حذف السيرفر {{ r.name }}؟')">
-                                            <i class="bi bi-trash"></i>
-                                        </a>
-                                    </div>
                                 </td>
                             </tr>
                             {% else %}
-                            <tr>
-                                <td colspan="6" class="text-center py-4 text-muted">لا توجد سيرفرات مضافة</td>
-                            </tr>
+                            <tr><td colspan="6" class="text-center py-3 text-muted">لا توجد سيرفرات</td></tr>
                             {% endfor %}
                         </tbody>
                     </table>
                 </div>
             </div>
-            <div class="modal-footer border-top" style="border-color: var(--bg-hover) !important; background-color: var(--bg-hover); border-radius: 0 0 16px 16px;">
-                <a href="{{ url_for('routers') }}" class="btn btn-outline-info rounded-3">
-                    <i class="bi bi-gear"></i> الإدارة الكاملة
-                </a>
-                <button type="button" class="btn btn-secondary rounded-3" data-bs-dismiss="modal">إغلاق</button>
+            <div class="modal-footer border-top" style="border-color: var(--bg-hover) !important; background-color: var(--bg-hover); border-radius: 0 0 12px 12px;">
+                <a href="{{ url_for('routers') }}" class="btn btn-outline-info btn-sm rounded-3" style="font-size: 0.72rem;">الإدارة الكاملة</a>
+                <button type="button" class="btn btn-secondary btn-sm rounded-3" style="font-size: 0.72rem;" data-bs-dismiss="modal">إغلاق</button>
             </div>
         </div>
     </div>
 </div>
 
-<!-- ✅ نافذة تفاصيل المشتركين (المنتهين والمتوقفين) -->
+<!-- Subscribers Modal -->
 <div class="modal fade" id="subscribersDetailsModal" tabindex="-1">
     <div class="modal-dialog modal-dialog-centered modal-lg">
-        <div class="modal-content border-0 shadow-lg" style="border-radius: 16px; background-color: var(--bg-card);">
+        <div class="modal-content border-0 shadow-lg" style="border-radius: 12px; background-color: var(--bg-card);">
             <div class="modal-header subscribers-modal-header">
-                <h5 class="modal-title fw-bold">
-                    <i class="bi bi-people-fill"></i> الحسابات المنتهية والمتوقفة
-                </h5>
+                <h5 class="modal-title fw-bold" style="font-size: 0.95rem;"><i class="bi bi-people-fill"></i> الحسابات المنتهية والمتوقفة</h5>
                 <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
             </div>
-            <div class="modal-body p-4">
-                <div class="row g-3 mb-4 text-center">
-                    <div class="col-4">
-                        <div class="p-3 rounded-3" style="background-color: var(--bg-main); border: 1px solid var(--bg-hover);">
-                            <h4 class="fw-bold text-danger mb-0">{{ inactive_subs|length }}</h4>
-                            <small class="text-muted">إجمالي غير النشطين</small>
-                        </div>
-                    </div>
-                    <div class="col-4">
-                        <div class="p-3 rounded-3" style="background-color: var(--bg-main); border: 1px solid var(--bg-hover);">
-                            <h4 class="fw-bold text-warning mb-0">{{ inactive_subs|selectattr('status', 'equalto', 'expired')|list|length }}</h4>
-                            <small class="text-muted">المنتهين</small>
-                        </div>
-                    </div>
-                    <div class="col-4">
-                        <div class="p-3 rounded-3" style="background-color: var(--bg-main); border: 1px solid var(--bg-hover);">
-                            <h4 class="fw-bold text-secondary mb-0">{{ inactive_subs|selectattr('status', 'equalto', 'paused')|list|length }}</h4>
-                            <small class="text-muted">المتوقفين</small>
-                        </div>
-                    </div>
-                </div>
-                
-                <div class="table-responsive" style="max-height: 350px; overflow-y: auto; border: 1px solid var(--bg-hover); border-radius: 10px;">
+            <div class="modal-body p-3">
+                <div class="table-responsive" style="max-height: 350px; overflow-y: auto; border: 1px solid var(--bg-hover); border-radius: 8px;">
                     <table class="table table-hover table-clean mb-0 text-center">
-                        <thead>
-                            <tr>
-                                <th>#</th>
-                                <th>الاسم</th>
-                                <th>المستخدم</th>
-                                <th>الحالة</th>
-                                <th>ينتهي</th>
-                                <th>إجراءات</th>
-                            </tr>
-                        </thead>
+                        <thead><tr><th>#</th><th>الاسم</th><th>المستخدم</th><th>الحالة</th><th>ينتهي</th></tr></thead>
                         <tbody>
                             {% for sub in inactive_subs %}
                             <tr>
@@ -567,283 +1119,771 @@
                                 <td class="text-muted">{{ sub.username }}</td>
                                 <td>
                                     {% if sub.status == 'expired' %}
-                                        <span class="badge bg-danger bg-opacity-10 text-danger border border-danger">🔴 منتهي</span>
+                                        <span class="stat-badge danger" style="font-size: 0.62rem; padding: 3px 8px;">🔴 منتهي</span>
                                     {% elif sub.status == 'paused' %}
-                                        <span class="badge bg-warning bg-opacity-10 text-warning border border-warning">⏸ موقوف</span>
+                                        <span class="stat-badge warning" style="font-size: 0.62rem; padding: 3px 8px;">⏸ موقوف</span>
                                     {% endif %}
                                 </td>
-                                <td class="text-muted small">
-                                    {{ sub.expires_at.strftime('%Y-%m-%d') if sub.expires_at else '-' }}
-                                </td>
-                                <td>
-                                    <div class="d-flex justify-content-center gap-1">
-                                        <a href="{{ url_for('subscribers') }}" class="btn btn-sm btn-outline-info" title="عرض">
-                                            <i class="bi bi-eye"></i>
-                                        </a>
-                                        <a href="{{ url_for('toggle_subscriber', sub_id=sub.id) }}" class="btn btn-sm btn-outline-success" title="تفعيل">
-                                            <i class="bi bi-play-fill"></i>
-                                        </a>
-                                    </div>
-                                </td>
+                                <td class="text-muted">{{ sub.expires_at.strftime('%Y-%m-%d') if sub.expires_at else '-' }}</td>
                             </tr>
                             {% else %}
-                            <tr>
-                                <td colspan="6" class="text-center py-4 text-muted">لا توجد حسابات منتهية أو متوقفة</td>
-                            </tr>
+                            <tr><td colspan="5" class="text-center py-3 text-muted">لا توجد حسابات</td></tr>
                             {% endfor %}
                         </tbody>
                     </table>
                 </div>
             </div>
-            <div class="modal-footer border-top" style="border-color: var(--bg-hover) !important; background-color: var(--bg-hover); border-radius: 0 0 16px 16px;">
-                <a href="{{ url_for('subscribers') }}" class="btn btn-outline-info rounded-3">
-                    <i class="bi bi-people"></i> الإدارة الكاملة
-                </a>
-                <button type="button" class="btn btn-secondary rounded-3" data-bs-dismiss="modal">إغلاق</button>
+            <div class="modal-footer border-top" style="border-color: var(--bg-hover) !important; background-color: var(--bg-hover); border-radius: 0 0 12px 12px;">
+                <a href="{{ url_for('subscribers') }}" class="btn btn-outline-info btn-sm rounded-3" style="font-size: 0.72rem;">الإدارة الكاملة</a>
+                <button type="button" class="btn btn-secondary btn-sm rounded-3" style="font-size: 0.72rem;" data-bs-dismiss="modal">إغلاق</button>
             </div>
         </div>
     </div>
 </div>
 
-<!-- ✅ نافذة تفاصيل التلجرام -->
-<div class="modal fade" id="telegramDetailsModal" tabindex="-1">
+<!-- ✅ Online Subscribers Modal -->
+<div class="modal fade" id="onlineSubsModal" tabindex="-1">
+    <div class="modal-dialog modal-dialog-centered modal-xl">
+        <div class="modal-content border-0 shadow-lg" style="border-radius: 12px; background-color: var(--bg-card);">
+            <div class="modal-header online-modal-header">
+                <h5 class="modal-title fw-bold" style="font-size: 1rem;">
+                    <i class="bi bi-wifi"></i> المشتركون المتصلون الآن
+                    <span class="badge bg-white text-success ms-2" style="font-size: 0.75rem;">{{ online_subs|length }}</span>
+                </h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body p-3">
+                {% if online_subs %}
+                <div class="text-center mb-2" style="font-size: 0.7rem; color: var(--text-muted);">
+                    <i class="bi bi-info-circle"></i> اضغط على أي مشترك لعرض تفاصيله الكاملة
+                </div>
+                <div class="table-responsive" style="max-height: 500px; overflow-y: auto; border: 1px solid var(--bg-hover); border-radius: 8px;">
+                    <table class="table table-hover table-clean mb-0 text-center">
+                        <thead style="position: sticky; top: 0; background-color: var(--bg-hover); z-index: 10;">
+                            <tr>
+                                <th>#</th>
+                                <th>اسم المستخدم</th>
+                                <th>الاسم</th>
+                                <th>IP المشترك</th>
+                                <th>IP الراوتر</th>
+                                <th>وقت الاتصال</th>
+                                <th>المدة</th>
+                                <th style="color: #22c55e;">⬇ تحميل</th>
+                                <th style="color: #f59e0b;">⬆ رفع</th>
+                                <th>النوع</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for sub in online_subs %}
+                            <tr onclick='openSubDetail(
+                                {{ sub.id }},
+                                "{{ (sub.name or '')|e }}",
+                                "{{ sub.username|e }}",
+                                "{{ sub.current_ip or '' }}",
+                                "{{ routers[sub.router_id].ip_address if sub.router_id and sub.router_id in routers else '' }}",
+                                "{{ routers[sub.router_id].name if sub.router_id and sub.router_id in routers else '' }}",
+                                "{{ sub.connected_at | localtime('%Y-%m-%d %H:%M:%S') if sub.connected_at else '-' }}",
+                                "{{ sub.session_uptime or '-' }}",
+                                {{ sub.session_rx_bytes or 0 }},
+                                {{ sub.session_tx_bytes or 0 }},
+                                "{{ sub.package or '-' }}",
+                                "{{ sub.user_type or 'pppoe' }}",
+                                "{{ sub.status or 'active' }}",
+                                "{{ sub.expires_at.strftime('%Y-%m-%d') if sub.expires_at else '-' }}",
+                                "{{ sub.ip_updated_at | localtime('%H:%M:%S') if sub.ip_updated_at else '-' }}"
+                            )'>
+                                <td class="text-muted">#{{ sub.id }}</td>
+                                <td>
+                                    <span style="font-family: monospace; font-weight: 600; color: var(--accent);">
+                                        {{ sub.username }}
+                                    </span>
+                                </td>
+                                <td class="fw-bold text-primary">{{ sub.name or '-' }}</td>
+                                <td>
+                                    <span class="ip-badge ip-online">
+                                        <i class="bi bi-wifi"></i> {{ sub.current_ip }}
+                                    </span>
+                                </td>
+                                <td>
+                                    {% if sub.router_id and sub.router_id in routers %}
+                                        <span class="badge bg-secondary bg-opacity-10 text-secondary border border-secondary" style="font-family: monospace; font-size: 0.72rem;">
+                                            <i class="bi bi-router"></i> {{ routers[sub.router_id].ip_address }}
+                                        </span>
+                                    {% else %}
+                                        <span class="text-muted">-</span>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    {% if sub.connected_at %}
+                                        <span style="font-size: 0.72rem; color: var(--text-muted);">
+                                            {{ sub.connected_at | localtime('%m-%d %H:%M') }}
+                                        </span>
+                                    {% else %}
+                                        <span class="text-muted">-</span>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    {% if sub.session_uptime %}
+                                        <span class="stat-badge info" style="font-size: 0.68rem; padding: 3px 8px; font-family: monospace;">
+                                            <i class="bi bi-clock"></i> {{ sub.session_uptime }}
+                                        </span>
+                                    {% else %}
+                                        <span class="text-muted">-</span>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    <span class="speed-badge speed-down">
+                                        <i class="bi bi-arrow-down-circle-fill"></i> {{ (sub.session_rx_bytes or 0) | filesizeformat }}
+                                    </span>
+                                </td>
+                                <td>
+                                    <span class="speed-badge speed-up">
+                                        <i class="bi bi-arrow-up-circle-fill"></i> {{ (sub.session_tx_bytes or 0) | filesizeformat }}
+                                    </span>
+                                </td>
+                                <td>
+                                    {% if sub.user_type == 'hotspot' %}
+                                        <span class="stat-badge warning" style="font-size: 0.62rem; padding: 3px 8px;">📶 هوت سبوت</span>
+                                    {% else %}
+                                        <span class="stat-badge info" style="font-size: 0.62rem; padding: 3px 8px;">🌐 برودباند</span>
+                                    {% endif %}
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+                <div class="mt-2 text-center text-muted" style="font-size: 0.68rem;">
+                    <i class="bi bi-info-circle"></i>
+                    يتم التحديث تلقائياً كل دقيقتين من الراوترات | آخر تحديث: {{ current_time }}
+                </div>
+                {% else %}
+                <div class="p-5 text-center text-muted">
+                    <i class="bi bi-wifi-off" style="font-size: 3rem; color: var(--bg-hover);"></i>
+                    <h5 class="mt-3 mb-1">لا يوجد مشتركون متصلون حالياً</h5>
+                    <small style="font-size: 0.75rem;">سيظهر المتصلون هنا تلقائياً عند دخولهم</small>
+                </div>
+                {% endif %}
+            </div>
+            <div class="modal-footer border-top" style="border-color: var(--bg-hover) !important; background-color: var(--bg-hover); border-radius: 0 0 12px 12px;">
+                <button type="button" class="btn btn-outline-success btn-sm rounded-3" style="font-size: 0.75rem;" onclick="refreshOnlineSubs()">
+                    <i class="bi bi-arrow-clockwise"></i> تحديث فوري
+                </button>
+                <a href="{{ url_for('subscribers') }}" class="btn btn-outline-info btn-sm rounded-3" style="font-size: 0.75rem;">
+                    <i class="bi bi-people"></i> الإدارة الكاملة
+                </a>
+                <button type="button" class="btn btn-secondary btn-sm rounded-3" style="font-size: 0.75rem;" data-bs-dismiss="modal">إغلاق</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- ✅ Modal تفاصيل المشترك -->
+<div class="modal fade" id="subDetailModal" tabindex="-1">
     <div class="modal-dialog modal-dialog-centered modal-lg">
-        <div class="modal-content border-0 shadow-lg" style="border-radius: 16px; background-color: var(--bg-card);">
-            <div class="modal-header telegram-modal-header">
-                <h5 class="modal-title fw-bold">
-                    <i class="bi bi-telegram"></i> تفاصيل إشعارات التلجرام
+        <div class="modal-content border-0 shadow-lg" style="border-radius: 12px; background-color: var(--bg-card);">
+            <div class="modal-header" style="background: linear-gradient(135deg, #0ea5e9, #0284c7); border-radius: 12px 12px 0 0; color: white;">
+                <h5 class="modal-title fw-bold" style="font-size: 1rem;">
+                    <i class="bi bi-person-badge-fill"></i>
+                    تفاصيل المشترك المتصل
                 </h5>
                 <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
             </div>
             <div class="modal-body p-4">
-                <div class="d-flex justify-content-between align-items-center p-3 mb-4 rounded-3" style="background-color: var(--bg-main); border: 1px solid var(--bg-hover);">
-                    <div>
-                        <h6 class="mb-0 fw-bold">حالة الإشعارات</h6>
-                        <small class="text-muted">حالة الاتصال بخدمة التلجرام</small>
+                <div class="text-center mb-4">
+                    <div style="width: 70px; height: 70px; margin: 0 auto 10px; background: linear-gradient(135deg, #22c55e, #16a34a); border-radius: 50%; display: flex; align-items: center; justify-content: center;">
+                        <i class="bi bi-person-fill" style="font-size: 2.2rem; color: white;"></i>
                     </div>
-                    <div>
-                        {% if telegram_status and telegram_status.enabled %}
-                            <span class="badge bg-success fs-6 px-3 py-2">
-                                <span class="pulse-dot"></span> مفعل ويعمل
-                            </span>
-                        {% else %}
-                            <span class="badge bg-danger fs-6 px-3 py-2">
-                                <i class="bi bi-x-circle-fill"></i> معطل
-                            </span>
-                        {% endif %}
+                    <h4 class="fw-bold mb-1" id="det_name" style="color: var(--text-main);">-</h4>
+                    <div class="mb-2">
+                        <span class="ip-badge ip-online" style="font-size: 0.85rem; padding: 6px 14px;">
+                            <i class="bi bi-wifi"></i> <span id="det_ip">-</span>
+                        </span>
+                    </div>
+                    <div class="d-flex justify-content-center gap-2">
+                        <span class="stat-badge success" style="font-size: 0.72rem;">
+                            <span class="pulse-dot"></span> متصل الآن
+                        </span>
+                        <span id="det_type_badge" class="stat-badge info" style="font-size: 0.72rem;">-</span>
                     </div>
                 </div>
 
-                <h6 class="fw-bold text-accent mb-3"><i class="bi bi-list-ul"></i> آخر الإشعارات المرسلة</h6>
-                <div class="table-responsive" style="max-height: 250px; overflow-y: auto; border: 1px solid var(--bg-hover); border-radius: 10px;">
-                    <table class="table table-hover table-clean mb-0">
-                        <thead>
-                            <tr>
-                                <th>الوقت</th>
-                                <th>النوع</th>
-                                <th>الحالة</th>
-                                <th>الرسالة</th>
-                            </tr>
-                        </thead>
+                <div class="row g-3 mb-3">
+                    <div class="col-md-6">
+                        <div class="p-3 rounded-3" style="background-color: var(--bg-main); border: 1px solid var(--bg-hover);">
+                            <div class="d-flex justify-content-between align-items-center mb-2">
+                                <span class="text-muted" style="font-size: 0.75rem;">
+                                    <i class="bi bi-arrow-down-circle-fill" style="color: #22c55e;"></i> التحميل
+                                </span>
+                                <i class="bi bi-download" style="color: #22c55e; font-size: 1.2rem;"></i>
+                            </div>
+                            <h4 class="fw-bold mb-0" id="det_download" style="color: #22c55e; font-family: monospace;">0 B</h4>
+                            <small class="text-muted" style="font-size: 0.7rem;">إجمالي التحميل الحالي</small>
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <div class="p-3 rounded-3" style="background-color: var(--bg-main); border: 1px solid var(--bg-hover);">
+                            <div class="d-flex justify-content-between align-items-center mb-2">
+                                <span class="text-muted" style="font-size: 0.75rem;">
+                                    <i class="bi bi-arrow-up-circle-fill" style="color: #f59e0b;"></i> الرفع
+                                </span>
+                                <i class="bi bi-upload" style="color: #f59e0b; font-size: 1.2rem;"></i>
+                            </div>
+                            <h4 class="fw-bold mb-0" id="det_upload" style="color: #f59e0b; font-family: monospace;">0 B</h4>
+                            <small class="text-muted" style="font-size: 0.7rem;">إجمالي الرفع الحالي</small>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="table-responsive" style="border: 1px solid var(--bg-hover); border-radius: 8px;">
+                    <table class="table table-clean mb-0" style="font-size: 0.82rem;">
                         <tbody>
-                            {% for log in recent_telegram_logs %}
                             <tr>
-                                <td class="text-muted small">{{ log.created_at | localtime('%m-%d %H:%M') }}</td>
-                                <td><span class="badge bg-secondary">{{ log.message_type }}</span></td>
-                                <td>
-                                    {% if log.status == 'success' %}
-                                        <i class="bi bi-check-circle-fill text-success"></i>
-                                    {% else %}
-                                        <i class="bi bi-x-circle-fill text-danger"></i>
-                                    {% endif %}
+                                <td style="background-color: var(--bg-main); width: 40%; color: var(--text-muted); font-weight: 600;">
+                                    <i class="bi bi-hash"></i> رقم المشترك
                                 </td>
-                                <td class="text-muted small">{{ log.message[:50] }}{% if log.message|length > 50 %}...{% endif %}</td>
+                                <td style="background-color: var(--bg-card); color: var(--text-main); font-family: monospace;" id="det_id">-</td>
                             </tr>
-                            {% else %}
                             <tr>
-                                <td colspan="4" class="text-center py-4 text-muted">لا توجد إشعارات مسجلة</td>
+                                <td style="background-color: var(--bg-main); color: var(--text-muted); font-weight: 600;">
+                                    <i class="bi bi-person"></i> اسم المستخدم
+                                </td>
+                                <td style="background-color: var(--bg-card); color: var(--accent); font-family: monospace; font-weight: 600;" id="det_username">-</td>
                             </tr>
-                            {% endfor %}
+                            <tr>
+                                <td style="background-color: var(--bg-main); color: var(--text-muted); font-weight: 600;">
+                                    <i class="bi bi-wifi"></i> عنوان IP
+                                </td>
+                                <td style="background-color: var(--bg-card); color: var(--text-main); font-family: monospace;" id="det_ip2">-</td>
+                            </tr>
+                            <tr>
+                                <td style="background-color: var(--bg-main); color: var(--text-muted); font-weight: 600;">
+                                    <i class="bi bi-router"></i> الراوتر المتصل به
+                                </td>
+                                <td style="background-color: var(--bg-card); color: var(--text-main);" id="det_router">-</td>
+                            </tr>
+                            <tr>
+                                <td style="background-color: var(--bg-main); color: var(--text-muted); font-weight: 600;">
+                                    <i class="bi bi-box-seam"></i> الباقة
+                                </td>
+                                <td style="background-color: var(--bg-card); color: var(--text-main); font-weight: 600;" id="det_package">-</td>
+                            </tr>
+                            <tr>
+                                <td style="background-color: var(--bg-main); color: var(--text-muted); font-weight: 600;">
+                                    <i class="bi bi-clock-history"></i> وقت الاتصال
+                                </td>
+                                <td style="background-color: var(--bg-card); color: var(--text-main); font-family: monospace;" id="det_connected_at">-</td>
+                            </tr>
+                            <tr>
+                                <td style="background-color: var(--bg-main); color: var(--text-muted); font-weight: 600;">
+                                    <i class="bi bi-hourglass-split"></i> مدة الاتصال
+                                </td>
+                                <td style="background-color: var(--bg-card);">
+                                    <span class="stat-badge info" style="font-size: 0.72rem; padding: 4px 10px; font-family: monospace;" id="det_uptime">-</span>
+                                </td>
+                            </tr>
+                            <tr>
+                                <td style="background-color: var(--bg-main); color: var(--text-muted); font-weight: 600;">
+                                    <i class="bi bi-calendar-check"></i> تاريخ انتهاء الاشتراك
+                                </td>
+                                <td style="background-color: var(--bg-card); color: var(--text-main);" id="det_expires">-</td>
+                            </tr>
+                            <tr>
+                                <td style="background-color: var(--bg-main); color: var(--text-muted); font-weight: 600;">
+                                    <i class="bi bi-arrow-clockwise"></i> آخر تحديث للبيانات
+                                </td>
+                                <td style="background-color: var(--bg-card); color: var(--text-main); font-family: monospace;" id="det_updated">-</td>
+                            </tr>
                         </tbody>
                     </table>
                 </div>
+
+                <div class="mt-3">
+                    <div class="d-flex justify-content-between mb-1" style="font-size: 0.72rem;">
+                        <span style="color: #22c55e;"><i class="bi bi-arrow-down"></i> التحميل</span>
+                        <span style="color: #f59e0b;"><i class="bi bi-arrow-up"></i> الرفع</span>
+                    </div>
+                    <div style="height: 10px; background-color: var(--bg-main); border-radius: 5px; overflow: hidden; display: flex;">
+                        <div id="det_bar_down" style="background: linear-gradient(90deg, #22c55e, #4ade80); height: 100%; transition: width 0.5s;"></div>
+                        <div id="det_bar_up" style="background: linear-gradient(90deg, #f59e0b, #fbbf24); height: 100%; transition: width 0.5s;"></div>
+                    </div>
+                    <div class="text-center mt-2" style="font-size: 0.68rem; color: var(--text-muted);">
+                        نسبة التحميل والرفع من إجمالي البيانات المستخدمة
+                    </div>
+                </div>
             </div>
-            <div class="modal-footer border-top" style="border-color: var(--bg-hover) !important; background-color: var(--bg-hover); border-radius: 0 0 16px 16px;">
-                <a href="{{ url_for('admin_settings') }}" class="btn btn-outline-info rounded-3">
-                    <i class="bi bi-gear"></i> الإعدادات الكاملة
+            <div class="modal-footer border-top" style="border-color: var(--bg-hover) !important; background-color: var(--bg-hover); border-radius: 0 0 12px 12px;">
+                <a href="{{ url_for('subscribers') }}" class="btn btn-outline-info btn-sm rounded-3" style="font-size: 0.75rem;">
+                    <i class="bi bi-pencil"></i> تعديل المشترك
                 </a>
-                <button type="button" class="btn btn-secondary rounded-3" data-bs-dismiss="modal">إغلاق</button>
+                <button type="button" class="btn btn-secondary btn-sm rounded-3" style="font-size: 0.75rem;" data-bs-dismiss="modal">إغلاق</button>
             </div>
         </div>
     </div>
 </div>
 
-<!-- ✅ Modal تغيير بيانات المدير -->
+<!-- Revenue Modal -->
+<div class="modal fade" id="revenueDetailsModal" tabindex="-1">
+    <div class="modal-dialog modal-dialog-centered modal-lg">
+        <div class="modal-content border-0 shadow-lg" style="border-radius: 12px; background-color: var(--bg-card);">
+            <div class="modal-header revenue-modal-header">
+                <h5 class="modal-title fw-bold" style="font-size: 0.95rem;"><i class="bi bi-cash-coin"></i> تفاصيل الإيرادات</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body p-3">
+                <div class="row g-2 mb-3">
+                    <div class="col-md-4"><div class="revenue-box"><h6 class="text-muted mb-1" style="font-size: 0.72rem;">مبيعات اليوم</h6><h4 class="fw-bold text-warning mb-0">{{ today_revenue }}</h4><small class="text-muted" style="font-size: 0.68rem;">ل.س</small></div></div>
+                    <div class="col-md-4"><div class="revenue-box"><h6 class="text-muted mb-1" style="font-size: 0.72rem;">مبيعات الشهر</h6><h4 class="fw-bold text-info mb-0">{{ monthly_revenue|default(0) }}</h4><small class="text-muted" style="font-size: 0.68rem;">ل.س</small></div></div>
+                    <div class="col-md-4"><div class="revenue-box"><h6 class="text-muted mb-1" style="font-size: 0.72rem;">مبيعات السنة</h6><h4 class="fw-bold mb-0" style="color: #a855f7;">{{ yearly_revenue|default(0) }}</h4><small class="text-muted" style="font-size: 0.68rem;">ل.س</small></div></div>
+                </div>
+                {% if recent_payments %}
+                <h6 class="fw-bold text-accent mb-2" style="font-size: 0.85rem;"><i class="bi bi-list-ul"></i> آخر 5 دفعات</h6>
+                <div class="table-responsive" style="max-height: 250px; overflow-y: auto; border: 1px solid var(--bg-hover); border-radius: 8px;">
+                    <table class="table table-hover table-clean mb-0 text-center">
+                        <thead><tr><th>#</th><th>المبلغ</th><th>الحالة</th><th>التاريخ</th></tr></thead>
+                        <tbody>
+                            {% for p in recent_payments %}
+                            <tr>
+                                <td class="text-muted">#{{ p.id }}</td>
+                                <td class="fw-bold text-warning">{{ p.amount|int }} ل.س</td>
+                                <td><span class="stat-badge success" style="font-size: 0.62rem; padding: 3px 8px;">✅ مكتملة</span></td>
+                                <td class="text-muted" style="font-size: 0.72rem;">{{ p.created_at | localtime('%m-%d %H:%M') }}</td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+                {% endif %}
+            </div>
+            <div class="modal-footer border-top" style="border-color: var(--bg-hover) !important; background-color: var(--bg-hover); border-radius: 0 0 12px 12px;">
+                <a href="{{ url_for('payments') }}" class="btn btn-outline-warning btn-sm rounded-3" style="font-size: 0.72rem;">
+                    <i class="bi bi-cash-stack"></i> سجل الدفعات الكامل
+                </a>
+                <button type="button" class="btn btn-secondary btn-sm rounded-3" style="font-size: 0.72rem;" data-bs-dismiss="modal">إغلاق</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Telegram Modal -->
+<div class="modal fade" id="telegramDetailsModal" tabindex="-1">
+    <div class="modal-dialog modal-dialog-centered modal-lg">
+        <div class="modal-content border-0 shadow-lg" style="border-radius: 12px; background-color: var(--bg-card);">
+            <div class="modal-header telegram-modal-header">
+                <h5 class="modal-title fw-bold" style="font-size: 0.95rem;"><i class="bi bi-telegram"></i> تفاصيل الإشعارات</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body p-3">
+                <div class="table-responsive" style="max-height: 300px; overflow-y: auto; border: 1px solid var(--bg-hover); border-radius: 8px;">
+                    <table class="table table-hover table-clean mb-0">
+                        <thead><tr><th>الوقت</th><th>النوع</th><th>الحالة</th><th>الرسالة</th></tr></thead>
+                        <tbody>
+                            {% for log in recent_telegram_logs %}
+                            <tr>
+                                <td class="text-muted">{{ log.created_at | localtime('%m-%d %H:%M') }}</td>
+                                <td><span class="stat-badge info" style="font-size: 0.62rem; padding: 3px 8px;">{{ log.message_type }}</span></td>
+                                <td>{% if log.status == 'success' %}<i class="bi bi-check-circle-fill text-success"></i>{% else %}<i class="bi bi-x-circle-fill text-danger"></i>{% endif %}</td>
+                                <td class="text-muted">{{ log.message[:50] }}</td>
+                            </tr>
+                            {% else %}
+                            <tr><td colspan="4" class="text-center py-3 text-muted">لا توجد إشعارات</td></tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+            <div class="modal-footer border-top" style="border-color: var(--bg-hover) !important; background-color: var(--bg-hover); border-radius: 0 0 12px 12px;">
+                <a href="{{ url_for('admin_settings') }}" class="btn btn-outline-info btn-sm rounded-3" style="font-size: 0.72rem;">الإعدادات الكاملة</a>
+                <button type="button" class="btn btn-secondary btn-sm rounded-3" style="font-size: 0.72rem;" data-bs-dismiss="modal">إغلاق</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Change Credentials Modal -->
 <div class="modal fade" id="changeCredentialsModal" tabindex="-1">
     <div class="modal-dialog modal-dialog-centered">
-        <div class="modal-content border-0 shadow-lg" style="border-radius: 16px; background-color: var(--bg-card);">
+        <div class="modal-content border-0 shadow-lg" style="border-radius: 12px; background-color: var(--bg-card);">
             <form method="POST" action="{{ url_for('change_admin_credentials') }}">
-                <div class="modal-header border-bottom" style="border-color: var(--bg-hover) !important; background-color: var(--bg-hover); border-radius: 16px 16px 0 0;">
-                    <h5 class="modal-title text-accent fw-bold">
-                        <i class="bi bi-shield-lock"></i> تغيير بيانات الدخول
-                    </h5>
+                <div class="modal-header border-bottom" style="border-color: var(--bg-hover) !important; background-color: var(--bg-hover); border-radius: 12px 12px 0 0;">
+                    <h5 class="modal-title text-accent fw-bold" style="font-size: 0.95rem;"><i class="bi bi-shield-lock"></i> تغيير بيانات الدخول</h5>
                     <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
                 </div>
-                <div class="modal-body p-4">
-                    <div class="mb-3">
-                        <label class="form-label fw-bold text-muted">اسم المستخدم الجديد (اتركه فارغاً للإبقاء)</label>
-                        <input type="text" name="new_username" class="form-control" style="background-color: var(--bg-main); color: var(--text-main); border: 1px solid var(--bg-hover);">
-                    </div>
-                    <div class="mb-3">
-                        <label class="form-label fw-bold text-muted">كلمة المرور الحالية *</label>
-                        <input type="password" name="current_password" class="form-control" style="background-color: var(--bg-main); color: var(--text-main); border: 1px solid var(--bg-hover);" required>
-                    </div>
+                <div class="modal-body p-3">
+                    <div class="mb-2"><label class="form-label fw-bold text-muted" style="font-size: 0.75rem;">اسم المستخدم الجديد</label><input type="text" name="new_username" class="form-control" style="background-color: var(--bg-main); color: var(--text-main); border: 1px solid var(--bg-hover); font-size: 0.82rem;"></div>
+                    <div class="mb-2"><label class="form-label fw-bold text-muted" style="font-size: 0.75rem;">كلمة المرور الحالية *</label><input type="password" name="current_password" class="form-control" style="background-color: var(--bg-main); color: var(--text-main); border: 1px solid var(--bg-hover); font-size: 0.82rem;" required></div>
                     <hr style="border-color: var(--bg-hover);">
-                    <div class="mb-3">
-                        <label class="form-label fw-bold text-muted">كلمة المرور الجديدة</label>
-                        <input type="password" name="new_password" class="form-control" style="background-color: var(--bg-main); color: var(--text-main); border: 1px solid var(--bg-hover);">
-                    </div>
-                    <div class="mb-3">
-                        <label class="form-label fw-bold text-muted">تأكيد كلمة المرور الجديدة</label>
-                        <input type="password" name="confirm_password" class="form-control" style="background-color: var(--bg-main); color: var(--text-main); border: 1px solid var(--bg-hover);">
-                    </div>
+                    <div class="mb-2"><label class="form-label fw-bold text-muted" style="font-size: 0.75rem;">كلمة المرور الجديدة</label><input type="password" name="new_password" class="form-control" style="background-color: var(--bg-main); color: var(--text-main); border: 1px solid var(--bg-hover); font-size: 0.82rem;"></div>
+                    <div class="mb-2"><label class="form-label fw-bold text-muted" style="font-size: 0.75rem;">تأكيد كلمة المرور</label><input type="password" name="confirm_password" class="form-control" style="background-color: var(--bg-main); color: var(--text-main); border: 1px solid var(--bg-hover); font-size: 0.82rem;"></div>
                 </div>
-                <div class="modal-footer border-top" style="border-color: var(--bg-hover) !important; background-color: var(--bg-hover); border-radius: 0 0 16px 16px;">
-                    <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal" style="color: var(--text-main); border-color: var(--text-muted);">إلغاء</button>
-                    <button type="submit" class="btn btn-primary">
-                        <i class="bi bi-save"></i> حفظ التغييرات
-                    </button>
+                <div class="modal-footer border-top" style="border-color: var(--bg-hover) !important; background-color: var(--bg-hover); border-radius: 0 0 12px 12px;">
+                    <button type="button" class="btn btn-outline-secondary btn-sm" data-bs-dismiss="modal" style="color: var(--text-main); border-color: var(--text-muted); font-size: 0.75rem;">إلغاء</button>
+                    <button type="submit" class="btn btn-primary btn-sm" style="font-size: 0.75rem;"><i class="bi bi-save"></i> حفظ</button>
                 </div>
             </form>
         </div>
     </div>
 </div>
 
-<!-- ✅ سكريبت التحديث الحقيقي المباشر -->
+<!-- ==================== JavaScript ==================== -->
 <script>
-    // 🔄 دالة تحديث الأرقام في الصفحة
-    function updateDashboard() {
-        fetch('/api/dashboard_data?t=' + Date.now())
-            .then(response => response.json())
-            .then(data => {
-                if (data.error) return;
+    let dashUploadChart, dashDownloadChart;
+    let dashMonitoringInterval = null;
+    let dashAllInterfaces = [];
+    let dashSelectedInterface = '';
+    let dashIsDirectionReversed = false;
 
-                // ✅ تحديث بطاقة السيرفرات
-                const routersCount = document.getElementById('routersCount');
-                const routersOnlineNum = document.getElementById('routersOnlineNum');
-                const routersOfflineNum = document.getElementById('routersOfflineNum');
-                const routersOnlineText = document.getElementById('routersOnlineText');
+    const DASH_MAX_POINTS = 20;
+    const DASH_UPDATE_INTERVAL = 3000;
+    const DASH_STORAGE_KEY = 'dashboard_traffic_state';
+    const DASH_DIRECTION_KEY = 'dashboard_traffic_direction';
 
-                if (routersCount && routersCount.textContent != data.routers_count) {
-                    routersCount.textContent = data.routers_count;
-                    routersCount.classList.add('flash-update');
-                    setTimeout(() => routersCount.classList.remove('flash-update'), 600);
-                }
-                if (routersOnlineNum) routersOnlineNum.textContent = data.routers_online;
-                if (routersOfflineNum) routersOfflineNum.textContent = data.routers_count - data.routers_online;
-                if (routersOnlineText) routersOnlineText.textContent = data.routers_online + ' متصل';
+    let dashUploadData = [];
+    let dashDownloadData = [];
+    let dashLabels = [];
 
-                // ✅ تحديث بطاقة المشتركين
-                const subCount = document.getElementById('subCount');
-                const activeSubsText = document.getElementById('activeSubsText');
-                const pausedSubsNum = document.getElementById('pausedSubsNum');
-                const onlineNowNum = document.getElementById('onlineNowNum');
+    // ✅ فتح تفاصيل مشترك
+    function openSubDetail(id, name, username, ip, routerIp, routerName, connectedAt, uptime, rxBytes, txBytes, pkg, userType, status, expires, updatedAt) {
+        document.getElementById('det_id').textContent = '#' + id;
+        document.getElementById('det_name').textContent = name || username;
+        document.getElementById('det_username').textContent = username;
+        document.getElementById('det_ip').textContent = ip || '-';
+        document.getElementById('det_ip2').textContent = ip || '-';
+        document.getElementById('det_router').textContent = routerName ? (routerName + ' — ' + routerIp) : '-';
+        document.getElementById('det_package').textContent = pkg || '-';
+        document.getElementById('det_connected_at').textContent = connectedAt || '-';
+        document.getElementById('det_uptime').innerHTML = '<i class="bi bi-clock"></i> ' + (uptime || '-');
+        document.getElementById('det_expires').textContent = expires || '-';
+        document.getElementById('det_updated').textContent = updatedAt || '-';
 
-                if (subCount && subCount.textContent != data.sub_count) {
-                    subCount.textContent = data.sub_count;
-                    subCount.classList.add('flash-update');
-                    setTimeout(() => subCount.classList.remove('flash-update'), 600);
-                }
-                if (activeSubsText) activeSubsText.textContent = data.active_subs + ' نشط';
-                if (pausedSubsNum) pausedSubsNum.textContent = data.sub_count - data.active_subs;
-                if (onlineNowNum) onlineNowNum.textContent = data.online_count || 0;
+        const typeBadge = document.getElementById('det_type_badge');
+        if (userType === 'hotspot') {
+            typeBadge.textContent = '📶 هوت سبوت';
+            typeBadge.className = 'stat-badge warning';
+            typeBadge.style.fontSize = '0.72rem';
+        } else {
+            typeBadge.textContent = '🌐 برودباند';
+            typeBadge.className = 'stat-badge info';
+            typeBadge.style.fontSize = '0.72rem';
+        }
 
-                // ✅ تحديث بطاقة الإيرادات
-                const todayRevenue = document.getElementById('todayRevenue');
-                const pendingPays = document.getElementById('pendingPays');
-                const newUsersToday = document.getElementById('newUsersToday');
+        const fmt = (bytes) => {
+            bytes = Number(bytes) || 0;
+            if (bytes === 0) return '0 B';
+            const units = ['B', 'KB', 'MB', 'GB', 'TB'];
+            const i = Math.floor(Math.log(bytes) / Math.log(1024));
+            return (bytes / Math.pow(1024, i)).toFixed(2) + ' ' + units[i];
+        };
 
-                if (todayRevenue && todayRevenue.textContent != data.today_revenue) {
-                    todayRevenue.textContent = data.today_revenue;
-                    todayRevenue.classList.add('flash-update');
-                    setTimeout(() => todayRevenue.classList.remove('flash-update'), 600);
-                }
-                if (pendingPays) pendingPays.textContent = data.pending_commands || 0;
-                if (newUsersToday) newUsersToday.textContent = data.new_users_today || 0;
+        document.getElementById('det_download').textContent = fmt(txBytes);
+        document.getElementById('det_upload').textContent = fmt(rxBytes);
 
-                // ✅ تحديث عدد الإشعارات والأوامر
-                const telegramLogsCount = document.getElementById('telegramLogsCount');
-                const pendingCommands = document.getElementById('pendingCommands');
-                if (telegramLogsCount && data.telegram_logs) {
-                    telegramLogsCount.textContent = data.telegram_logs.length;
-                }
-                if (pendingCommands) {
-                    pendingCommands.textContent = data.pending_commands || 0;
-                }
+        const total = Number(rxBytes) + Number(txBytes);
+        const downPct = total > 0 ? (Number(txBytes) / total) * 100 : 50;
+        const upPct = total > 0 ? (Number(rxBytes) / total) * 100 : 50;
+        document.getElementById('det_bar_down').style.width = downPct + '%';
+        document.getElementById('det_bar_up').style.width = upPct + '%';
 
-                // ✅ تحديث جدول الأحداث
-                const eventsTbody = document.getElementById('eventsTableBody');
-                const eventsCount = document.getElementById('eventsCount');
-                if (eventsTbody && data.events && data.events.length > 0) {
-                    eventsCount.textContent = data.events.length;
-                    let html = '';
-                    data.events.forEach(e => {
-                        const safeAction = (e.action || '').replace(/</g, '&lt;');
-                        const safeTarget = (e.target || '-').replace(/</g, '&lt;');
-                        const safeDetails = (e.details || '-').replace(/</g, '&lt;');
-                        html += `
-                            <tr>
-                                <td class="text-muted small">${e.time}</td>
-                                <td><span class="badge bg-info bg-opacity-10 text-info">${e.admin}</span></td>
-                                <td class="fw-bold">${safeAction}</td>
-                                <td>${safeTarget}</td>
-                                <td class="text-muted small">${safeDetails}</td>
-                            </tr>
-                        `;
-                    });
-                    eventsTbody.innerHTML = html;
-                }
-
-                // ✅ تحديث سجل التلجرام
-                const telegramLogsBody = document.getElementById('telegramLogsBody');
-                if (telegramLogsBody && data.telegram_logs && data.telegram_logs.length > 0) {
-                    let html = '';
-                    data.telegram_logs.forEach(log => {
-                        const icon = log.status === 'success' 
-                            ? '<i class="bi bi-check-circle-fill text-success"></i>' 
-                            : '<i class="bi bi-x-circle-fill text-danger"></i>';
-                        html += `
-                            <div class="p-3 border-bottom" style="border-color: var(--bg-hover) !important;">
-                                <div class="d-flex justify-content-between align-items-center mb-1">
-                                    <div class="d-flex align-items-center gap-2">
-                                        ${icon}
-                                        <small class="text-muted fw-bold">${log.type}</small>
-                                    </div>
-                                    <small class="text-muted">${log.time}</small>
-                                </div>
-                            </div>
-                        `;
-                    });
-                    telegramLogsBody.innerHTML = html;
-                }
-
-                // ✅ تحديث الساعة الحية
-                const liveClock = document.getElementById('liveClock');
-                if (liveClock) {
-                    const now = new Date();
-                    const timeStr = now.toLocaleTimeString('ar-EG', { hour12: false });
-                    const dateStr = now.toLocaleDateString('ar-EG');
-                    liveClock.innerHTML = `<i class="bi bi-clock-history"></i> ${dateStr} ${timeStr}`;
-                }
-            })
-            .catch(err => console.warn('⚠️ فشل تحديث البيانات:', err));
+        new bootstrap.Modal(document.getElementById('subDetailModal')).show();
     }
 
-    // 🚀 بدء التحديث التلقائي كل 5 ثوانٍ
-    document.addEventListener('DOMContentLoaded', function() {
-        console.log('✅ بدء التحديث المباشر كل 5 ثوانٍ');
-        updateDashboard(); // تحديث فوري
-        setInterval(updateDashboard, 5000); // ثم كل 5 ثوانٍ
+    // ✅ تحديث فوري للمتصلين
+    function refreshOnlineSubs() {
+        if (!confirm('سيتم مزامنة جميع الراوترات لجلب المتصلين. متابعة؟')) return;
+        const btn = event.target.closest('button');
+        const orig = btn.innerHTML;
+        btn.disabled = true;
+        btn.innerHTML = '<span class="spinner-border spinner-border-sm"></span> جاري...';
+        fetch('/subscribers/sync-now', { method: 'POST' })
+            .then(r => r.json())
+            .then(d => {
+                if (d.ok) {
+                    location.reload();
+                } else {
+                    alert('❌ فشل: ' + (d.error || 'خطأ'));
+                    btn.disabled = false;
+                    btn.innerHTML = orig;
+                }
+            })
+            .catch(e => {
+                alert('❌ خطأ: ' + e.message);
+                btn.disabled = false;
+                btn.innerHTML = orig;
+            });
+    }
+
+    function escapeHtml(str) {
+        if (str === null || str === undefined) return '';
+        return String(str).replace(/[&<>"']/g, function(m) {
+            return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[m];
+        });
+    }
+
+    function dashLoadDirection() {
+        try { dashIsDirectionReversed = localStorage.getItem(DASH_DIRECTION_KEY) === 'true'; }
+        catch(e) { dashIsDirectionReversed = false; }
+        dashUpdateDirectionUI();
+    }
+
+    function dashUpdateDirectionUI() {
+        const btn = document.getElementById('dashDirectionBtn');
+        const text = document.getElementById('dashDirectionText');
+        if (!btn || !text) return;
+        if (dashIsDirectionReversed) {
+            btn.classList.add('reversed');
+            text.textContent = 'معكوس';
+        } else {
+            btn.classList.remove('reversed');
+            text.textContent = 'تلقائي';
+        }
+    }
+
+    function dashToggleDirection() {
+        dashIsDirectionReversed = !dashIsDirectionReversed;
+        try { localStorage.setItem(DASH_DIRECTION_KEY, String(dashIsDirectionReversed)); } catch(e) {}
+        dashUpdateDirectionUI();
+        dashUploadData.length = 0;
+        dashDownloadData.length = 0;
+        dashLabels.length = 0;
+        if (dashUploadChart && dashDownloadChart) {
+            dashUploadChart.data.labels = dashLabels;
+            dashUploadChart.data.datasets[0].data = dashUploadData;
+            dashUploadChart.update();
+            dashDownloadChart.data.labels = dashLabels;
+            dashDownloadChart.data.datasets[0].data = dashDownloadData;
+            dashDownloadChart.update();
+        }
+        const routerId = document.getElementById('dashRouterSelect')?.value;
+        if (routerId && dashSelectedInterface && dashMonitoringInterval) {
+            dashFetchTraffic(routerId, dashSelectedInterface);
+        }
+    }
+
+    function dashSaveState(routerId, iface, isMonitoring) {
+        try { localStorage.setItem(DASH_STORAGE_KEY, JSON.stringify({ routerId, interfaceName: iface, isMonitoring })); } catch(e) {}
+    }
+
+    function dashLoadState() {
+        try { const raw = localStorage.getItem(DASH_STORAGE_KEY); return raw ? JSON.parse(raw) : null; }
+        catch(e) { return null; }
+    }
+
+    function dashInitCharts() {
+        const uEl = document.getElementById('dashUploadChart');
+        const dEl = document.getElementById('dashDownloadChart');
+        if (!uEl || !dEl) return;
+        const ctxU = uEl.getContext('2d');
+        const ctxD = dEl.getContext('2d');
+        const opts = {
+            responsive: true, maintainAspectRatio: false, animation: { duration: 200 },
+            plugins: { legend: { display: false } },
+            scales: { x: { display: false }, y: { beginAtZero: true, grid: { color: 'rgba(255,255,255,0.05)' }, ticks: { color: '#94a3b8', font: { size: 8 }, maxTicksLimit: 3 } } },
+            elements: { point: { radius: 0 }, line: { tension: 0.4, borderWidth: 1.8 } }
+        };
+        dashUploadChart = new Chart(ctxU, { type: 'line', data: { labels: dashLabels, datasets: [{ data: dashUploadData, borderColor: '#f59e0b', backgroundColor: 'rgba(245,158,11,0.15)', fill: true }] }, options: opts });
+        dashDownloadChart = new Chart(ctxD, { type: 'line', data: { labels: dashLabels, datasets: [{ data: dashDownloadData, borderColor: '#22c55e', backgroundColor: 'rgba(34,197,94,0.15)', fill: true }] }, options: opts });
+    }
+
+    function dashFetchInterfaces(routerId, callback) {
+        const input = document.getElementById('dashInterfaceSearch');
+        input.value = '';
+        input.placeholder = '⏳ جاري الجلب...';
+        input.disabled = true;
+        document.getElementById('dashStatus').style.display = 'block';
+        document.getElementById('dashStatusText').textContent = 'جاري الاتصال...';
+        fetch(`/api/traffic/interfaces/${routerId}`)
+            .then(res => { if (!res.ok) return res.text().then(t => { throw new Error(`HTTP ${res.status}`); }); return res.json(); })
+            .then(data => {
+                if (data.ok) {
+                    dashAllInterfaces = data.interfaces || [];
+                    input.disabled = false;
+                    input.placeholder = `🔍 ابحث... (${dashAllInterfaces.length})`;
+                    document.getElementById('dashStatusText').textContent = `✅ ${dashAllInterfaces.length} منفذ`;
+                    dashRenderDropdown(dashAllInterfaces);
+                    if (callback) callback();
+                } else {
+                    input.placeholder = '❌ خطأ';
+                    document.getElementById('dashStatusText').textContent = '❌ ' + (data.error || 'فشل');
+                    input.disabled = false;
+                }
+            })
+            .catch(err => {
+                console.error('❌ Fetch Error:', err);
+                input.placeholder = '❌ فشل';
+                document.getElementById('dashStatusText').textContent = '❌ فشل الاتصال';
+                input.disabled = false;
+            });
+    }
+
+    function dashRenderDropdown(interfaces) {
+        const dd = document.getElementById('dashInterfaceDropdown');
+        if (interfaces.length === 0) {
+            dd.innerHTML = '<div style="padding: 12px; text-align: center; color: var(--text-muted); font-size: 0.72rem;">لا توجد نتائج</div>';
+            return;
+        }
+        dd.innerHTML = interfaces.map(i => {
+            const cls = i.running ? 'iface-running' : 'iface-idle';
+            const txt = i.running ? '🟢 يعمل' : '⚪ متوقف';
+            const safeName = escapeHtml(i.name);
+            const isSel = i.name === dashSelectedInterface ? 'selected' : '';
+            return `<div class="traffic-dropdown-item ${isSel}" onclick="dashSelectInterface('${escapeHtml(i.name).replace(/'/g, "\\'")}')">
+                <span class="iface-name" title="${safeName}">${safeName}</span>
+                <span class="iface-status-badge ${cls}">${txt}</span>
+            </div>`;
+        }).join('');
+    }
+
+    function dashFilterInterfaces() {
+        const q = document.getElementById('dashInterfaceSearch').value.toLowerCase().trim();
+        document.getElementById('dashClearBtn').style.display = q ? 'block' : 'none';
+        const filtered = q ? dashAllInterfaces.filter(i => i.name.toLowerCase().includes(q) || (i.type && i.type.toLowerCase().includes(q))) : dashAllInterfaces;
+        dashRenderDropdown(filtered);
+        document.getElementById('dashInterfaceDropdown').classList.add('show');
+    }
+
+    function dashShowDropdown() {
+        if (dashAllInterfaces.length > 0) document.getElementById('dashInterfaceDropdown').classList.add('show');
+    }
+
+    function dashClearSearch() {
+        document.getElementById('dashInterfaceSearch').value = '';
+        document.getElementById('dashClearBtn').style.display = 'none';
+        dashRenderDropdown(dashAllInterfaces);
+        document.getElementById('dashInterfaceDropdown').classList.add('show');
+    }
+
+    function dashSelectInterface(name) {
+        dashSelectedInterface = name;
+        document.getElementById('dashInterfaceSelect').value = name;
+        document.getElementById('dashInterfaceSearch').value = name;
+        document.getElementById('dashClearBtn').style.display = 'block';
+        document.getElementById('dashInterfaceDropdown').classList.remove('show');
+        const routerId = document.getElementById('dashRouterSelect').value;
+        dashSaveState(routerId, name, false);
+    }
+
+    document.addEventListener('click', function(e) {
+        const w = e.target.closest('.traffic-search-wrapper');
+        if (!w) {
+            const dd = document.getElementById('dashInterfaceDropdown');
+            if (dd) dd.classList.remove('show');
+        }
+    });
+
+    function onDashRouterChange() {
+        const rid = document.getElementById('dashRouterSelect').value;
+        const input = document.getElementById('dashInterfaceSearch');
+        if (!rid) {
+            input.value = '';
+            input.disabled = true;
+            input.placeholder = '🔍 ابحث...';
+            document.getElementById('dashInterfaceDropdown').classList.remove('show');
+            document.getElementById('dashStatus').style.display = 'none';
+            dashAllInterfaces = [];
+            dashSelectedInterface = '';
+            return;
+        }
+        dashSelectedInterface = '';
+        document.getElementById('dashInterfaceSelect').value = '';
+        document.getElementById('dashInterfaceDropdown').innerHTML = '';
+        dashSaveState(rid, '', false);
+        dashFetchInterfaces(rid, null);
+    }
+
+    function dashStartMonitoring() {
+        const rid = document.getElementById('dashRouterSelect').value;
+        const iface = dashSelectedInterface;
+        if (!rid || !iface) { alert('⚠️ الرجاء اختيار الراوتر والمنفذ أولاً'); return; }
+        document.getElementById('trafficEmptyState').style.display = 'none';
+        document.getElementById('trafficContent').style.display = 'flex';
+        document.getElementById('dashStartBtn').style.display = 'none';
+        document.getElementById('dashStopBtn').style.display = 'inline-flex';
+        document.getElementById('liveBadge').style.display = 'inline-flex';
+        dashUploadData.length = 0;
+        dashDownloadData.length = 0;
+        dashLabels.length = 0;
+        if (!dashUploadChart) dashInitCharts();
+        dashSaveState(rid, iface, true);
+        dashFetchTraffic(rid, iface);
+        dashMonitoringInterval = setInterval(() => dashFetchTraffic(rid, iface), DASH_UPDATE_INTERVAL);
+    }
+
+    function dashStopMonitoring() {
+        clearInterval(dashMonitoringInterval);
+        document.getElementById('dashStartBtn').style.display = 'inline-flex';
+        document.getElementById('dashStopBtn').style.display = 'none';
+        document.getElementById('liveBadge').style.display = 'none';
+        const rid = document.getElementById('dashRouterSelect').value;
+        dashSaveState(rid, dashSelectedInterface, false);
+    }
+
+    function dashFetchTraffic(routerId, interfaceName) {
+        fetch(`/api/traffic/stats/${routerId}/${interfaceName}`)
+            .then(r => r.json())
+            .then(data => {
+                if (!data.ok) return;
+                const s = data.stats;
+                const rx = dashParseMbps(s.rx_rate);
+                const tx = dashParseMbps(s.tx_rate);
+                const rxB = parseInt(s.rx_byte) || 0;
+                const txB = parseInt(s.tx_byte) || 0;
+                let upRate, downRate, upByte, downByte;
+                if (dashIsDirectionReversed) {
+                    upRate = rx; downRate = tx; upByte = rxB; downByte = txB;
+                } else {
+                    upRate = tx; downRate = rx; upByte = txB; downByte = rxB;
+                }
+                const upGB = (upByte / (1024*1024*1024)).toFixed(2);
+                const downGB = (downByte / (1024*1024*1024)).toFixed(2);
+                document.getElementById('dashUploadRate').textContent = upRate.toFixed(2);
+                document.getElementById('dashDownloadRate').textContent = downRate.toFixed(2);
+                document.getElementById('dashUploadTotal').textContent = upGB + ' GB';
+                document.getElementById('dashDownloadTotal').textContent = downGB + ' GB';
+                document.getElementById('dashUploadBadge').textContent = upRate.toFixed(2) + ' Mbps';
+                document.getElementById('dashDownloadBadge').textContent = downRate.toFixed(2) + ' Mbps';
+                document.getElementById('dashUploadProgress').style.width = Math.min((upRate / 100) * 100, 100) + '%';
+                document.getElementById('dashDownloadProgress').style.width = Math.min((downRate / 100) * 100, 100) + '%';
+                const now = new Date().toLocaleTimeString('ar-EG', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+                dashLabels.push(now);
+                dashUploadData.push(upRate);
+                dashDownloadData.push(downRate);
+                if (dashLabels.length > DASH_MAX_POINTS) {
+                    dashLabels.shift();
+                    dashUploadData.shift();
+                    dashDownloadData.shift();
+                }
+                dashUploadChart.update('none');
+                dashDownloadChart.update('none');
+            })
+            .catch(err => console.error(err));
+    }
+
+    function dashParseMbps(s) {
+        if (!s) return 0;
+        s = String(s);
+        if (s.includes('Gbps')) return parseFloat(s) * 1000;
+        if (s.includes('Mbps')) return parseFloat(s);
+        if (s.includes('kbps')) return parseFloat(s) / 1000;
+        const n = parseFloat(s);
+        return isNaN(n) ? 0 : n / 1000000;
+    }
+
+    window.addEventListener('DOMContentLoaded', function() {
+        dashLoadDirection();
+        const state = dashLoadState();
+        if (!state || !state.routerId) return;
+        const rs = document.getElementById('dashRouterSelect');
+        if (!rs) return;
+        rs.value = state.routerId;
+        if (rs.value !== state.routerId) return;
+        dashFetchInterfaces(state.routerId, function() {
+            if (state.interfaceName) {
+                dashSelectInterface(state.interfaceName);
+                if (state.isMonitoring) {
+                    setTimeout(() => dashStartMonitoring(), 500);
+                }
+            }
+        });
     });
 </script>
 
