@@ -1449,9 +1449,6 @@ def api_telegram_data():
 
 @app.route('/api/mikrotik/push', methods=['POST'])
 def mikrotik_push():
-    """
-    يستقبل بيانات المستخدمين النشطين من MikroTik مباشرة
-    """
     try:
         api_key = request.args.get('key')
         if api_key != 'zinar-push-key-2026':
@@ -1564,7 +1561,8 @@ def check_admin_login():
         'my_account_login', 'my_account_dashboard',
         'my_account_logout', 'my_account_refresh',
         'my_account_live_speed',
-        'mikrotik_push'
+        'mikrotik_push',
+        'push_all_to_radius'
     )
     if request.endpoint in public:
         return
@@ -2741,6 +2739,101 @@ def test_telegram():
 def payments():
     pay_list = Payment.query.order_by(Payment.created_at.desc()).all()
     return render_template('payments.html', payments=pay_list)
+
+
+# ============ ✅ مزامنة كل الحسابات مع RADIUS ============
+
+@app.route('/push-all-to-radius')
+def push_all_to_radius():
+    """زيارة هذا الرابط ترسل كل الحسابات إلى RADIUS دفعة واحدة"""
+    try:
+        if not radius_sync:
+            return """
+            <html dir="rtl"><head><meta charset="utf-8"></head>
+            <body style="font-family: Tahoma; padding: 40px; background: #0f172a; color: #fff;">
+                <h1 style="color: #ef4444;">❌ radius_sync غير موجود</h1>
+                <p>ملف radius_sync.py غير مثبت على السيرفر.</p>
+            </body></html>
+            """
+
+        subs = Subscriber.query.all()
+        ok = 0
+        fail = 0
+        errors = []
+
+        for s in subs:
+            try:
+                radius_sync.sync_user(s.username, s.password)
+                ok += 1
+            except Exception as e:
+                fail += 1
+                if len(errors) < 10:
+                    errors.append(f"{s.username}: {str(e)}")
+
+        # تسجيل الحدث
+        try:
+            log_event('مزامنة RADIUS شاملة', f'{ok} نجح / {fail} فشل',
+                      f'الإجمالي: {len(subs)}', admin_name='النظام')
+        except Exception:
+            pass
+
+        html = f"""
+        <html dir="rtl">
+        <head>
+            <meta charset="utf-8">
+            <title>مزامنة RADIUS</title>
+        </head>
+        <body style="font-family: Tahoma; padding: 40px; background: #0f172a; color: #fff;">
+            <h1 style="color: #38bdf8;">🔄 نتيجة المزامنة مع RADIUS</h1>
+            <div style="background: #1e293b; padding: 20px; border-radius: 12px; margin: 20px 0;">
+                <p style="font-size: 22px; margin: 10px 0;">
+                    ✅ <b style="color: #22c55e;">نجح:</b> {ok}
+                </p>
+                <p style="font-size: 22px; margin: 10px 0;">
+                    ❌ <b style="color: #ef4444;">فشل:</b> {fail}
+                </p>
+                <p style="font-size: 18px; margin: 10px 0;">
+                    📊 <b>الإجمالي:</b> {len(subs)}
+                </p>
+            </div>
+        """
+
+        if errors:
+            html += """
+            <h3 style="color: #f59e0b;">أول أخطاء (بحد أقصى 10):</h3>
+            <ul style="background: #1e293b; padding: 20px; border-radius: 12px;">
+            """
+            for err in errors:
+                html += f"<li style='color: #f59e0b; margin: 5px 0;'>{err}</li>"
+            html += "</ul>"
+
+        if fail == 0 and ok > 0:
+            html += """
+            <div style="background: #064e3b; padding: 20px; border-radius: 12px; margin: 20px 0;">
+                <p style="font-size: 20px; color: #6ee7b7;">
+                    ✅ كل الحسابات الآن في RADIUS. جرّب الدخول بحساب 010203.
+                </p>
+            </div>
+            """
+
+        html += """
+            <p style="color: #94a3b8; margin-top: 30px;">
+                <a href="/subscribers" style="color: #38bdf8;">← العودة لصفحة المشتركين</a>
+            </p>
+        </body>
+        </html>
+        """
+        return html
+
+    except Exception as e:
+        logger.error(f"❌ push_all_to_radius error: {e}")
+        return f"""
+        <html dir="rtl"><head><meta charset="utf-8"></head>
+        <body style="font-family: Tahoma; padding: 40px; background: #0f172a; color: #fff;">
+            <h1 style="color: #ef4444;">❌ خطأ</h1>
+            <p>{str(e)}</p>
+        </body></html>
+        """
 
 
 # ============ Main ============
