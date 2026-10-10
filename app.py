@@ -5,13 +5,14 @@ import csv
 import random
 import string
 import logging
+import secrets
 import traceback
 import calendar
 import socket
 import time
 import threading
 import ipaddress
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from zoneinfo import ZoneInfo
 
 from flask import (
@@ -42,7 +43,13 @@ except ImportError:
 # ============ الإعدادات ============
 
 app = Flask(__name__)
-app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', 'zinar-secret-key-2024')
+
+# ✅ إصلاح: مفتاح سري آمن
+_secret = os.environ.get('SECRET_KEY')
+if not _secret:
+    _secret = secrets.token_hex(32)
+    print("⚠️ SECRET_KEY غير موجود في متغيرات البيئة! تم توليد مفتاح مؤقت.")
+app.config['SECRET_KEY'] = _secret
 app.config['MAX_CONTENT_LENGTH'] = 20 * 1024 * 1024
 
 logging.basicConfig(level=logging.INFO)
@@ -52,9 +59,29 @@ if not LIBROUTEROS_AVAILABLE:
     logger.warning("⚠️ مكتبة librouteros غير مثبتة - مراقبة الترافيك معطلة")
 
 LOCAL_TZ = ZoneInfo("Asia/Damascus")
+UTC = timezone.utc
+
+# ✅ إصلاح: مفاتيح API
 IMPORT_API_KEY = os.environ.get('IMPORT_API_KEY', 'zinar-import-key-2026')
+PUSH_API_KEY = os.environ.get('PUSH_API_KEY', 'zinar-push-key-2026')
 
 _traffic_cache = {}
+_traffic_lock = threading.Lock()  # ✅ إصلاح: قفل للـ Thread Safety
+
+
+def utcnow():
+    """✅ إصلاح: بديل حديث لـ datetime.utcnow()"""
+    return datetime.now(UTC).replace(tzinfo=None)
+
+
+def to_local_str(dt, format='%Y-%m-%d %H:%M:%S'):
+    """✅ إصلاح: تحويل آمن للوقت المحلي"""
+    if dt is None:
+        return "-"
+    if dt.tzinfo is None:
+        dt = dt.replace(tzinfo=UTC)
+    return dt.astimezone(LOCAL_TZ).strftime(format)
+
 
 # ============ Database Config ============
 
@@ -95,7 +122,7 @@ def localtime_filter(dt, format='%Y-%m-%d %H:%M:%S'):
     if dt is None:
         return "-"
     if dt.tzinfo is None:
-        dt = dt.replace(tzinfo=ZoneInfo("UTC"))
+        dt = dt.replace(tzinfo=UTC)
     return dt.astimezone(LOCAL_TZ).strftime(format)
 
 
@@ -116,10 +143,10 @@ class Router(db.Model):
     username = db.Column(db.String(50), nullable=False)
     password = db.Column(db.String(150), nullable=False)
     port = db.Column(db.Integer, default=22)
-    api_port = db.Column(db.Integer, default=13)
+    api_port = db.Column(db.Integer, default=8728)  # ✅ إصلاح: 8728 بدل 13
     is_master = db.Column(db.Boolean, default=False)
     is_active = db.Column(db.Boolean, default=True)
-    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    created_at = db.Column(db.DateTime, default=utcnow)
 
 
 class AdminUser(db.Model):
@@ -128,7 +155,7 @@ class AdminUser(db.Model):
     username = db.Column(db.String(50), unique=True, nullable=False)
     password = db.Column(db.String(255), nullable=False)
     email = db.Column(db.String(100))
-    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    created_at = db.Column(db.DateTime, default=utcnow)
 
 
 class Subscriber(db.Model):
@@ -141,7 +168,7 @@ class Subscriber(db.Model):
     user_type = db.Column(db.String(20), default='pppoe')
     router_id = db.Column(db.Integer)
     status = db.Column(db.String(20), default='active')
-    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    created_at = db.Column(db.DateTime, default=utcnow)
     expires_at = db.Column(db.DateTime)
     first_used_at = db.Column(db.DateTime)
     current_ip = db.Column(db.String(50))
@@ -164,7 +191,7 @@ class Payment(db.Model):
     subscriber_id = db.Column(db.Integer, db.ForeignKey('subscribers.id'))
     amount = db.Column(db.Float, default=0)
     status = db.Column(db.String(20), default='pending')
-    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    created_at = db.Column(db.DateTime, default=utcnow)
 
 
 class Package(db.Model):
@@ -176,7 +203,7 @@ class Package(db.Model):
     duration = db.Column(db.Integer, default=30)
     duration_unit = db.Column(db.String(10), default='days')
     user_type = db.Column(db.String(20), default='pppoe')
-    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    created_at = db.Column(db.DateTime, default=utcnow)
 
 
 class SystemEvent(db.Model):
@@ -186,7 +213,7 @@ class SystemEvent(db.Model):
     action = db.Column(db.String(100))
     target = db.Column(db.String(100))
     details = db.Column(db.String(255))
-    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    created_at = db.Column(db.DateTime, default=utcnow)
 
 
 class TelegramSetting(db.Model):
@@ -209,7 +236,7 @@ class TelegramLog(db.Model):
     message_type = db.Column(db.String(50))
     status = db.Column(db.String(20))
     message = db.Column(db.Text)
-    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    created_at = db.Column(db.DateTime, default=utcnow)
 
 
 # ============ Helpers ============
@@ -245,7 +272,7 @@ def add_months(source_date, months):
 
 def calculate_expiry(pkg, start_date=None):
     if start_date is None:
-        start_date = datetime.utcnow()
+        start_date = utcnow()
     if not pkg or not pkg.duration:
         return None
     if pkg.duration_unit == 'months':
@@ -261,7 +288,7 @@ def package_to_profile(name):
 
 def _day_bounds(day=None):
     if day is None:
-        day = datetime.utcnow()
+        day = utcnow()
     start = day.replace(hour=0, minute=0, second=0, microsecond=0)
     return start, start + timedelta(days=1)
 
@@ -313,7 +340,7 @@ def _calculate_connected_at(uptime_str):
         if m: total_seconds += int(m.group(1)) * 60
         m = re.search(r'(\d+)s', uptime_str)
         if m: total_seconds += int(m.group(1))
-        return datetime.utcnow() - timedelta(seconds=total_seconds)
+        return utcnow() - timedelta(seconds=total_seconds)
     except Exception:
         return None
 
@@ -707,7 +734,7 @@ def background_expiry_reminder():
     while True:
         try:
             with app.app_context():
-                now = datetime.utcnow()
+                now = utcnow()
                 upcoming = Subscriber.query.filter(
                     Subscriber.expires_at.isnot(None),
                     Subscriber.expires_at > now,
@@ -784,8 +811,8 @@ def background_router_monitor():
     while True:
         try:
             with app.app_context():
-                routers = Router.query.all()
-                for r in routers:
+                routers_list = Router.query.all()
+                for r in routers_list:
                     try:
                         current_state = check_router_connection(r.ip_address, r.port or 22)
                         if current_state == 'private':
@@ -816,7 +843,7 @@ def get_mikrotik_api(router):
     if not LIBROUTEROS_AVAILABLE:
         raise Exception("مكتبة librouteros غير مثبتة")
     try:
-        api_port = router.api_port or 13
+        api_port = router.api_port or 8728  # ✅ إصلاح
         logger.info(f"🔌 اتصال API: {router.ip_address}:{api_port} (user={router.username})")
         api = connect(
             username=router.username, password=router.password,
@@ -824,7 +851,7 @@ def get_mikrotik_api(router):
         )
         return api
     except Exception as e:
-        raise Exception(f"فشل الاتصال بالـ API على المنفذ {router.api_port}: {str(e)}")
+        raise Exception(f"فشل الاتصال بالـ API على المنفذ {api_port}: {str(e)}")
 
 
 # ============ Fetch Active IPs + Traffic ============
@@ -916,9 +943,9 @@ def background_ip_updater():
     while True:
         try:
             with app.app_context():
-                routers = Router.query.all()
+                routers_list = Router.query.all()
                 total_updated = 0
-                for router in routers:
+                for router in routers_list:
                     try:
                         active_ips = fetch_active_ips_from_router(router)
                         if not active_ips:
@@ -938,8 +965,8 @@ def background_ip_updater():
                                 sub.session_tx_bytes = info.get('tx_bytes', 0)
                                 if info.get('uptime'):
                                     sub.connected_at = _calculate_connected_at(info['uptime'])
-                                sub.ip_updated_at = datetime.utcnow()
-                                sub.last_seen_at = datetime.utcnow()
+                                sub.ip_updated_at = utcnow()
+                                sub.last_seen_at = utcnow()
                                 if changed:
                                     total_updated += 1
                         db.session.commit()
@@ -986,7 +1013,8 @@ def kick_user_via_ssh(router, username, user_type='pppoe'):
 
 
 def kick_subscriber(sub):
-    if os.environ.get("RENDER") == "true":
+    # ✅ إصلاح: حساسية الأحرف
+    if os.environ.get("RENDER", "").lower() == "true":
         return
     if not sub:
         return
@@ -1043,7 +1071,8 @@ def ensure_columns():
                     if 'is_active' not in cols:
                         conn.execute(text("ALTER TABLE routers ADD COLUMN is_active BOOLEAN DEFAULT TRUE"))
                     if 'api_port' not in cols:
-                        conn.execute(text("ALTER TABLE routers ADD COLUMN api_port INTEGER DEFAULT 13"))
+                        # ✅ إصلاح: 8728 بدل 13
+                        conn.execute(text("ALTER TABLE routers ADD COLUMN api_port INTEGER DEFAULT 8728"))
                 if 'telegram_settings' in tables:
                     cols = [c['name'] for c in insp.get_columns('telegram_settings')]
                     if 'notify_router_status' not in cols:
@@ -1122,7 +1151,7 @@ def api_auth():
         return jsonify({'result': 'deny', 'reason': 'suspended'})
     if sub.status == 'expired':
         return jsonify({'result': 'deny', 'reason': 'expired'})
-    now = datetime.utcnow()
+    now = utcnow()
     if sub.expires_at and sub.expires_at < now:
         sub.status = 'expired'
         db.session.commit()
@@ -1155,6 +1184,11 @@ def api_log():
 @app.route('/api/router_notify', methods=['POST', 'GET'])
 def api_router_notify():
     try:
+        # ✅ إصلاح: حماية بمفتاح API
+        api_key = request.headers.get('X-API-Key') or request.args.get('api_key')
+        if api_key != IMPORT_API_KEY:
+            return jsonify({'ok': False, 'error': 'Unauthorized'}), 401
+
         data = {}
         if request.is_json:
             data = request.get_json()
@@ -1348,15 +1382,18 @@ def api_get_traffic_stats(router_id, interface):
         cache_key = f"{router_id}_{interface}"
         now = time.time()
         rx_rate_bps = tx_rate_bps = 0
-        if cache_key in _traffic_cache:
-            prev = _traffic_cache[cache_key]
-            elapsed = now - prev['time']
-            if elapsed > 0:
-                rx_diff = max(0, rx_byte - prev['rx_byte'])
-                tx_diff = max(0, tx_byte - prev['tx_byte'])
-                rx_rate_bps = (rx_diff / elapsed) * 8
-                tx_rate_bps = (tx_diff / elapsed) * 8
-        _traffic_cache[cache_key] = {'time': now, 'rx_byte': rx_byte, 'tx_byte': tx_byte}
+        # ✅ إصلاح: قفل
+        with _traffic_lock:
+            if cache_key in _traffic_cache:
+                prev = _traffic_cache[cache_key]
+                elapsed = now - prev['time']
+                if elapsed > 0:
+                    rx_diff = max(0, rx_byte - prev['rx_byte'])
+                    tx_diff = max(0, tx_byte - prev['tx_byte'])
+                    rx_rate_bps = (rx_diff / elapsed) * 8
+                    tx_rate_bps = (tx_diff / elapsed) * 8
+            _traffic_cache[cache_key] = {'time': now, 'rx_byte': rx_byte, 'tx_byte': tx_byte}
+
         def format_rate(bps):
             if bps >= 1_000_000_000:
                 return f"{bps / 1_000_000_000:.2f}Gbps"
@@ -1399,13 +1436,15 @@ def api_dashboard_data():
         ).count()
         events = SystemEvent.query.order_by(SystemEvent.created_at.desc()).limit(15).all()
         events_data = [{
-            'time': e.created_at.astimezone(LOCAL_TZ).strftime('%H:%M'),
+            # ✅ إصلاح: to_local_str
+            'time': to_local_str(e.created_at, '%H:%M'),
             'admin': e.admin_name or 'النظام', 'action': e.action,
             'target': e.target or '-', 'details': e.details or '-'
         } for e in events]
         recent_logs = TelegramLog.query.order_by(TelegramLog.created_at.desc()).limit(5).all()
         logs_data = [{
-            'time': l.created_at.astimezone(LOCAL_TZ).strftime('%m-%d %H:%M'),
+            # ✅ إصلاح: to_local_str
+            'time': to_local_str(l.created_at, '%m-%d %H:%M'),
             'type': l.message_type, 'status': l.status
         } for l in recent_logs]
         return jsonify({
@@ -1430,7 +1469,8 @@ def api_telegram_data():
     try:
         logs = TelegramLog.query.order_by(TelegramLog.created_at.desc()).limit(10).all()
         logs_data = [{
-            'time': l.created_at.astimezone(LOCAL_TZ).strftime('%Y-%m-%d %H:%M:%S'),
+            # ✅ إصلاح: to_local_str
+            'time': to_local_str(l.created_at),
             'type': l.message_type, 'status': l.status, 'message': l.message
         } for l in logs]
         return jsonify({
@@ -1445,17 +1485,17 @@ def api_telegram_data():
         return jsonify({'error': str(e)}), 500
 
 
-# ============ ✅ استقبال بيانات MikroTik Push (جديد) ============
+# ============ استقبال بيانات MikroTik Push ============
 
 @app.route('/api/mikrotik/push', methods=['POST'])
 def mikrotik_push():
     """
     يستقبل بيانات المستخدمين النشطين من MikroTik مباشرة
-    MikroTik يرسلها كل 5 ثواني تلقائياً
     """
     try:
         api_key = request.args.get('key')
-        if api_key != 'zinar-push-key-2026':
+        # ✅ إصلاح: استخدام PUSH_API_KEY
+        if api_key != PUSH_API_KEY:
             return jsonify({'ok': False, 'error': 'Unauthorized'}), 401
 
         data = request.get_json(silent=True)
@@ -1464,13 +1504,15 @@ def mikrotik_push():
 
         router_name = data.get('router', 'Unknown')
         users = data.get('users', [])
+        if not isinstance(users, list):
+            return jsonify({'ok': False, 'error': 'users must be a list'}), 400
 
         router = Router.query.filter_by(name=router_name).first() or Router.query.first()
         now = time.time()
         updated_count = 0
 
         for user_info in users:
-            username = user_info.get('username', '').strip()
+            username = (user_info.get('username') or '').strip()
             if not username:
                 continue
 
@@ -1480,15 +1522,16 @@ def mikrotik_push():
 
             ip = user_info.get('ip', '')
             uptime = user_info.get('uptime', '')
-            rx = int(user_info.get('rx', 0))
-            tx = int(user_info.get('tx', 0))
+            # ✅ إصلاح: استخدام _safe_int
+            rx = _safe_int(user_info.get('rx', 0), 0)
+            tx = _safe_int(user_info.get('tx', 0), 0)
 
             sub.current_ip = ip
             sub.session_uptime = uptime
             sub.session_rx_bytes = rx
             sub.session_tx_bytes = tx
-            sub.ip_updated_at = datetime.utcnow()
-            sub.last_seen_at = datetime.utcnow()
+            sub.ip_updated_at = utcnow()
+            sub.last_seen_at = utcnow()
 
             if router and sub.router_id != router.id:
                 sub.router_id = router.id
@@ -1497,31 +1540,27 @@ def mikrotik_push():
                 sub.connected_at = _calculate_connected_at(uptime)
 
             cache_key = f"push_speed_{sub.id}"
-            if cache_key in _traffic_cache:
-                prev = _traffic_cache[cache_key]
-                elapsed = now - prev['time']
-                if elapsed >= 2.0:
-                    rx_diff = max(0, rx - prev['rx_byte'])
-                    tx_diff = max(0, tx - prev['tx_byte'])
-                    _traffic_cache[cache_key] = {
-                        'time': now,
-                        'rx_byte': rx,
-                        'tx_byte': tx,
-                        'rx_rate': (rx_diff / elapsed) * 8,
-                        'tx_rate': (tx_diff / elapsed) * 8,
-                    }
+            # ✅ إصلاح: قفل
+            with _traffic_lock:
+                if cache_key in _traffic_cache:
+                    prev = _traffic_cache[cache_key]
+                    elapsed = now - prev['time']
+                    if elapsed >= 2.0:
+                        rx_diff = max(0, rx - prev['rx_byte'])
+                        tx_diff = max(0, tx - prev['tx_byte'])
+                        _traffic_cache[cache_key] = {
+                            'time': now, 'rx_byte': rx, 'tx_byte': tx,
+                            'rx_rate': (rx_diff / elapsed) * 8,
+                            'tx_rate': (tx_diff / elapsed) * 8,
+                        }
+                    else:
+                        _traffic_cache[cache_key]['rx_byte'] = rx
+                        _traffic_cache[cache_key]['tx_byte'] = tx
                 else:
-                    _traffic_cache[cache_key]['rx_byte'] = rx
-                    _traffic_cache[cache_key]['tx_byte'] = tx
-            else:
-                _traffic_cache[cache_key] = {
-                    'time': now,
-                    'rx_byte': rx,
-                    'tx_byte': tx,
-                    'rx_rate': 0,
-                    'tx_rate': 0,
-                }
-
+                    _traffic_cache[cache_key] = {
+                        'time': now, 'rx_byte': rx, 'tx_byte': tx,
+                        'rx_rate': 0, 'tx_rate': 0,
+                    }
             updated_count += 1
 
         try:
@@ -1532,9 +1571,7 @@ def mikrotik_push():
         logger.info(f"📥 MikroTik Push من {router_name}: {updated_count} مشترك محدّث")
 
         return jsonify({
-            'ok': True,
-            'updated': updated_count,
-            'total': len(users),
+            'ok': True, 'updated': updated_count, 'total': len(users),
         })
     except Exception as e:
         logger.error(f"❌ MikroTik push error: {e}")
@@ -1618,7 +1655,7 @@ def my_account_dashboard():
 
     days_left = None
     if sub.expires_at:
-        delta = sub.expires_at - datetime.utcnow()
+        delta = sub.expires_at - utcnow()
         days_left = delta.days
 
     return render_template(
@@ -1656,8 +1693,8 @@ def my_account_refresh():
             sub.session_tx_bytes = info.get('tx_bytes', 0)
             if info.get('uptime'):
                 sub.connected_at = _calculate_connected_at(info['uptime'])
-            sub.ip_updated_at = datetime.utcnow()
-            sub.last_seen_at = datetime.utcnow()
+            sub.ip_updated_at = utcnow()
+            sub.last_seen_at = utcnow()
             db.session.commit()
 
             return jsonify({
@@ -1688,7 +1725,7 @@ def my_account_refresh():
         return jsonify({'ok': False, 'error': str(e)}), 500
 
 
-# ============ ✅ السرعة الحية (تُقرأ من Cache الذي يعبّئه MikroTik Push) ============
+# ============ السرعة الحية ============
 
 @app.route('/my-account/live-speed', methods=['POST'])
 def my_account_live_speed():
@@ -1700,7 +1737,9 @@ def my_account_live_speed():
         return jsonify({'ok': False, 'error': 'Not found'}), 404
 
     cache_key = f"push_speed_{sub.id}"
-    cached = _traffic_cache.get(cache_key, {})
+    # ✅ إصلاح: قراءة آمنة مع القفل
+    with _traffic_lock:
+        cached = dict(_traffic_cache.get(cache_key, {}))
     is_fresh = cached and (time.time() - cached.get('time', 0)) < 30
 
     rx_rate = cached.get('rx_rate', 0) if is_fresh else 0
@@ -1887,7 +1926,7 @@ def dashboard():
             Payment.created_at < end
         ).scalar() or 0
 
-        now = datetime.utcnow()
+        now = utcnow()
         start_month = datetime(now.year, now.month, 1)
         start_year = datetime(now.year, 1, 1)
 
@@ -2008,7 +2047,8 @@ def routers():
         un = request.form.get('username', '').strip()
         pw = request.form.get('password', '').strip()
         port = request.form.get('port', '22').strip()
-        api_port = request.form.get('api_port', '13').strip()
+        # ✅ إصلاح: 8728 بدل 13
+        api_port = request.form.get('api_port', '8728').strip()
         is_master = request.form.get('is_master') == 'on'
         if not name or not ip:
             flash('❌ الاسم و IP مطلوبان', 'danger')
@@ -2023,7 +2063,7 @@ def routers():
         try:
             api_port = int(api_port)
         except ValueError:
-            api_port = 13
+            api_port = 8728  # ✅ إصلاح
         try:
             if is_master:
                 Router.query.update({Router.is_master: False}, synchronize_session=False)
@@ -2073,7 +2113,8 @@ def update_router(router_id):
         un = request.form.get('username', '').strip()
         pw = request.form.get('password', '').strip()
         port = request.form.get('port', '22').strip()
-        api_port = request.form.get('api_port', '13').strip()
+        # ✅ إصلاح: 8728 بدل 13
+        api_port = request.form.get('api_port', '8728').strip()
         if not name or not ip:
             flash('❌ الاسم و IP مطلوبان', 'danger')
             return redirect(url_for('routers'))
@@ -2092,7 +2133,7 @@ def update_router(router_id):
         try:
             r.api_port = int(api_port)
         except ValueError:
-            r.api_port = 13
+            r.api_port = 8728  # ✅ إصلاح
         db.session.commit()
         log_event('تعديل راوتر', name, f'IP: {ip} | SSH: {r.port} | API: {r.api_port}')
         try:
@@ -2131,7 +2172,7 @@ def subscribers():
     ft = request.args.get('type', '').strip()
     page = request.args.get('page', 1, type=int)
     per_page = 50
-    now = datetime.utcnow()
+    now = utcnow()
     try:
         expired = Subscriber.query.filter(
             Subscriber.expires_at.isnot(None),
@@ -2176,12 +2217,12 @@ def subscribers():
 @app.route('/subscribers/sync-now', methods=['POST'])
 def sync_subscribers_now():
     try:
-        routers = Router.query.all()
+        routers_list = Router.query.all()
         total_updated = 0
         total_checked = 0
         total_online = 0
         errors = []
-        for router in routers:
+        for router in routers_list:
             try:
                 active_ips = fetch_active_ips_from_router(router)
                 total_checked += len(active_ips)
@@ -2201,8 +2242,8 @@ def sync_subscribers_now():
                         sub.session_tx_bytes = info.get('tx_bytes', 0)
                         if info.get('uptime'):
                             sub.connected_at = _calculate_connected_at(info['uptime'])
-                        sub.ip_updated_at = datetime.utcnow()
-                        sub.last_seen_at = datetime.utcnow()
+                        sub.ip_updated_at = utcnow()
+                        sub.last_seen_at = utcnow()
                         if changed:
                             total_updated += 1
                 db.session.commit()
@@ -2213,7 +2254,7 @@ def sync_subscribers_now():
                   f'فحص {total_checked} | متصل {total_online} | أخطاء {len(errors)}')
         return jsonify({
             'ok': True, 'updated': total_updated, 'checked': total_checked,
-            'online': total_online, 'routers': len(routers), 'errors': errors
+            'online': total_online, 'routers': len(routers_list), 'errors': errors
         })
     except Exception as e:
         logger.error(f"❌ Sync error: {e}")
@@ -2384,7 +2425,7 @@ def toggle_subscriber(sub_id):
             log_event('إيقاف مشترك', sub.username)
             flash(f'⏸ "{sub.username}" موقوف وتم قطعه', 'warning')
         else:
-            if sub.expires_at and sub.expires_at < datetime.utcnow():
+            if sub.expires_at and sub.expires_at < utcnow():
                 flash('⚠️ الحساب منتهي الإشتراك', 'danger')
             else:
                 sub.status = 'active'
@@ -2424,7 +2465,7 @@ def extend_subscriber(sub_id):
     try:
         sub = Subscriber.query.get_or_404(sub_id)
         pkg = Package.query.filter_by(name=sub.package).first() if sub.package else None
-        base = sub.expires_at if sub.expires_at and sub.expires_at > datetime.utcnow() else datetime.utcnow()
+        base = sub.expires_at if sub.expires_at and sub.expires_at > utcnow() else utcnow()
         sub.expires_at = calculate_expiry(pkg, base) if pkg else base + timedelta(days=30)
         sub.status = 'active'
         sub.reminder_3d_sent = False
@@ -2465,7 +2506,7 @@ def update_subscriber(sub_id):
             if sub.expires_at:
                 sub.expires_at = sub.expires_at + timedelta(days=days_to_add)
             else:
-                sub.expires_at = datetime.utcnow() + timedelta(days=days_to_add)
+                sub.expires_at = utcnow() + timedelta(days=days_to_add)
             sub.reminder_3d_sent = False
             sub.reminder_2d_sent = False
             sub.reminder_1d_sent = False
@@ -2535,7 +2576,7 @@ def bulk_delete_subscribers():
 @app.route('/subscribers/delete-expired', methods=['POST'])
 def delete_expired_subscribers():
     try:
-        now = datetime.utcnow()
+        now = utcnow()
         expired_subs = Subscriber.query.filter(
             Subscriber.expires_at.isnot(None),
             Subscriber.expires_at < now
