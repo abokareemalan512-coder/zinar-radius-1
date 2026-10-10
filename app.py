@@ -2,6 +2,7 @@ import os
 import re
 import io
 import csv
+import json
 import random
 import string
 import logging
@@ -44,15 +45,12 @@ except ImportError:
 
 app = Flask(__name__)
 
-# ✅ إصلاح: مفتاح سري آمن
 _secret = os.environ.get('SECRET_KEY')
 if not _secret:
     _secret = secrets.token_hex(32)
     print("⚠️ SECRET_KEY غير موجود في متغيرات البيئة! تم توليد مفتاح مؤقت.")
 app.config['SECRET_KEY'] = _secret
 app.config['MAX_CONTENT_LENGTH'] = 20 * 1024 * 1024
-
-# ✅ إصلاح حرج: السماح بالاتصال من صفحات Hotspot
 app.config['SESSION_COOKIE_SAMESITE'] = 'Lax'
 app.config['SESSION_COOKIE_SECURE'] = False
 app.config['SESSION_COOKIE_HTTPONLY'] = True
@@ -66,7 +64,6 @@ if not LIBROUTEROS_AVAILABLE:
 LOCAL_TZ = ZoneInfo("Asia/Damascus")
 UTC = timezone.utc
 
-# ✅ إصلاح: مفاتيح API
 IMPORT_API_KEY = os.environ.get('IMPORT_API_KEY', 'zinar-import-key-2026')
 PUSH_API_KEY = os.environ.get('PUSH_API_KEY', 'zinar-push-key-2026')
 
@@ -75,12 +72,10 @@ _traffic_lock = threading.Lock()
 
 
 def utcnow():
-    """✅ إصلاح: بديل حديث لـ datetime.utcnow()"""
     return datetime.now(UTC).replace(tzinfo=None)
 
 
 def to_local_str(dt, format='%Y-%m-%d %H:%M:%S'):
-    """✅ إصلاح: تحويل آمن للوقت المحلي"""
     if dt is None:
         return "-"
     if dt.tzinfo is None:
@@ -89,13 +84,8 @@ def to_local_str(dt, format='%Y-%m-%d %H:%M:%S'):
 
 
 def get_client_ip():
-    """
-    ✅ إصلاح حرج: الحصول على IP العميل الحقيقي خلف Proxy (Render)
-    """
-    # Render يستخدم reverse proxy - نقرأ من X-Forwarded-For أولاً
     forwarded = request.headers.get('X-Forwarded-For', '')
     if forwarded:
-        # قد يحتوي على عدة IPs مفصولة بفواصل - نأخذ الأول (العميل الحقيقي)
         return forwarded.split(',')[0].strip()
     real_ip = request.headers.get('X-Real-IP', '')
     if real_ip:
@@ -103,22 +93,19 @@ def get_client_ip():
     return request.remote_addr or 'unknown'
 
 
-# ============ CORS للسماح لصفحة Hotspot بالاتصال ============
-
-# ✅ إصلاح حرج: صفحات Hotspot على MikroTik تعمل بـ HTTP، والموقع HTTPS
-# لذلك نحتاج للسماح بـ CORS على نقاط API الرئيسية
+# ============ CORS للسماح لصفحات Hotspot ============
 
 CORS_PATHS = (
     '/api/auth',
     '/api/log',
     '/api/mikrotik/push',
     '/api/router_notify',
+    '/api/router/',
 )
 
 
 @app.after_request
 def add_cors_headers(response):
-    """✅ إصلاح حرج: إضافة CORS headers لكل نقاط API"""
     try:
         path = request.path or ''
         if any(path.startswith(p) for p in CORS_PATHS):
@@ -126,19 +113,20 @@ def add_cors_headers(response):
             response.headers['Access-Control-Allow-Methods'] = 'GET, POST, OPTIONS'
             response.headers['Access-Control-Allow-Headers'] = 'Content-Type, X-API-Key, Authorization'
             response.headers['Access-Control-Max-Age'] = '3600'
-            response.headers['Access-Control-Allow-Credentials'] = 'false'
     except Exception:
         pass
     return response
 
 
-# ✅ إصلاح حرج: معالجة طلبات OPTIONS (preflight)
 @app.route('/api/auth', methods=['OPTIONS'])
 @app.route('/api/log', methods=['OPTIONS'])
 @app.route('/api/mikrotik/push', methods=['OPTIONS'])
 @app.route('/api/router_notify', methods=['OPTIONS'])
+@app.route('/api/router/commands', methods=['OPTIONS'])
+@app.route('/api/router/command_result', methods=['OPTIONS'])
+@app.route('/api/router/batch_report', methods=['OPTIONS'])
+@app.route('/api/router/pending_simple', methods=['OPTIONS'])
 def handle_options():
-    """معالجة preflight requests من المتصفح"""
     response = make_response('', 204)
     response.headers['Access-Control-Allow-Origin'] = '*'
     response.headers['Access-Control-Allow-Methods'] = 'GET, POST, OPTIONS'
@@ -190,7 +178,6 @@ def localtime_filter(dt, format='%Y-%m-%d %H:%M:%S'):
     return dt.astimezone(LOCAL_TZ).strftime(format)
 
 
-# ✅ إصلاح: تسجيل blueprint بحذر
 _sync_bp_loaded = False
 try:
     from api_sync import sync_bp
@@ -232,7 +219,7 @@ class Subscriber(db.Model):
     username = db.Column(db.String(100), nullable=False)
     password = db.Column(db.String(150), nullable=False)
     package = db.Column(db.String(100))
-    user_type = db.Column(db.String(20), default='pppoe')
+    user_type = db.Column(db.String(20), default='hotspot')
     router_id = db.Column(db.Integer)
     status = db.Column(db.String(20), default='active')
     created_at = db.Column(db.DateTime, default=utcnow)
@@ -269,7 +256,7 @@ class Package(db.Model):
     price = db.Column(db.Float, default=0)
     duration = db.Column(db.Integer, default=30)
     duration_unit = db.Column(db.String(10), default='days')
-    user_type = db.Column(db.String(20), default='pppoe')
+    user_type = db.Column(db.String(20), default='hotspot')
     created_at = db.Column(db.DateTime, default=utcnow)
 
 
@@ -304,6 +291,20 @@ class TelegramLog(db.Model):
     status = db.Column(db.String(20))
     message = db.Column(db.Text)
     created_at = db.Column(db.DateTime, default=utcnow)
+
+
+# ✅ الجديد: جدول الأوامر للراوترات
+class RouterCommand(db.Model):
+    __tablename__ = 'router_commands'
+    id = db.Column(db.Integer, primary_key=True)
+    router_id = db.Column(db.Integer, db.ForeignKey('routers.id'), nullable=True)
+    router_name = db.Column(db.String(100))
+    action = db.Column(db.String(50), nullable=False)
+    payload = db.Column(db.Text)
+    status = db.Column(db.String(20), default='pending')
+    result = db.Column(db.Text)
+    created_at = db.Column(db.DateTime, default=utcnow)
+    executed_at = db.Column(db.DateTime)
 
 
 # ============ Helpers ============
@@ -384,8 +385,7 @@ def _safe_bool(value, default=False):
             value = value.decode('utf-8', errors='ignore')
         except Exception:
             return default
-    s = str(value).lower()
-    return s in ('true', 'yes', '1')
+    return str(value).lower() in ('true', 'yes', '1')
 
 
 def _safe_int(value, default=0):
@@ -412,6 +412,26 @@ def _calculate_connected_at(uptime_str):
         if m: total_seconds += int(m.group(1))
         return utcnow() - timedelta(seconds=total_seconds)
     except Exception:
+        return None
+
+
+# ✅ الجديد: دالة إضافة أمر للطابور
+def queue_router_command(action, payload, router_name=None):
+    """يُنشئ أمراً في الطابور لتنفيذه على MikroTik"""
+    try:
+        cmd = RouterCommand(
+            action=action,
+            payload=json.dumps(payload, ensure_ascii=False),
+            router_name=router_name or 'ALL',
+            status='pending'
+        )
+        db.session.add(cmd)
+        db.session.commit()
+        logger.info(f"📤 أمر جديد [{action}] → {router_name or 'ALL'} (ID={cmd.id})")
+        return cmd.id
+    except Exception as e:
+        db.session.rollback()
+        logger.error(f"❌ فشل إنشاء أمر: {e}")
         return None
 
 
@@ -479,7 +499,7 @@ def _parse_print_format(lines, debug_info, packages, subscribers):
                 rate_limit = current_entry.get('rate-limit', '').strip()
                 packages.append({
                     'name': name, 'speed': rate_limit if rate_limit else 'N/A',
-                    'price': 0, 'duration': 30, 'duration_unit': 'days', 'user_type': 'pppoe'
+                    'price': 0, 'duration': 30, 'duration_unit': 'days', 'user_type': 'hotspot'
                 })
                 debug_info['profile_lines'] += 1
         elif current_section == 'secret':
@@ -574,7 +594,7 @@ def _parse_export_format(lines, debug_info, packages, subscribers):
                     rate_limit = params.get('rate-limit', '').strip()
                     packages.append({
                         'name': name, 'speed': rate_limit if rate_limit else 'N/A',
-                        'price': 0, 'duration': 30, 'duration_unit': 'days', 'user_type': 'pppoe'
+                        'price': 0, 'duration': 30, 'duration_unit': 'days', 'user_type': 'hotspot'
                     })
                     debug_info['profile_lines'] += 1
             elif current_section == 'secret':
@@ -815,7 +835,6 @@ def background_expiry_reminder():
                 sent_count = 0
                 for sub in upcoming:
                     days_left = (sub.expires_at - now).days
-
                     if days_left == 3 and not sub.reminder_3d_sent:
                         if send_expiry_reminder(sub, 3):
                             sub.reminder_3d_sent = True
@@ -844,6 +863,29 @@ def background_expiry_reminder():
             except Exception:
                 pass
         time.sleep(3600)
+
+
+# ✅ الجديد: تنظيف الأوامر القديمة
+def background_command_cleaner():
+    """يحذف الأوامر المنفذة قبل أكثر من 7 أيام"""
+    time.sleep(300)
+    while True:
+        try:
+            with app.app_context():
+                cutoff = utcnow() - timedelta(days=7)
+                RouterCommand.query.filter(
+                    RouterCommand.status.in_(['done', 'failed']),
+                    RouterCommand.executed_at < cutoff
+                ).delete(synchronize_session=False)
+                db.session.commit()
+        except Exception as e:
+            logger.warning(f"⚠️ command_cleaner: {e}")
+        finally:
+            try:
+                db.session.remove()
+            except Exception:
+                pass
+        time.sleep(86400)
 
 
 # ============ Background Router Monitor ============
@@ -930,8 +972,6 @@ def _safe_close_api(api):
         pass
 
 
-# ============ Fetch Active IPs + Traffic ============
-
 def fetch_active_ips_from_router(router):
     if not LIBROUTEROS_AVAILABLE:
         return {}
@@ -939,47 +979,6 @@ def fetch_active_ips_from_router(router):
     api = None
     try:
         api = get_mikrotik_api(router)
-
-        interfaces_map = {}
-        try:
-            for iface in api.path('interface'):
-                name = _safe_str(iface.get('name'))
-                if not name:
-                    continue
-                interfaces_map[name] = {
-                    'rx_byte': _safe_int(iface.get('rx-byte', 0), 0),
-                    'tx_byte': _safe_int(iface.get('tx-byte', 0), 0),
-                }
-        except Exception as e:
-            logger.warning(f"⚠️ فشل جلب الواجهات من {router.name}: {e}")
-
-        try:
-            for ppp in api.path('ppp', 'active'):
-                uname = _safe_str(ppp.get('name'))
-                addr = _safe_str(ppp.get('address'))
-                if not uname or not addr or addr == '0.0.0.0':
-                    continue
-                iface_name = f"<pppoe-{uname}>"
-                iface_stats = interfaces_map.get(iface_name, {})
-                rx_bytes = iface_stats.get('rx_byte', 0)
-                tx_bytes = iface_stats.get('tx_byte', 0)
-                if not iface_stats:
-                    for k, v in interfaces_map.items():
-                        if uname in k and 'pppoe' in k.lower():
-                            rx_bytes = v.get('rx_byte', 0)
-                            tx_bytes = v.get('tx_byte', 0)
-                            break
-                result[uname] = {
-                    'ip': addr,
-                    'uptime': _safe_str(ppp.get('uptime', '')),
-                    'rx_bytes': rx_bytes,
-                    'tx_bytes': tx_bytes,
-                    'type': 'pppoe',
-                    'router_id': router.id
-                }
-        except Exception as e:
-            logger.warning(f"⚠️ فشل جلب PPP active من {router.name}: {e}")
-
         try:
             for hs in api.path('ip', 'hotspot', 'active'):
                 uname = _safe_str(hs.get('user'))
@@ -999,12 +998,10 @@ def fetch_active_ips_from_router(router):
                     'router_id': router.id
                 }
         except Exception as e:
-            logger.warning(f"⚠️ فشل جلب Hotspot active من {router.name}: {e}")
-
-        logger.info(f"✅ {router.name}: تم جلب {len(result)} مشترك نشط")
+            logger.warning(f"⚠️ فشل جلب Hotspot active: {e}")
         return result
     except Exception as e:
-        logger.warning(f"⚠️ فشل جلب IPs من {router.name}: {e}")
+        logger.warning(f"⚠️ فشل جلب IPs: {e}")
         return {}
     finally:
         _safe_close_api(api)
@@ -1044,7 +1041,7 @@ def background_ip_updater():
                         db.session.commit()
                     except Exception as e:
                         db.session.rollback()
-                        logger.warning(f"⚠️ خطأ تحديث IP من {router.name}: {e}")
+                        logger.warning(f"⚠️ خطأ تحديث IP: {e}")
                 if total_updated > 0:
                     logger.info(f"✅ تم تحديث IP لـ {total_updated} مشترك")
         except Exception as e:
@@ -1055,53 +1052,6 @@ def background_ip_updater():
             except Exception:
                 pass
         time.sleep(120)
-
-
-# ============ Kick via SSH ============
-
-def kick_user_via_ssh(router, username, user_type='pppoe'):
-    if not router:
-        return False, "no router"
-    try:
-        ssh = paramiko.SSHClient()
-        ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
-        ssh.connect(
-            hostname=router.ip_address, port=router.port or 22,
-            username=router.username, password=router.password,
-            timeout=8, allow_agent=False, look_for_keys=False,
-        )
-        if user_type == 'hotspot':
-            cmd = f'/ip hotspot active remove [find user="{username}"]'
-        else:
-            cmd = f'/ppp active remove [find name="{username}"]'
-        stdin, stdout, stderr = ssh.exec_command(cmd)
-        stdout.read()
-        ssh.close()
-        logger.info(f"👢 KICK: {username} on {router.name}")
-        return True, "kicked"
-    except Exception as e:
-        logger.warning(f"⚠️ KICK فشل {username}: {e}")
-        return False, str(e)
-
-
-def kick_subscriber(sub):
-    # ملاحظة: على Render لا يمكن الوصول لـ MikroTik (CGNAT)
-    if os.environ.get("RENDER", "").lower() == "true":
-        return
-    if not sub:
-        return
-    if sub.router_id:
-        r = Router.query.get(sub.router_id)
-        if r:
-            kick_user_via_ssh(r, sub.username, sub.user_type or 'pppoe')
-    other_routers = Router.query.filter(
-        Router.is_active == True, Router.id != (sub.router_id or 0)
-    ).all()
-    for r in other_routers:
-        try:
-            kick_user_via_ssh(r, sub.username, sub.user_type or 'pppoe')
-        except Exception:
-            pass
 
 
 # ============ Init DB ============
@@ -1144,17 +1094,11 @@ def ensure_columns():
                         conn.execute(text("ALTER TABLE routers ADD COLUMN is_active BOOLEAN DEFAULT TRUE"))
                     if 'api_port' not in cols:
                         conn.execute(text("ALTER TABLE routers ADD COLUMN api_port INTEGER DEFAULT 8728"))
-                if 'telegram_settings' in tables:
-                    cols = [c['name'] for c in insp.get_columns('telegram_settings')]
-                    if 'notify_router_status' not in cols:
-                        conn.execute(text("ALTER TABLE telegram_settings ADD COLUMN notify_router_status BOOLEAN DEFAULT TRUE"))
-                    if 'notify_expiry_reminder' not in cols:
-                        conn.execute(text("ALTER TABLE telegram_settings ADD COLUMN notify_expiry_reminder BOOLEAN DEFAULT TRUE"))
                 if 'subscribers' in tables:
                     cols = [c['name'] for c in insp.get_columns('subscribers')]
                     for col, sql in [
                         ('name', "ALTER TABLE subscribers ADD COLUMN name VARCHAR(100)"),
-                        ('user_type', "ALTER TABLE subscribers ADD COLUMN user_type VARCHAR(20) DEFAULT 'pppoe'"),
+                        ('user_type', "ALTER TABLE subscribers ADD COLUMN user_type VARCHAR(20) DEFAULT 'hotspot'"),
                         ('first_used_at', "ALTER TABLE subscribers ADD COLUMN first_used_at TIMESTAMP"),
                         ('current_ip', "ALTER TABLE subscribers ADD COLUMN current_ip VARCHAR(50)"),
                         ('ip_updated_at', "ALTER TABLE subscribers ADD COLUMN ip_updated_at TIMESTAMP"),
@@ -1171,14 +1115,6 @@ def ensure_columns():
                     ]:
                         if col not in cols:
                             conn.execute(text(sql))
-                if 'packages' in tables:
-                    cols = [c['name'] for c in insp.get_columns('packages')]
-                    for col, sql in [
-                        ('duration_unit', "ALTER TABLE packages ADD COLUMN duration_unit VARCHAR(10) DEFAULT 'days'"),
-                        ('user_type', "ALTER TABLE packages ADD COLUMN user_type VARCHAR(20) DEFAULT 'pppoe'"),
-                    ]:
-                        if col not in cols:
-                            conn.execute(text(sql))
                 conn.commit()
             logger.info("✅ فحص الأعمدة اكتمل")
         except Exception as e:
@@ -1188,14 +1124,10 @@ def ensure_columns():
 init_database()
 ensure_columns()
 
-monitor_thread = threading.Thread(target=background_router_monitor, daemon=True)
-monitor_thread.start()
-
-ip_updater_thread = threading.Thread(target=background_ip_updater, daemon=True)
-ip_updater_thread.start()
-
-reminder_thread = threading.Thread(target=background_expiry_reminder, daemon=True)
-reminder_thread.start()
+threading.Thread(target=background_router_monitor, daemon=True).start()
+threading.Thread(target=background_ip_updater, daemon=True).start()
+threading.Thread(target=background_expiry_reminder, daemon=True).start()
+threading.Thread(target=background_command_cleaner, daemon=True).start()
 
 
 # ============ API للميكروتيك ============
@@ -1243,7 +1175,7 @@ def api_auth():
         expires_str = sub.expires_at.strftime('%Y-%m-%d %H:%M:%S') if sub.expires_at else ''
         return jsonify({
             'result': 'allow', 'profile': profile, 'expires': expires_str,
-            'user_type': sub.user_type or 'pppoe', 'name': sub.name or sub.username
+            'user_type': sub.user_type or 'hotspot', 'name': sub.name or sub.username
         })
     except Exception as e:
         db.session.rollback()
@@ -1265,11 +1197,6 @@ def api_log():
 @app.route('/api/router_notify', methods=['POST', 'GET'])
 def api_router_notify():
     try:
-        # ✅ إصلاح: السماح بدون مفتاح من MikroTik المحلي (لأنه يأتي من الخلف فقط)
-        api_key = request.headers.get('X-API-Key') or request.args.get('api_key')
-        if api_key and api_key != IMPORT_API_KEY:
-            return jsonify({'ok': False, 'error': 'Unauthorized'}), 401
-
         data = {}
         if request.is_json:
             data = request.get_json() or {}
@@ -1292,9 +1219,9 @@ def api_router_notify():
         db.session.commit()
         try:
             send_telegram_message(message, message_type='router_alert')
-        except Exception as tg_err:
-            logger.warning(f"Telegram send failed: {tg_err}")
-        return jsonify({'ok': True, 'message': 'Notification received', 'data': data})
+        except Exception:
+            pass
+        return jsonify({'ok': True})
     except Exception as e:
         db.session.rollback()
         return jsonify({'ok': False, 'error': str(e)}), 500
@@ -1314,14 +1241,14 @@ def api_import_subscribers():
             username = str(item.get('username', '')).strip()
             password = str(item.get('password', '')).strip()
             package = str(item.get('package', '')).strip()
-            user_type = str(item.get('user_type', 'pppoe')).strip()
+            user_type = str(item.get('user_type', 'hotspot')).strip()
             status = str(item.get('status', 'active')).strip()
             name = str(item.get('name', username)).strip()
             if not username or not password:
                 skipped += 1
                 continue
             if user_type not in ('pppoe', 'hotspot'):
-                user_type = 'pppoe'
+                user_type = 'hotspot'
             if status not in ('active', 'paused', 'expired'):
                 status = 'active'
             sub = Subscriber.query.filter_by(username=username).first()
@@ -1339,12 +1266,9 @@ def api_import_subscribers():
                 ))
                 imported += 1
         db.session.commit()
-        log_event('استيراد مشتركين (API)', f'{imported + updated} مشترك',
-                  f'جديد: {imported} | محدّث: {updated} | متجاهل: {skipped}', admin_name='النظام (API)')
         return jsonify({
             'ok': True, 'imported': imported, 'updated': updated, 'skipped': skipped,
-            'total': len(data),
-            'message': f'تم بنجاح: {imported} مشترك جديد، {updated} محدّث، {skipped} متجاهل.'
+            'total': len(data)
         })
     except Exception as e:
         db.session.rollback()
@@ -1367,7 +1291,7 @@ def api_import_packages():
             price = item.get('price', 0)
             duration = item.get('duration', 30)
             duration_unit = str(item.get('duration_unit', 'days')).strip()
-            user_type = str(item.get('user_type', 'pppoe')).strip()
+            user_type = str(item.get('user_type', 'hotspot')).strip()
             if not name:
                 skipped += 1
                 continue
@@ -1382,7 +1306,7 @@ def api_import_packages():
             if duration_unit not in ('days', 'months'):
                 duration_unit = 'days'
             if user_type not in ('pppoe', 'hotspot'):
-                user_type = 'pppoe'
+                user_type = 'hotspot'
             pkg = Package.query.filter_by(name=name).first()
             if pkg:
                 pkg.speed = speed or pkg.speed
@@ -1398,211 +1322,198 @@ def api_import_packages():
                 ))
                 imported += 1
         db.session.commit()
-        log_event('استيراد باقات (API)', f'{imported + updated} باقة',
-                  f'جديدة: {imported} | محدّثة: {updated} | متجاهلة: {skipped}', admin_name='النظام (API)')
         return jsonify({
             'ok': True, 'imported': imported, 'updated': updated, 'skipped': skipped,
-            'total': len(data),
-            'message': f'تم بنجاح: {imported} باقة جديدة، {updated} محدّثة، {skipped} متجاهلة.'
+            'total': len(data)
         })
     except Exception as e:
         db.session.rollback()
         return jsonify({'ok': False, 'error': str(e)}), 500
 
 
-# ============ Traffic API ============
+# ============ نظام الأوامر للراوترات (Pull Model) ============
 
-@app.route('/api/traffic/interfaces/<int:router_id>')
-def api_get_interfaces(router_id):
-    router = Router.query.get_or_404(router_id)
-    api = None
-    try:
-        api = get_mikrotik_api(router)
-        interfaces_data = list(api.path('interface'))
-        interfaces = []
-        for iface in interfaces_data:
-            name = _safe_str(iface.get('name'))
-            if not name:
-                continue
-            disabled = _safe_bool(iface.get('disabled'), False)
-            if disabled:
-                continue
-            iface_type = _safe_str(iface.get('type'), 'unknown')
-            running = _safe_bool(iface.get('running'), False)
-            interfaces.append({'name': name, 'type': iface_type, 'running': running})
-        interfaces.sort(key=lambda x: x['name'])
-        return jsonify({'ok': True, 'interfaces': interfaces, 'method': 'API', 'count': len(interfaces)})
-    except Exception as e:
-        logger.error(f"❌ خطأ جلب المنافذ: {e}")
-        return jsonify({'ok': False, 'error': str(e)}), 500
-    finally:
-        _safe_close_api(api)
-
-
-@app.route('/api/traffic/stats/<int:router_id>/<interface>')
-def api_get_traffic_stats(router_id, interface):
-    router = Router.query.get_or_404(router_id)
-    api = None
-    try:
-        api = get_mikrotik_api(router)
-        interfaces = list(api.path('interface'))
-        target = None
-        for iface in interfaces:
-            if _safe_str(iface.get('name')) == interface:
-                target = iface
-                break
-        if not target:
-            return jsonify({'ok': False, 'error': f'المنفذ {interface} غير موجود'}), 404
-        rx_byte = _safe_int(target.get('rx-byte', '0'), 0)
-        tx_byte = _safe_int(target.get('tx-byte', '0'), 0)
-        cache_key = f"{router_id}_{interface}"
-        now = time.time()
-        rx_rate_bps = tx_rate_bps = 0
-        with _traffic_lock:
-            if cache_key in _traffic_cache:
-                prev = _traffic_cache[cache_key]
-                elapsed = now - prev['time']
-                if elapsed > 0:
-                    rx_diff = max(0, rx_byte - prev['rx_byte'])
-                    tx_diff = max(0, tx_byte - prev['tx_byte'])
-                    rx_rate_bps = (rx_diff / elapsed) * 8
-                    tx_rate_bps = (tx_diff / elapsed) * 8
-            _traffic_cache[cache_key] = {'time': now, 'rx_byte': rx_byte, 'tx_byte': tx_byte}
-
-        def format_rate(bps):
-            if bps >= 1_000_000_000:
-                return f"{bps / 1_000_000_000:.2f}Gbps"
-            elif bps >= 1_000_000:
-                return f"{bps / 1_000_000:.2f}Mbps"
-            elif bps >= 1_000:
-                return f"{bps / 1_000:.2f}kbps"
-            else:
-                return f"{int(bps)}bps"
-        stats = {
-            'rx_rate': format_rate(rx_rate_bps),
-            'tx_rate': format_rate(tx_rate_bps),
-            'rx_byte': str(rx_byte),
-            'tx_byte': str(tx_byte),
-        }
-        return jsonify({'ok': True, 'stats': stats, 'method': 'API'})
-    except Exception as e:
-        logger.error(f"❌ خطأ جلب الترافيك: {e}")
-        return jsonify({'ok': False, 'error': str(e)}), 500
-    finally:
-        _safe_close_api(api)
-
-
-@app.route('/api/dashboard_data')
-def api_dashboard_data():
-    try:
-        start, end = _day_bounds()
-        today_revenue = db.session.query(db.func.sum(Payment.amount)).filter(
-            Payment.status == 'completed',
-            Payment.created_at >= start,
-            Payment.created_at < end
-        ).scalar() or 0
-        new_users_today = Subscriber.query.filter(
-            Subscriber.created_at >= start,
-            Subscriber.created_at < end
-        ).count()
-        events = SystemEvent.query.order_by(SystemEvent.created_at.desc()).limit(15).all()
-        events_data = [{
-            'time': to_local_str(e.created_at, '%H:%M'),
-            'admin': e.admin_name or 'النظام', 'action': e.action,
-            'target': e.target or '-', 'details': e.details or '-'
-        } for e in events]
-        recent_logs = TelegramLog.query.order_by(TelegramLog.created_at.desc()).limit(5).all()
-        logs_data = [{
-            'time': to_local_str(l.created_at, '%m-%d %H:%M'),
-            'type': l.message_type, 'status': l.status
-        } for l in recent_logs]
-        return jsonify({
-            'routers_count': Router.query.count(),
-            'routers_online': Router.query.filter_by(is_active=True).count(),
-            'sub_count': Subscriber.query.count(),
-            'active_subs': Subscriber.query.filter_by(status='active').count(),
-            'online_count': Subscriber.query.filter(
-                Subscriber.current_ip.isnot(None), Subscriber.current_ip != ''
-            ).count(),
-            'today_revenue': f"{today_revenue:.0f}",
-            'new_users_today': new_users_today,
-            'events': events_data, 'telegram_logs': logs_data
-        })
-    except Exception as e:
-        db.session.rollback()
-        return jsonify({'error': str(e)}), 500
-
-
-@app.route('/api/telegram_data')
-def api_telegram_data():
-    try:
-        logs = TelegramLog.query.order_by(TelegramLog.created_at.desc()).limit(10).all()
-        logs_data = [{
-            'time': to_local_str(l.created_at),
-            'type': l.message_type, 'status': l.status, 'message': l.message
-        } for l in logs]
-        return jsonify({
-            'total_notifications': TelegramLog.query.count(),
-            'new_subscribers': TelegramLog.query.filter_by(message_type='new_subscriber').count(),
-            'expired_subscribers': TelegramLog.query.filter_by(message_type='expired_subscriber').count(),
-            'bulk_adds': TelegramLog.query.filter_by(message_type='bulk_add').count(),
-            'logs': logs_data
-        })
-    except Exception as e:
-        db.session.rollback()
-        return jsonify({'error': str(e)}), 500
-
-
-# ============ MikroTik Push ============
-
-@app.route('/api/mikrotik/push', methods=['POST'])
-def mikrotik_push():
-    """
-    يستقبل بيانات المستخدمين النشطين من MikroTik مباشرة (Push)
-    هذه الطريقة تعمل حتى خلف CGNAT لأن MikroTik هو من يبدأ الاتصال
-    """
+@app.route('/api/router/commands', methods=['GET'])
+def router_get_commands():
+    """MikroTik يسأل: هل عندك أوامر؟ (JSON)"""
     try:
         api_key = request.args.get('key')
         if api_key != PUSH_API_KEY:
             return jsonify({'ok': False, 'error': 'Unauthorized'}), 401
+        router_name = request.args.get('router', '').strip()
+        if not router_name:
+            return jsonify({'ok': False, 'error': 'router name required'}), 400
 
-        data = request.get_json(silent=True)
-        if not data or 'users' not in data:
-            return jsonify({'ok': False, 'error': 'Invalid data'}), 400
+        pending = RouterCommand.query.filter(
+            RouterCommand.status == 'pending',
+            db.or_(
+                RouterCommand.router_name == router_name,
+                RouterCommand.router_name == 'ALL',
+                RouterCommand.router_name.is_(None),
+            )
+        ).order_by(RouterCommand.created_at.asc()).limit(20).all()
+
+        commands = []
+        for cmd in pending:
+            try:
+                payload = json.loads(cmd.payload or '{}')
+            except Exception:
+                payload = {}
+            commands.append({'id': cmd.id, 'action': cmd.action, 'data': payload})
+            cmd.status = 'sent'
+            cmd.executed_at = utcnow()
+
+        db.session.commit()
+        router = Router.query.filter_by(name=router_name).first()
+        return jsonify({
+            'ok': True, 'router': router_name,
+            'router_id': router.id if router else None,
+            'commands': commands, 'count': len(commands),
+            'server_time': utcnow().isoformat(),
+        })
+    except Exception as e:
+        db.session.rollback()
+        logger.error(f"❌ router_get_commands: {e}")
+        return jsonify({'ok': False, 'error': str(e)}), 500
+
+
+@app.route('/api/router/pending_simple', methods=['GET'])
+def router_pending_simple():
+    """
+    نسخة مبسطة لـ MikroTik (نص عادي، بدون JSON)
+    التنسيق: ID|action|username|password|package
+    كل سطر = أمر واحد
+    """
+    try:
+        api_key = request.args.get('key')
+        if api_key != PUSH_API_KEY:
+            return "UNAUTHORIZED", 401
+        router_name = request.args.get('router', '').strip()
+        if not router_name:
+            return "NO_ROUTER", 400
+
+        pending = RouterCommand.query.filter(
+            RouterCommand.status == 'pending',
+            db.or_(
+                RouterCommand.router_name == router_name,
+                RouterCommand.router_name == 'ALL',
+                RouterCommand.router_name.is_(None),
+            )
+        ).order_by(RouterCommand.created_at.asc()).limit(30).all()
+
+        lines = []
+        for cmd in pending:
+            try:
+                payload = json.loads(cmd.payload or '{}')
+            except Exception:
+                payload = {}
+
+            if cmd.action == 'sync_user':
+                u = payload.get('username', '')
+                p = payload.get('password', '')
+                pkg = payload.get('package', 'default')
+                lines.append(f"{cmd.id}|sync_user|{u}|{p}|{pkg}")
+            elif cmd.action == 'delete_user':
+                u = payload.get('username', '')
+                lines.append(f"{cmd.id}|delete_user|{u}|-|-")
+            elif cmd.action == 'pause_user':
+                u = payload.get('username', '')
+                lines.append(f"{cmd.id}|pause_user|{u}|-|-")
+            elif cmd.action == 'resume_user':
+                u = payload.get('username', '')
+                p = payload.get('password') or '-'
+                lines.append(f"{cmd.id}|resume_user|{u}|{p}|-")
+            elif cmd.action == 'sync_all':
+                # كل مستخدم = سطر مستقل
+                for u in payload.get('users', []):
+                    un = u.get('username', '')
+                    pw = u.get('password', '')
+                    pkg = u.get('package', 'default')
+                    lines.append(f"{cmd.id}|sync_user|{un}|{pw}|{pkg}")
+
+            cmd.status = 'sent'
+            cmd.executed_at = utcnow()
+
+        db.session.commit()
+
+        if not lines:
+            return "EMPTY"
+        return "\n".join(lines)
+    except Exception as e:
+        db.session.rollback()
+        logger.error(f"❌ pending_simple: {e}")
+        return f"ERROR|{e}", 500
+
+
+@app.route('/api/router/command_result', methods=['POST'])
+def router_command_result():
+    """MikroTik يُبلغ نتيجة تنفيذ أمر"""
+    try:
+        data = request.get_json(silent=True) or {}
+        api_key = request.args.get('key') or data.get('key')
+        if api_key != PUSH_API_KEY:
+            return jsonify({'ok': False, 'error': 'Unauthorized'}), 401
+
+        cmd_id = data.get('command_id')
+        success = bool(data.get('success', False))
+        result_msg = str(data.get('result', ''))[:500]
+
+        if not cmd_id:
+            return jsonify({'ok': False, 'error': 'command_id required'}), 400
+
+        cmd = RouterCommand.query.get(cmd_id)
+        if not cmd:
+            return jsonify({'ok': False, 'error': 'command not found'}), 404
+
+        cmd.status = 'done' if success else 'failed'
+        cmd.result = result_msg
+        cmd.executed_at = utcnow()
+        db.session.commit()
+
+        logger.info(f"📥 نتيجة أمر #{cmd_id}: {'✅' if success else '❌'} - {result_msg}")
+        return jsonify({'ok': True})
+    except Exception as e:
+        db.session.rollback()
+        logger.error(f"❌ router_command_result: {e}")
+        return jsonify({'ok': False, 'error': str(e)}), 500
+
+
+@app.route('/api/router/batch_report', methods=['POST'])
+def router_batch_report():
+    """MikroTik يرفع صورة كاملة: active users + local users"""
+    try:
+        data = request.get_json(silent=True) or {}
+        api_key = request.args.get('key') or data.get('key')
+        if api_key != PUSH_API_KEY:
+            return jsonify({'ok': False, 'error': 'Unauthorized'}), 401
 
         router_name = data.get('router', 'Unknown')
-        users = data.get('users', [])
-        if not isinstance(users, list):
-            return jsonify({'ok': False, 'error': 'users must be a list'}), 400
+        active_users = data.get('active_users', [])
+        local_users = data.get('local_users', [])
 
         router = Router.query.filter_by(name=router_name).first() or Router.query.first()
-        now = time.time()
-        updated_count = 0
+        now_ts = time.time()
+        updated = 0
 
-        for user_info in users:
-            username = (user_info.get('username') or '').strip()
+        for u in active_users:
+            username = (u.get('username') or '').strip()
             if not username:
                 continue
-
             sub = Subscriber.query.filter_by(username=username).first()
             if not sub:
                 continue
-
-            ip = user_info.get('ip', '')
-            uptime = user_info.get('uptime', '')
-            rx = _safe_int(user_info.get('rx', 0), 0)
-            tx = _safe_int(user_info.get('tx', 0), 0)
-
+            ip = u.get('ip', '')
+            uptime = u.get('uptime', '')
+            rx = _safe_int(u.get('rx', 0), 0)
+            tx = _safe_int(u.get('tx', 0), 0)
             sub.current_ip = ip
             sub.session_uptime = uptime
             sub.session_rx_bytes = rx
             sub.session_tx_bytes = tx
             sub.ip_updated_at = utcnow()
             sub.last_seen_at = utcnow()
-
             if router and sub.router_id != router.id:
                 sub.router_id = router.id
-
             if uptime:
                 sub.connected_at = _calculate_connected_at(uptime)
 
@@ -1610,38 +1521,46 @@ def mikrotik_push():
             with _traffic_lock:
                 if cache_key in _traffic_cache:
                     prev = _traffic_cache[cache_key]
-                    elapsed = now - prev['time']
+                    elapsed = now_ts - prev['time']
                     if elapsed >= 2.0:
-                        rx_diff = max(0, rx - prev['rx_byte'])
-                        tx_diff = max(0, tx - prev['tx_byte'])
                         _traffic_cache[cache_key] = {
-                            'time': now, 'rx_byte': rx, 'tx_byte': tx,
-                            'rx_rate': (rx_diff / elapsed) * 8,
-                            'tx_rate': (tx_diff / elapsed) * 8,
+                            'time': now_ts, 'rx_byte': rx, 'tx_byte': tx,
+                            'rx_rate': (max(0, rx - prev['rx_byte']) / elapsed) * 8,
+                            'tx_rate': (max(0, tx - prev['tx_byte']) / elapsed) * 8,
                         }
                     else:
                         _traffic_cache[cache_key]['rx_byte'] = rx
                         _traffic_cache[cache_key]['tx_byte'] = tx
                 else:
                     _traffic_cache[cache_key] = {
-                        'time': now, 'rx_byte': rx, 'tx_byte': tx,
+                        'time': now_ts, 'rx_byte': rx, 'tx_byte': tx,
                         'rx_rate': 0, 'tx_rate': 0,
                     }
-            updated_count += 1
+            updated += 1
 
-        try:
-            db.session.commit()
-        except Exception:
-            db.session.rollback()
+        if local_users:
+            local_names = {u.get('username', '') for u in local_users if u.get('username')}
+            sub_names = {s.username for s in Subscriber.query.all()}
+            extra = local_names - sub_names
+            missing = sub_names - local_names
+            if extra:
+                logger.warning(f"⚠️ على MikroTik فقط: {list(extra)[:10]}")
+            if missing:
+                logger.warning(f"⚠️ على الموقع فقط: {list(missing)[:10]}")
 
-        logger.info(f"📥 MikroTik Push من {router_name}: {updated_count} مشترك محدّث")
-
-        return jsonify({
-            'ok': True, 'updated': updated_count, 'total': len(users),
-        })
+        db.session.commit()
+        logger.info(f"📊 تقرير من {router_name}: {updated} نشط / {len(local_users)} محلي")
+        return jsonify({'ok': True, 'updated': updated, 'router_id': router.id if router else None})
     except Exception as e:
-        logger.error(f"❌ MikroTik push error: {e}")
+        db.session.rollback()
+        logger.error(f"❌ batch_report: {e}")
         return jsonify({'ok': False, 'error': str(e)}), 500
+
+
+@app.route('/api/mikrotik/push', methods=['POST'])
+def mikrotik_push():
+    """نقطة قديمة - للتشغيل المتوافق"""
+    return router_batch_report()
 
 
 # ============ Auth Guard ============
@@ -1667,9 +1586,11 @@ def check_admin_login():
         'my_account_login', 'my_account_dashboard',
         'my_account_logout', 'my_account_refresh',
         'my_account_live_speed',
-        'mikrotik_push', 'handle_options'
+        'mikrotik_push', 'handle_options',
+        'router_get_commands', 'router_pending_simple',
+        'router_command_result', 'router_batch_report',
+        'admin_queue_sync_all',
     )
-    # إضافة endpoints الـ blueprint إن وُجد
     if _sync_bp_loaded:
         public = public + ('sync.get_subscribers', 'sync.mark_first_use')
     if request.endpoint in public:
@@ -1684,25 +1605,20 @@ def check_admin_login():
 def my_account_login():
     if session.get('subscriber_id'):
         return redirect(url_for('my_account_dashboard'))
-
     if request.method == 'POST':
         username = request.form.get('username', '').strip()
         password = request.form.get('password', '').strip()
-
         if not username or not password:
             flash('❌ الرجاء إدخال اسم المستخدم وكلمة المرور', 'danger')
             return redirect(url_for('my_account_login'))
-
         sub = Subscriber.query.filter_by(username=username).first()
         if not sub or sub.password != password:
             flash('❌ اسم المستخدم أو كلمة المرور غير صحيحة', 'danger')
             return redirect(url_for('my_account_login'))
-
         session['subscriber_id'] = sub.id
         session['subscriber_username'] = sub.username
         log_event('دخول مشترك', sub.username, 'دخول بوابة المشتركين', admin_name=sub.username)
         return redirect(url_for('my_account_dashboard'))
-
     return render_template('my_account_login.html')
 
 
@@ -1710,99 +1626,46 @@ def my_account_login():
 def my_account_dashboard():
     if not session.get('subscriber_id'):
         return redirect(url_for('my_account_login'))
-
     sub = Subscriber.query.get(session['subscriber_id'])
     if not sub:
         session.pop('subscriber_id', None)
-        session.pop('subscriber_username', None)
         return redirect(url_for('my_account_login'))
-
-    router = None
-    if sub.router_id:
-        router = Router.query.get(sub.router_id)
-
+    router = Router.query.get(sub.router_id) if sub.router_id else None
     days_left = None
     if sub.expires_at:
-        delta = sub.expires_at - utcnow()
-        days_left = delta.days
-
-    return render_template(
-        'my_account.html',
-        sub=sub,
-        router=router,
-        days_left=days_left
-    )
+        days_left = (sub.expires_at - utcnow()).days
+    return render_template('my_account.html', sub=sub, router=router, days_left=days_left)
 
 
 @app.route('/my-account/refresh', methods=['POST'])
 def my_account_refresh():
     if not session.get('subscriber_id'):
         return jsonify({'ok': False, 'error': 'Unauthorized'}), 401
-
     sub = Subscriber.query.get(session['subscriber_id'])
     if not sub:
         return jsonify({'ok': False, 'error': 'Not found'}), 404
-
-    if not sub.router_id:
-        return jsonify({'ok': False, 'error': 'No router assigned'})
-
-    router = Router.query.get(sub.router_id)
-    if not router:
-        return jsonify({'ok': False, 'error': 'Router not found'})
-
-    try:
-        active_ips = fetch_active_ips_from_router(router)
-        info = active_ips.get(sub.username)
-
-        if info:
-            sub.current_ip = info['ip']
-            sub.session_uptime = info.get('uptime', '')
-            sub.session_rx_bytes = info.get('rx_bytes', 0)
-            sub.session_tx_bytes = info.get('tx_bytes', 0)
-            if info.get('uptime'):
-                sub.connected_at = _calculate_connected_at(info['uptime'])
-            sub.ip_updated_at = utcnow()
-            sub.last_seen_at = utcnow()
-            db.session.commit()
-
-            return jsonify({
-                'ok': True, 'online': True,
-                'ip': sub.current_ip,
-                'uptime': sub.session_uptime,
-                'rx_bytes': sub.session_rx_bytes,
-                'tx_bytes': sub.session_tx_bytes,
-                'connected_at': sub.connected_at.strftime('%Y-%m-%d %H:%M:%S') if sub.connected_at else '-',
-                'router_ip': router.ip_address,
-                'router_name': router.name
-            })
-        else:
-            return jsonify({
-                'ok': True, 'online': False,
-                'ip': sub.current_ip or '-',
-                'uptime': '-', 'rx_bytes': 0, 'tx_bytes': 0,
-                'connected_at': '-',
-                'router_ip': router.ip_address if router else '-',
-                'router_name': router.name if router else '-'
-            })
-    except Exception as e:
-        logger.error(f"❌ Refresh error: {e}")
-        return jsonify({'ok': False, 'error': str(e)}), 500
+    return jsonify({
+        'ok': True, 'online': bool(sub.current_ip),
+        'ip': sub.current_ip or '-',
+        'uptime': sub.session_uptime or '-',
+        'rx_bytes': sub.session_rx_bytes or 0,
+        'tx_bytes': sub.session_tx_bytes or 0,
+        'connected_at': sub.connected_at.strftime('%Y-%m-%d %H:%M:%S') if sub.connected_at else '-',
+        'router_ip': '-', 'router_name': '-'
+    })
 
 
 @app.route('/my-account/live-speed', methods=['POST'])
 def my_account_live_speed():
     if not session.get('subscriber_id'):
         return jsonify({'ok': False, 'error': 'Unauthorized'}), 401
-
     sub = Subscriber.query.get(session['subscriber_id'])
     if not sub:
         return jsonify({'ok': False, 'error': 'Not found'}), 404
-
     cache_key = f"push_speed_{sub.id}"
     with _traffic_lock:
         cached = dict(_traffic_cache.get(cache_key, {}))
     is_fresh = cached and (time.time() - cached.get('time', 0)) < 30
-
     rx_rate = cached.get('rx_rate', 0) if is_fresh else 0
     tx_rate = cached.get('tx_rate', 0) if is_fresh else 0
     rx_byte = cached.get('rx_byte', sub.session_rx_bytes or 0)
@@ -1816,10 +1679,8 @@ def my_account_live_speed():
 
     up_val, up_unit = fmt(rx_rate)
     down_val, down_unit = fmt(tx_rate)
-
     return jsonify({
-        'ok': True,
-        'online': is_fresh,
+        'ok': True, 'online': is_fresh,
         'upload_speed': up_val, 'upload_unit': up_unit,
         'download_speed': down_val, 'download_unit': down_unit,
         'upload_total': rx_byte, 'download_total': tx_byte,
@@ -1900,18 +1761,7 @@ def import_backup():
                 return redirect(url_for('import_backup'))
             packages, subscribers, debug_info = parse_mikrotik_rsc(content)
             if not packages and not subscribers:
-                preview = debug_info['preview'].replace('\n', '<br>').replace('<', '&lt;').replace('>', '&gt;')[:800]
-                sections = ', '.join(debug_info['sections_found']) or 'لا يوجد'
-                error_msg = (
-                    f'⚠️ لم يتم العثور على بيانات!<br>'
-                    f'📄 صيغة الملف: <strong>{debug_info["format"]}</strong><br>'
-                    f'📄 عدد الأسطر: {debug_info["lines_read"]}<br>'
-                    f'🔍 الأقسام المكتشفة: {sections}<br>'
-                    f'📊 أسطر Profiles: {debug_info["profile_lines"]} | أسطر Secrets: {debug_info["secret_lines"]}<br>'
-                    f'<br><strong>معاينة أول أسطر الملف:</strong><br>'
-                    f'<code style="display:block; max-height:200px; overflow:auto; background:#000; padding:10px; margin-top:5px; text-align:left; direction:ltr; color:#0f0; font-size:11px;">{preview}</code>'
-                )
-                flash(error_msg, 'warning')
+                flash(f'⚠️ لم يتم العثور على بيانات! صيغة: {debug_info["format"]}', 'warning')
                 return redirect(url_for('import_backup'))
             pkg_imported = pkg_updated = 0
             for p in packages:
@@ -1940,22 +1790,13 @@ def import_backup():
                     ))
                     sub_imported += 1
             db.session.commit()
-            log_event(
-                'استيراد نسخة احتياطية', f'ملف: {file.filename}',
-                f'باقات: {pkg_imported}+{pkg_updated} | مشتركين: {sub_imported}+{sub_updated}',
-                admin_name=session.get('admin_name', 'المدير')
-            )
-            flash(
-                f'✅ تم الاستيراد بنجاح! (صيغة: {debug_info["format"]}) | '
-                f'📦 الباقات: {pkg_imported} جديدة، {pkg_updated} محدّثة | '
-                f'👥 المشتركون: {sub_imported} جديد، {sub_updated} محدّث',
-                'success'
-            )
+            log_event('استيراد نسخة احتياطية', f'ملف: {file.filename}',
+                      f'باقات: {pkg_imported}+{pkg_updated} | مشتركين: {sub_imported}+{sub_updated}')
+            flash(f'✅ استيراد ناجح | باقات: {pkg_imported}+{pkg_updated} | مشتركين: {sub_imported}+{sub_updated}', 'success')
             return redirect(url_for('import_backup'))
         except Exception as e:
             db.session.rollback()
             logger.error(f"❌ Backup import error: {e}")
-            logger.error(traceback.format_exc())
             flash(f'❌ خطأ في الاستيراد: {str(e)}', 'danger')
             return redirect(url_for('import_backup'))
     return render_template('import_backup.html',
@@ -1995,16 +1836,12 @@ def dashboard():
             Payment.status == 'completed',
             Payment.created_at >= start_month
         ).scalar() or 0
-
         yearly_revenue = db.session.query(db.func.sum(Payment.amount)).filter(
             Payment.status == 'completed',
             Payment.created_at >= start_year
         ).scalar() or 0
 
-        inactive_subs = Subscriber.query.filter(
-            Subscriber.status.in_(['expired', 'paused'])
-        ).all()
-
+        inactive_subs = Subscriber.query.filter(Subscriber.status.in_(['expired', 'paused'])).all()
         new_users_today = Subscriber.query.filter(
             Subscriber.created_at >= start,
             Subscriber.created_at < end
@@ -2015,42 +1852,30 @@ def dashboard():
         current_time = get_local_time_str()
         telegram_status = TelegramSetting.query.first()
         recent_telegram_logs = TelegramLog.query.order_by(TelegramLog.created_at.desc()).limit(5).all()
-
         recent_subs = Subscriber.query.order_by(Subscriber.created_at.desc()).limit(5).all()
         recent_payments = Payment.query.filter_by(status='completed').order_by(Payment.created_at.desc()).limit(5).all()
         recent_routers = Router.query.order_by(Router.created_at.desc()).limit(5).all()
-
         online_subs = Subscriber.query.filter(
-            Subscriber.current_ip.isnot(None),
-            Subscriber.current_ip != ''
+            Subscriber.current_ip.isnot(None), Subscriber.current_ip != ''
         ).order_by(Subscriber.last_seen_at.desc()).all()
         top_online_subs = online_subs[:10]
 
+        # ✅ عدد الأوامر المعلقة
+        pending_commands = RouterCommand.query.filter_by(status='pending').count()
+
         return render_template(
             'dashboard.html',
-            routers_count=routers_count,
-            routers_online=routers_online,
-            routers=routers_list,
-            sub_count=sub_count,
-            active_subs=active_subs,
-            today_revenue=today_revenue,
-            monthly_revenue=monthly_revenue,
-            yearly_revenue=yearly_revenue,
-            inactive_subs=inactive_subs,
-            new_users_today=new_users_today,
-            has_master=master is not None,
-            events=events_list,
+            routers_count=routers_count, routers_online=routers_online, routers=routers_list,
+            sub_count=sub_count, active_subs=active_subs,
+            today_revenue=today_revenue, monthly_revenue=monthly_revenue, yearly_revenue=yearly_revenue,
+            inactive_subs=inactive_subs, new_users_today=new_users_today,
+            has_master=master is not None, events=events_list,
             admin_name=session.get('admin_name', 'مدير'),
-            current_time=current_time,
-            telegram_status=telegram_status,
-            recent_telegram_logs=recent_telegram_logs,
-            pending_pays=pending_pays,
-            active_sessions=0,
-            recent_subs=recent_subs,
-            recent_payments=recent_payments,
-            recent_routers=recent_routers,
-            online_subs=online_subs,
-            top_online_subs=top_online_subs,
+            current_time=current_time, telegram_status=telegram_status,
+            recent_telegram_logs=recent_telegram_logs, pending_pays=pending_pays,
+            active_sessions=0, recent_subs=recent_subs, recent_payments=recent_payments,
+            recent_routers=recent_routers, online_subs=online_subs, top_online_subs=top_online_subs,
+            pending_commands=pending_commands,
         )
     except Exception as e:
         db.session.rollback()
@@ -2116,14 +1941,10 @@ def routers():
         if Router.query.filter_by(name=name).first():
             flash('❌ الاسم موجود', 'danger')
             return redirect(url_for('routers'))
-        try:
-            port = int(port)
-        except ValueError:
-            port = 22
-        try:
-            api_port = int(api_port)
-        except ValueError:
-            api_port = 8728
+        try: port = int(port)
+        except ValueError: port = 22
+        try: api_port = int(api_port)
+        except ValueError: api_port = 8728
         try:
             if is_master:
                 Router.query.update({Router.is_master: False}, synchronize_session=False)
@@ -2132,11 +1953,7 @@ def routers():
                 port=port, api_port=api_port, is_master=is_master, is_active=True
             ))
             db.session.commit()
-            log_event('إضافة راوتر', name, f'IP: {ip} | SSH: {port} | API: {api_port}')
-            try:
-                notify_admin_action(f"🖥️ إضافة راوتر: `{name}` - IP: `{ip}` (SSH: {port} | API: {api_port})")
-            except Exception:
-                pass
+            log_event('إضافة راوتر', name, f'IP: {ip}')
             flash(f'✅ الراوتر "{name}" أُضيف', 'success')
         except Exception as e:
             db.session.rollback()
@@ -2153,10 +1970,6 @@ def set_master_router(router_id):
         r.is_master = True
         db.session.commit()
         log_event('تعيين راوتر رئيسي', r.name)
-        try:
-            notify_admin_action(f"⭐ تعيين راوتر رئيسي: `{r.name}`")
-        except Exception:
-            pass
         flash('✅ تم التحديث بنجاح', 'success')
     except Exception as e:
         db.session.rollback()
@@ -2177,28 +1990,17 @@ def update_router(router_id):
         if not name or not ip:
             flash('❌ الاسم و IP مطلوبان', 'danger')
             return redirect(url_for('routers'))
-        if Router.query.filter(Router.name == name, Router.id != router_id).first():
-            flash('❌ الاسم موجود', 'danger')
-            return redirect(url_for('routers'))
         r.name = name
         r.ip_address = ip
         r.username = un
         if pw:
             r.password = pw
-        try:
-            r.port = int(port)
-        except ValueError:
-            r.port = 22
-        try:
-            r.api_port = int(api_port)
-        except ValueError:
-            r.api_port = 8728
+        try: r.port = int(port)
+        except ValueError: r.port = 22
+        try: r.api_port = int(api_port)
+        except ValueError: r.api_port = 8728
         db.session.commit()
-        log_event('تعديل راوتر', name, f'IP: {ip} | SSH: {r.port} | API: {r.api_port}')
-        try:
-            notify_admin_action(f"✏️ تعديل راوتر: `{name}` - IP: `{ip}`")
-        except Exception:
-            pass
+        log_event('تعديل راوتر', name)
         flash('✅ تم التحديث بنجاح', 'success')
     except Exception as e:
         db.session.rollback()
@@ -2214,10 +2016,6 @@ def delete_router(router_id):
         db.session.delete(r)
         db.session.commit()
         log_event('حذف راوتر', r_name)
-        try:
-            notify_admin_action(f"🗑️ حذف راوتر: `{r_name}`")
-        except Exception:
-            pass
         flash('✅ تم الحذف بنجاح', 'success')
     except Exception as e:
         db.session.rollback()
@@ -2240,10 +2038,8 @@ def subscribers():
         ).all()
         for s in expired:
             s.status = 'expired'
-            try:
-                kick_subscriber(s)
-            except Exception:
-                pass
+            # أرسل أمر تعطيل للميكروتيك
+            queue_router_command('pause_user', {'username': s.username})
         if expired:
             db.session.commit()
         q = Subscriber.query
@@ -2263,57 +2059,28 @@ def subscribers():
         pagination = None
     return render_template(
         'subscribers.html',
-        subscribers=subs,
-        pagination=pagination,
+        subscribers=subs, pagination=pagination,
         routers={r.id: r for r in Router.query.all()},
         packages=Package.query.order_by(Package.name).all(),
-        search=search,
-        now=now,
-        filter_type=ft
+        search=search, now=now, filter_type=ft
     )
 
 
 @app.route('/subscribers/sync-now', methods=['POST'])
 def sync_subscribers_now():
+    """يطلب من MikroTik رفع تقريره الآن"""
     try:
         routers_list = Router.query.all()
-        total_updated = 0
-        total_checked = 0
-        total_online = 0
-        errors = []
-        for router in routers_list:
-            try:
-                active_ips = fetch_active_ips_from_router(router)
-                total_checked += len(active_ips)
-                for username, info in active_ips.items():
-                    sub = Subscriber.query.filter_by(username=username).first()
-                    if sub:
-                        total_online += 1
-                        changed = False
-                        if sub.current_ip != info['ip']:
-                            sub.current_ip = info['ip']
-                            changed = True
-                        if sub.router_id != router.id:
-                            sub.router_id = router.id
-                            changed = True
-                        sub.session_uptime = info.get('uptime', '')
-                        sub.session_rx_bytes = info.get('rx_bytes', 0)
-                        sub.session_tx_bytes = info.get('tx_bytes', 0)
-                        if info.get('uptime'):
-                            sub.connected_at = _calculate_connected_at(info['uptime'])
-                        sub.ip_updated_at = utcnow()
-                        sub.last_seen_at = utcnow()
-                        if changed:
-                            total_updated += 1
-                db.session.commit()
-            except Exception as e:
-                errors.append(f"{router.name}: {str(e)}")
-                db.session.rollback()
-        log_event('مزامنة فورية', f'{total_updated} تحديث',
-                  f'فحص {total_checked} | متصل {total_online} | أخطاء {len(errors)}')
+        if not routers_list:
+            return jsonify({'ok': False, 'error': 'لا يوجد راوترات'})
+        # ننشئ أمر "report_now" لكل راوتر
+        for r in routers_list:
+            queue_router_command('report_now', {}, router_name=r.name)
+        log_event('طلب مزامنة فورية', f'{len(routers_list)} راوتر')
         return jsonify({
-            'ok': True, 'updated': total_updated, 'checked': total_checked,
-            'online': total_online, 'routers': len(routers_list), 'errors': errors
+            'ok': True,
+            'message': 'تم إرسال طلب المزامنة للراوترات',
+            'routers': len(routers_list),
         })
     except Exception as e:
         logger.error(f"❌ Sync error: {e}")
@@ -2328,10 +2095,10 @@ def add_subscriber():
         un = request.form.get('username', '').strip()
         pw = request.form.get('password', '').strip()
         pkg = request.form.get('package', '').strip()
-        ut = request.form.get('user_type', 'pppoe').strip()
+        ut = request.form.get('user_type', 'hotspot').strip()
         phone = request.form.get('phone', '').strip()
         if ut not in ('pppoe', 'hotspot'):
-            ut = 'pppoe'
+            ut = 'hotspot'
         if not un or not pw:
             flash('❌ الاسم وكلمة المرور مطلوبان', 'danger')
             return redirect(url_for('add_subscriber'))
@@ -2341,21 +2108,23 @@ def add_subscriber():
         try:
             db.session.add(Subscriber(
                 name=name or un, username=un, password=pw, package=pkg,
-                user_type=ut, expires_at=None, status='active',
-                phone=phone
+                user_type=ut, expires_at=None, status='active', phone=phone
             ))
             db.session.commit()
-            if radius_sync:
-                try:
-                    radius_sync.sync_user(un, pw)
-                except Exception:
-                    pass
+
+            # ✅ إرسال أمر المزامنة إلى MikroTik
+            queue_router_command('sync_user', {
+                'username': un,
+                'password': pw,
+                'package': pkg or 'default',
+                'user_type': ut,
+            })
             log_event('إضافة مشترك', un, f'الباقة: {pkg}')
             try:
                 notify_new_subscriber(un)
             except Exception:
                 pass
-            flash(f'✅ المشترك "{un}" أُضيف بنجاح', 'success')
+            flash(f'✅ المشترك "{un}" أُضيف وأُرسل للمزامنة', 'success')
             return redirect(url_for('subscribers'))
         except Exception as e:
             db.session.rollback()
@@ -2371,7 +2140,7 @@ def add_subscriber():
 def bulk_add():
     if request.method == 'POST':
         pkg = request.form.get('package', '').strip()
-        ut = request.form.get('user_type', 'pppoe').strip()
+        ut = request.form.get('user_type', 'hotspot').strip()
         prefix = request.form.get('prefix', '').strip()
         cm = request.form.get('char_mode', 'numbers').strip()
         cnt = request.form.get('count', '1').strip()
@@ -2379,25 +2148,17 @@ def bulk_add():
         fp = request.form.get('fixed_password', '').strip()
         pl = request.form.get('password_length', '6').strip()
         if ut not in ('pppoe', 'hotspot'):
-            ut = 'pppoe'
+            ut = 'hotspot'
         if cm not in ('numbers', 'letters', 'mixed'):
             cm = 'numbers'
         if pm not in ('random', 'same_as_username', 'fixed'):
             pm = 'random'
+        try: pl = int(pl); pl = pl if 4 <= pl <= 20 else 6
+        except ValueError: pl = 6
         try:
-            pl = int(pl)
-            if pl < 4 or pl > 20:
-                pl = 6
-        except ValueError:
-            pl = 6
-        try:
-            rl = int(request.form.get('random_length', '6'))
-            if rl < 4 or rl > 20:
-                rl = 6
-        except ValueError:
-            rl = 6
-        try:
-            cnt = int(cnt)
+            rl = int(request.form.get('random_length', '6')); rl = rl if 4 <= rl <= 20 else 6
+        except ValueError: rl = 6
+        try: cnt = int(cnt)
         except ValueError:
             flash('❌ عدد غير صحيح', 'danger')
             return redirect(url_for('bulk_add'))
@@ -2408,16 +2169,15 @@ def bulk_add():
         N = '23456789'
         M = L + N
         usernames = []
-        if cm == 'numbers':
-            for _ in range(cnt):
+        for _ in range(cnt):
+            if cm == 'numbers':
                 usernames.append(f"{prefix}{''.join(random.choices(N, k=rl))}")
-        elif cm == 'letters':
-            for _ in range(cnt):
+            elif cm == 'letters':
                 usernames.append(f"{prefix}{''.join(random.choices(L, k=rl))}")
-        else:
-            for _ in range(cnt):
+            else:
                 usernames.append(f"{prefix}{''.join(random.choices(M, k=rl))}")
         created = failed = 0
+        sync_payload = []
         for un in usernames:
             if pm == 'same_as_username':
                 pw = un
@@ -2435,6 +2195,10 @@ def bulk_add():
                     name=un, username=un, password=pw, package=pkg,
                     user_type=ut, expires_at=None, status='active'
                 ))
+                sync_payload.append({
+                    'username': un, 'password': pw,
+                    'package': pkg or 'default', 'user_type': ut,
+                })
                 created += 1
             except Exception:
                 db.session.rollback()
@@ -2443,21 +2207,18 @@ def bulk_add():
             db.session.commit()
         except Exception:
             db.session.rollback()
-        if radius_sync:
-            for un in usernames:
-                sub = Subscriber.query.filter_by(username=un).first()
-                if sub:
-                    try:
-                        radius_sync.sync_user(sub.username, sub.password)
-                    except Exception:
-                        pass
+
+        # ✅ إرسال أمر مزامنة جماعي
+        if sync_payload:
+            queue_router_command('sync_all', {'users': sync_payload})
+
         log_event('إضافة جملة', f'{created} مشترك', f'الباقة: {pkg}')
         try:
             notify_bulk_add(created, failed, pkg)
         except Exception:
             pass
         flash(
-            f'✅ تم إيجاد {created} مشترك' + (f' — فشل {failed}' if failed else ''),
+            f'✅ تم إنشاء {created} مشترك' + (f' — فشل {failed}' if failed else '') + ' وأُرسلوا للمزامنة',
             'success' if not failed else 'warning'
         )
         return redirect(url_for('subscribers'))
@@ -2475,27 +2236,18 @@ def toggle_subscriber(sub_id):
         if sub.status == 'active':
             sub.status = 'paused'
             db.session.commit()
-            if radius_sync:
-                try:
-                    radius_sync.pause_user(sub.username)
-                except Exception:
-                    pass
-            kick_subscriber(sub)
+            queue_router_command('pause_user', {'username': sub.username})
             log_event('إيقاف مشترك', sub.username)
-            flash(f'⏸ "{sub.username}" موقوف وتم قطعه', 'warning')
+            flash(f'⏸ "{sub.username}" موقوف وأُرسل أمر القطع', 'warning')
         else:
             if sub.expires_at and sub.expires_at < utcnow():
                 flash('⚠️ الحساب منتهي الإشتراك', 'danger')
             else:
                 sub.status = 'active'
                 db.session.commit()
-                if radius_sync:
-                    try:
-                        radius_sync.resume_user(sub.username, sub.password)
-                    except Exception:
-                        pass
+                queue_router_command('resume_user', {'username': sub.username, 'password': sub.password})
                 log_event('تنشيط مشترك', sub.username)
-                flash(f'▶ "{sub.username}" نشط الأن', 'success')
+                flash(f'▶ "{sub.username}" نشط', 'success')
     except Exception as e:
         db.session.rollback()
         flash(f'❌ {str(e)}', 'danger')
@@ -2510,7 +2262,6 @@ def reset_subscriber(sub_id):
         sub.first_used_at = None
         sub.status = 'active'
         db.session.commit()
-        kick_subscriber(sub)
         log_event('تصفير مشترك', sub.username)
         flash('🔄 تم تصفير عداد المشترك بنجاح', 'success')
     except Exception as e:
@@ -2532,7 +2283,7 @@ def extend_subscriber(sub_id):
         sub.reminder_1d_sent = False
         sub.reminder_0d_sent = False
         db.session.commit()
-        log_event('تتمديد اشتراك', sub.username, f'تاريخ الانتهاء الجديد: {sub.expires_at.strftime("%Y-%m-%d")}')
+        log_event('تتمديد اشتراك', sub.username, f'جديد: {sub.expires_at.strftime("%Y-%m-%d")}')
         flash(f'➕ ينتهي في {sub.expires_at.strftime("%Y-%m-%d")}', 'success')
     except Exception as e:
         db.session.rollback()
@@ -2546,14 +2297,28 @@ def update_subscriber(sub_id):
         sub = Subscriber.query.get_or_404(sub_id)
         sub.name = request.form.get('name', '').strip() or sub.name
         nun = request.form.get('username', '').strip()
-        if nun:
+        if nun and nun != sub.username:
+            # حذف القديم وإنشاء الجديد
+            queue_router_command('delete_user', {'username': sub.username})
             sub.username = nun
+            queue_router_command('sync_user', {
+                'username': sub.username, 'password': sub.password,
+                'package': sub.package or 'default', 'user_type': sub.user_type,
+            })
         pw = request.form.get('password', '').strip()
         if pw:
             sub.password = pw
+            queue_router_command('sync_user', {
+                'username': sub.username, 'password': pw,
+                'package': sub.package or 'default', 'user_type': sub.user_type,
+            })
         pkg = request.form.get('package', '').strip()
-        if pkg:
+        if pkg and pkg != sub.package:
             sub.package = pkg
+            queue_router_command('sync_user', {
+                'username': sub.username, 'password': sub.password,
+                'package': pkg, 'user_type': sub.user_type,
+            })
         ut = request.form.get('user_type', '').strip()
         if ut in ('pppoe', 'hotspot'):
             sub.user_type = ut
@@ -2572,7 +2337,7 @@ def update_subscriber(sub_id):
             sub.reminder_0d_sent = False
         db.session.commit()
         log_event('تعديل مشترك', sub.username)
-        flash('✅ تم التحديث في قاعدة البيانات', 'success')
+        flash('✅ تم التحديث وأُرسل للمزامنة', 'success')
     except Exception as e:
         db.session.rollback()
         flash(f'❌ {str(e)}', 'danger')
@@ -2584,16 +2349,11 @@ def delete_subscriber(sub_id):
     try:
         sub = Subscriber.query.get_or_404(sub_id)
         un = sub.username
-        kick_subscriber(sub)
-        if radius_sync:
-            try:
-                radius_sync.delete_user(un)
-            except Exception:
-                pass
+        queue_router_command('delete_user', {'username': un})
         db.session.delete(sub)
         db.session.commit()
         log_event('حذف مشترك', un)
-        flash('✅ تم الحذف وقطع الاتصال بنجاح', 'success')
+        flash('✅ تم الحذف وأُرسل أمر القطع', 'success')
     except Exception as e:
         db.session.rollback()
         flash(f'❌ {str(e)}', 'danger')
@@ -2609,23 +2369,14 @@ def bulk_delete_subscribers():
             return redirect(url_for('subscribers'))
         ids_list = [int(x) for x in ids.split(',') if x.strip().isdigit()]
         subs = Subscriber.query.filter(Subscriber.id.in_(ids_list)).all()
-        deleted = kicked = 0
+        deleted = 0
         for sub in subs:
-            try:
-                kick_subscriber(sub)
-                kicked += 1
-            except Exception:
-                pass
-            if radius_sync:
-                try:
-                    radius_sync.delete_user(sub.username)
-                except Exception:
-                    pass
+            queue_router_command('delete_user', {'username': sub.username})
             db.session.delete(sub)
             deleted += 1
         db.session.commit()
         log_event('حذف جملة', f'{deleted} مشترك')
-        flash(f'🗑 تم حذف {deleted} مشترك — تم قطع {kicked}', 'success')
+        flash(f'🗑 تم حذف {deleted} مشترك وأُرسل أمر القطع', 'success')
     except Exception as e:
         db.session.rollback()
         flash(f'❌ {str(e)}', 'danger')
@@ -2656,15 +2407,7 @@ def delete_expired_subscribers():
             return redirect(url_for('subscribers'))
         deleted = 0
         for sub in unique:
-            try:
-                kick_subscriber(sub)
-            except Exception:
-                pass
-            if radius_sync:
-                try:
-                    radius_sync.delete_user(sub.username)
-                except Exception:
-                    pass
+            queue_router_command('delete_user', {'username': sub.username})
             db.session.delete(sub)
             deleted += 1
         db.session.commit()
@@ -2700,17 +2443,15 @@ def export_subscribers(format):
         for i, s in enumerate(subs, 1):
             w.writerow([
                 i, s.name or '', s.username, s.password,
-                s.package or '', s.user_type or 'pppoe',
+                s.package or '', s.user_type or 'hotspot',
                 s.status or 'active', s.current_ip or '',
                 s.expires_at.strftime('%Y-%m-%d %H:%M') if s.expires_at else 'غير محدد'
             ])
         mem = io.BytesIO()
         mem.write(out.getvalue().encode('utf-8'))
         mem.seek(0)
-        return send_file(
-            mem, mimetype='text/csv', as_attachment=True,
-            download_name=f'subscribers_{ts}.csv'
-        )
+        return send_file(mem, mimetype='text/csv', as_attachment=True,
+                         download_name=f'subscribers_{ts}.csv')
     return redirect(url_for('subscribers'))
 
 
@@ -2722,7 +2463,7 @@ def packages():
         price = request.form.get('price', '0').strip()
         duration = request.form.get('duration', '30').strip()
         unit = request.form.get('duration_unit', 'days').strip()
-        ut = request.form.get('user_type', 'pppoe').strip()
+        ut = request.form.get('user_type', 'hotspot').strip()
         if not name:
             flash('❌ اسم الباقة مطلوب', 'danger')
             return redirect(url_for('packages'))
@@ -2756,7 +2497,7 @@ def update_package(pkg_id):
         pkg.price = float(request.form.get('price', pkg.price))
         pkg.duration = int(request.form.get('duration', pkg.duration))
         pkg.duration_unit = request.form.get('duration_unit', 'days').strip()
-        pkg.user_type = request.form.get('user_type', 'pppoe').strip()
+        pkg.user_type = request.form.get('user_type', 'hotspot').strip()
         db.session.commit()
         log_event('تعديل باقة', pkg.name, f'السعر: {pkg.price}')
         flash('✅ تم تحديث الباقة بنجاح', 'success')
@@ -2781,6 +2522,58 @@ def delete_package(pkg_id):
     return redirect(url_for('packages'))
 
 
+# ============ Admin: Queue Commands ============
+
+@app.route('/admin/queue-sync-all', methods=['POST'])
+def admin_queue_sync_all():
+    """زر يدوي: أرسل أمر مزامنة شاملة"""
+    if not session.get('admin_id'):
+        flash('❌ غير مصرح', 'danger')
+        return redirect(url_for('login'))
+    try:
+        subs = Subscriber.query.all()
+        payload = [{
+            'username': s.username,
+            'password': s.password,
+            'package': s.package or 'default',
+            'status': s.status or 'active',
+            'user_type': s.user_type or 'hotspot',
+        } for s in subs]
+        cmd_id = queue_router_command('sync_all', {'users': payload}, router_name='ALL')
+        if cmd_id:
+            flash(f'✅ تم وضع {len(subs)} مشترك في قائمة المزامنة (أمر #{cmd_id})', 'success')
+        else:
+            flash('❌ فشل إنشاء الأمر', 'danger')
+    except Exception as e:
+        flash(f'❌ {e}', 'danger')
+    return redirect(url_for('subscribers'))
+
+
+@app.route('/admin/commands')
+def admin_commands():
+    """عرض كل الأوامر"""
+    if not session.get('admin_id'):
+        return redirect(url_for('login'))
+    cmds = RouterCommand.query.order_by(RouterCommand.created_at.desc()).limit(100).all()
+    return render_template('commands.html', commands=cmds)
+
+
+@app.route('/admin/commands/clear', methods=['POST'])
+def admin_commands_clear():
+    if not session.get('admin_id'):
+        return redirect(url_for('login'))
+    try:
+        RouterCommand.query.filter(RouterCommand.status.in_(['done', 'failed'])).delete(synchronize_session=False)
+        db.session.commit()
+        flash('✅ تم حذف الأوامر المنتهية', 'success')
+    except Exception as e:
+        db.session.rollback()
+        flash(f'❌ {e}', 'danger')
+    return redirect(url_for('admin_commands'))
+
+
+# ============ Admin Settings ============
+
 @app.route('/admin-settings', methods=['GET'])
 def admin_settings():
     settings = TelegramSetting.query.first()
@@ -2791,18 +2584,14 @@ def admin_settings():
             notify_expiry_reminder=True
         )
     logs = TelegramLog.query.order_by(TelegramLog.created_at.desc()).limit(10).all()
-    total_notifications = TelegramLog.query.count()
-    new_subscribers = TelegramLog.query.filter_by(message_type='new_subscriber').count()
-    expired_subscribers = TelegramLog.query.filter_by(message_type='expired_subscriber').count()
-    bulk_adds = TelegramLog.query.filter_by(message_type='bulk_add').count()
     return render_template(
         'admin_settings.html',
         telegram_settings=settings,
         telegram_logs=logs,
-        total_notifications=total_notifications,
-        new_subscribers=new_subscribers,
-        expired_subscribers=expired_subscribers,
-        bulk_adds=bulk_adds
+        total_notifications=TelegramLog.query.count(),
+        new_subscribers=TelegramLog.query.filter_by(message_type='new_subscriber').count(),
+        expired_subscribers=TelegramLog.query.filter_by(message_type='expired_subscriber').count(),
+        bulk_adds=TelegramLog.query.filter_by(message_type='bulk_add').count()
     )
 
 
@@ -2832,18 +2621,151 @@ def test_telegram():
     if not settings or not settings.token or not settings.chat_id:
         return jsonify({'success': False, 'error': 'الإعدادات غير مكتملة'})
     ok, msg = send_telegram_message(
-        "✅ *اختبار الإشعار*\nتم إرسال رسالة اختبار بنجاح من النظام",
+        "✅ *اختبار الإشعار*\nتم إرسال رسالة اختبار بنجاح",
         message_type='test', force=True
     )
-    if ok:
-        return jsonify({'success': True})
-    return jsonify({'success': False, 'error': msg})
+    return jsonify({'success': ok, 'error': None if ok else msg})
 
 
 @app.route('/payments')
 def payments():
     pay_list = Payment.query.order_by(Payment.created_at.desc()).all()
     return render_template('payments.html', payments=pay_list)
+
+
+# ============ Traffic API (يبقى كما هو) ============
+
+@app.route('/api/traffic/interfaces/<int:router_id>')
+def api_get_interfaces(router_id):
+    router = Router.query.get_or_404(router_id)
+    api = None
+    try:
+        api = get_mikrotik_api(router)
+        interfaces_data = list(api.path('interface'))
+        interfaces = []
+        for iface in interfaces_data:
+            name = _safe_str(iface.get('name'))
+            if not name:
+                continue
+            if _safe_bool(iface.get('disabled'), False):
+                continue
+            interfaces.append({
+                'name': name,
+                'type': _safe_str(iface.get('type'), 'unknown'),
+                'running': _safe_bool(iface.get('running'), False)
+            })
+        interfaces.sort(key=lambda x: x['name'])
+        return jsonify({'ok': True, 'interfaces': interfaces, 'count': len(interfaces)})
+    except Exception as e:
+        return jsonify({'ok': False, 'error': str(e)}), 500
+    finally:
+        _safe_close_api(api)
+
+
+@app.route('/api/traffic/stats/<int:router_id>/<interface>')
+def api_get_traffic_stats(router_id, interface):
+    router = Router.query.get_or_404(router_id)
+    api = None
+    try:
+        api = get_mikrotik_api(router)
+        interfaces = list(api.path('interface'))
+        target = None
+        for iface in interfaces:
+            if _safe_str(iface.get('name')) == interface:
+                target = iface
+                break
+        if not target:
+            return jsonify({'ok': False, 'error': 'المنفذ غير موجود'}), 404
+        rx_byte = _safe_int(target.get('rx-byte', '0'), 0)
+        tx_byte = _safe_int(target.get('tx-byte', '0'), 0)
+        cache_key = f"{router_id}_{interface}"
+        now = time.time()
+        rx_rate_bps = tx_rate_bps = 0
+        with _traffic_lock:
+            if cache_key in _traffic_cache:
+                prev = _traffic_cache[cache_key]
+                elapsed = now - prev['time']
+                if elapsed > 0:
+                    rx_rate_bps = (max(0, rx_byte - prev['rx_byte']) / elapsed) * 8
+                    tx_rate_bps = (max(0, tx_byte - prev['tx_byte']) / elapsed) * 8
+            _traffic_cache[cache_key] = {'time': now, 'rx_byte': rx_byte, 'tx_byte': tx_byte}
+
+        def fmt(bps):
+            if bps >= 1_000_000_000: return f"{bps/1_000_000_000:.2f}Gbps"
+            if bps >= 1_000_000: return f"{bps/1_000_000:.2f}Mbps"
+            if bps >= 1_000: return f"{bps/1_000:.2f}kbps"
+            return f"{int(bps)}bps"
+
+        return jsonify({'ok': True, 'stats': {
+            'rx_rate': fmt(rx_rate_bps), 'tx_rate': fmt(tx_rate_bps),
+            'rx_byte': str(rx_byte), 'tx_byte': str(tx_byte)
+        }})
+    except Exception as e:
+        return jsonify({'ok': False, 'error': str(e)}), 500
+    finally:
+        _safe_close_api(api)
+
+
+@app.route('/api/dashboard_data')
+def api_dashboard_data():
+    try:
+        start, end = _day_bounds()
+        today_revenue = db.session.query(db.func.sum(Payment.amount)).filter(
+            Payment.status == 'completed',
+            Payment.created_at >= start,
+            Payment.created_at < end
+        ).scalar() or 0
+        new_users_today = Subscriber.query.filter(
+            Subscriber.created_at >= start,
+            Subscriber.created_at < end
+        ).count()
+        events = SystemEvent.query.order_by(SystemEvent.created_at.desc()).limit(15).all()
+        events_data = [{
+            'time': to_local_str(e.created_at, '%H:%M'),
+            'admin': e.admin_name or 'النظام', 'action': e.action,
+            'target': e.target or '-', 'details': e.details or '-'
+        } for e in events]
+        recent_logs = TelegramLog.query.order_by(TelegramLog.created_at.desc()).limit(5).all()
+        logs_data = [{
+            'time': to_local_str(l.created_at, '%m-%d %H:%M'),
+            'type': l.message_type, 'status': l.status
+        } for l in recent_logs]
+        return jsonify({
+            'routers_count': Router.query.count(),
+            'routers_online': Router.query.filter_by(is_active=True).count(),
+            'sub_count': Subscriber.query.count(),
+            'active_subs': Subscriber.query.filter_by(status='active').count(),
+            'online_count': Subscriber.query.filter(
+                Subscriber.current_ip.isnot(None), Subscriber.current_ip != ''
+            ).count(),
+            'today_revenue': f"{today_revenue:.0f}",
+            'new_users_today': new_users_today,
+            'pending_commands': RouterCommand.query.filter_by(status='pending').count(),
+            'events': events_data, 'telegram_logs': logs_data
+        })
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/telegram_data')
+def api_telegram_data():
+    try:
+        logs = TelegramLog.query.order_by(TelegramLog.created_at.desc()).limit(10).all()
+        logs_data = [{
+            'time': to_local_str(l.created_at),
+            'type': l.message_type, 'status': l.status, 'message': l.message
+        } for l in logs]
+        return jsonify({
+            'total_notifications': TelegramLog.query.count(),
+            'new_subscribers': TelegramLog.query.filter_by(message_type='new_subscriber').count(),
+            'expired_subscribers': TelegramLog.query.filter_by(message_type='expired_subscriber').count(),
+            'bulk_adds': TelegramLog.query.filter_by(message_type='bulk_add').count(),
+            'logs': logs_data
+        })
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'error': str(e)}), 500
 
 
 # ============ Main ============
