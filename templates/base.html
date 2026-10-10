@@ -232,6 +232,11 @@
             <i class="bi bi-people"></i> المشتركين
         </a>
         
+        <!-- ✅ رابط مراقبة الترافيك (جديد) -->
+        <a href="{{ url_for('traffic_monitor_page') }}" class="nav-item {% if request.endpoint == 'traffic_monitor_page' %}active{% endif %}">
+            <i class="bi bi-graph-up-arrow"></i> مراقبة الترافيك
+        </a>
+        
         <a href="{{ url_for('import_backup') }}" class="nav-item import-link {% if request.endpoint == 'import_backup' %}active{% endif %}">
             <i class="bi bi-cloud-upload"></i> استيراد من الميكروتيك
         </a>
