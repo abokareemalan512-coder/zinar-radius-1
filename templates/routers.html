@@ -247,7 +247,7 @@
         </h2>
         <small class="text-muted">إضافة وتعديل وحذف راوترات MikroTik</small>
     </div>
-    <button class="btn btn-add-router" data-bs-toggle="modal" data-bs-target="#addRouterModal">
+    <button type="button" class="btn btn-add-router" data-bs-toggle="modal" data-bs-target="#addRouterModal">
         <i class="bi bi-plus-circle"></i> إضافة راوتر جديد
     </button>
 </div>
@@ -258,7 +258,7 @@
         {% for category, message in messages %}
             <div class="alert alert-{{ category }} alert-dismissible fade show" role="alert">
                 {{ message }}
-                <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="إغلاق"></button>
             </div>
         {% endfor %}
     {% endif %}
@@ -329,9 +329,17 @@
                     </td>
                     <td>
                         <div class="d-flex justify-content-center gap-1 flex-wrap">
-                            <button class="btn btn-dark-custom info"
-                                    onclick='openEditRouter({{ r.id }}, "{{ r.name|e }}", "{{ r.ip_address|e }}", "{{ r.username|e }}", "{{ r.port }}", "{{ r.api_port or 8728 }}", {{ "true" if r.is_master else "false" }})'
-                                    title="تعديل">
+                            <!-- ✅ إصلاح: استخدام data-* بدل inline onclick لتجنب مشاكل الأحرف الخاصة -->
+                            <button type="button"
+                                    class="btn btn-dark-custom info js-edit-router"
+                                    title="تعديل"
+                                    data-router-id="{{ r.id }}"
+                                    data-router-name="{{ r.name }}"
+                                    data-router-ip="{{ r.ip_address }}"
+                                    data-router-username="{{ r.username }}"
+                                    data-router-port="{{ r.port }}"
+                                    data-router-api-port="{{ r.api_port or 8728 }}"
+                                    data-router-master="{{ 'true' if r.is_master else 'false' }}">
                                 <i class="bi bi-pencil"></i>
                             </button>
                             {% if not r.is_master %}
@@ -341,9 +349,10 @@
                                     <i class="bi bi-star"></i>
                                 </a>
                             {% endif %}
+                            <!-- ✅ إصلاح: تمرير الاسم بأمان إلى confirm -->
                             <a href="{{ url_for('delete_router', router_id=r.id) }}"
-                               class="btn btn-dark-custom danger"
-                               onclick="return confirm('هل أنت متأكد من حذف الراوتر {{ r.name }}؟')"
+                               class="btn btn-dark-custom danger js-delete-router"
+                               data-router-name="{{ r.name }}"
                                title="حذف">
                                 <i class="bi bi-trash"></i>
                             </a>
@@ -357,7 +366,7 @@
                             <i class="bi bi-router"></i>
                             <h5 class="mb-2">لا توجد راوترات مضافة</h5>
                             <p class="text-muted mb-3">ابدأ بإضافة أول راوتر MikroTik للبدء</p>
-                            <button class="btn btn-add-router" data-bs-toggle="modal" data-bs-target="#addRouterModal">
+                            <button type="button" class="btn btn-add-router" data-bs-toggle="modal" data-bs-target="#addRouterModal">
                                 <i class="bi bi-plus-circle"></i> إضافة راوتر جديد
                             </button>
                         </div>
@@ -370,53 +379,54 @@
 </div>
 
 <!-- ✅ Modal إضافة راوتر -->
-<div class="modal fade" id="addRouterModal" tabindex="-1">
+<div class="modal fade" id="addRouterModal" tabindex="-1" aria-hidden="true">
     <div class="modal-dialog modal-dialog-centered modal-lg">
         <div class="modal-content modal-content-dark">
-            <form method="POST" action="{{ url_for('routers') }}">
+            <form method="POST" action="{{ url_for('routers') }}" autocomplete="off">
                 <div class="modal-header modal-header-dark">
                     <h5 class="modal-title fw-bold">
                         <i class="bi bi-plus-circle-fill"></i> إضافة راوتر جديد
                     </h5>
-                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="إغلاق"></button>
                 </div>
                 <div class="modal-body p-4">
                     <div class="row g-3">
                         <div class="col-md-6">
                             <label class="form-label-dark">اسم الراوتر *</label>
                             <input type="text" name="name" class="form-control form-control-dark"
-                                   placeholder="مثال: ZENAR-Net" required>
+                                   placeholder="مثال: ZENAR-Net" required maxlength="100">
                         </div>
                         <div class="col-md-6">
                             <label class="form-label-dark">عنوان IP *</label>
                             <input type="text" name="ip_address" class="form-control form-control-dark"
-                                   placeholder="192.168.1.1" required>
+                                   placeholder="192.168.1.1" required maxlength="50">
                         </div>
                         <div class="col-md-6">
                             <label class="form-label-dark">اسم المستخدم *</label>
                             <input type="text" name="username" class="form-control form-control-dark"
-                                   value="admin" required>
+                                   value="admin" required maxlength="50">
                         </div>
                         <div class="col-md-6">
                             <label class="form-label-dark">كلمة المرور *</label>
                             <input type="password" name="password" class="form-control form-control-dark"
-                                   placeholder="••••••••" required>
+                                   placeholder="••••••••" required maxlength="150" autocomplete="new-password">
                         </div>
                         <div class="col-md-6">
                             <label class="form-label-dark">
                                 <i class="bi bi-terminal text-info"></i> منفذ SSH
                             </label>
                             <input type="number" name="port" class="form-control form-control-dark"
-                                   value="22" required>
+                                   value="22" required min="1" max="65535">
                             <small class="text-muted" style="font-size: 0.75rem;">يُستخدم لقطع اتصال المشتركين</small>
                         </div>
                         <div class="col-md-6">
                             <label class="form-label-dark">
                                 <i class="bi bi-plug text-success"></i> منفذ API
                             </label>
+                            <!-- ✅ إصلاح: المنفذ الافتراضي الصحيح 8728 -->
                             <input type="number" name="api_port" class="form-control form-control-dark"
-                                   value="8728" required>
-                            <small class="text-muted" style="font-size: 0.75rem;">يُستخدم لمراقبة الترافيك (8728 أو 13)</small>
+                                   value="8728" required min="1" max="65535">
+                            <small class="text-muted" style="font-size: 0.75rem;">يُستخدم لمراقبة الترافيك (الافتراضي: 8728)</small>
                         </div>
                         <div class="col-12">
                             <div class="form-check mt-2">
@@ -440,48 +450,53 @@
 </div>
 
 <!-- ✅ Modal تعديل راوتر -->
-<div class="modal fade" id="editRouterModal" tabindex="-1">
+<div class="modal fade" id="editRouterModal" tabindex="-1" aria-hidden="true">
     <div class="modal-dialog modal-dialog-centered modal-lg">
         <div class="modal-content modal-content-dark">
-            <form method="POST" id="editRouterForm">
+            <form method="POST" id="editRouterForm" autocomplete="off">
                 <div class="modal-header modal-header-dark">
                     <h5 class="modal-title fw-bold">
                         <i class="bi bi-pencil-square"></i> تعديل بيانات الراوتر
                     </h5>
-                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="إغلاق"></button>
                 </div>
                 <div class="modal-body p-4">
                     <div class="row g-3">
                         <div class="col-md-6">
                             <label class="form-label-dark">اسم الراوتر *</label>
-                            <input type="text" name="name" id="edit_name" class="form-control form-control-dark" required>
+                            <input type="text" name="name" id="edit_name" class="form-control form-control-dark"
+                                   required maxlength="100">
                         </div>
                         <div class="col-md-6">
                             <label class="form-label-dark">عنوان IP *</label>
-                            <input type="text" name="ip_address" id="edit_ip" class="form-control form-control-dark" required>
+                            <input type="text" name="ip_address" id="edit_ip" class="form-control form-control-dark"
+                                   required maxlength="50">
                         </div>
                         <div class="col-md-6">
                             <label class="form-label-dark">اسم المستخدم *</label>
-                            <input type="text" name="username" id="edit_username" class="form-control form-control-dark" required>
+                            <input type="text" name="username" id="edit_username" class="form-control form-control-dark"
+                                   required maxlength="50">
                         </div>
                         <div class="col-md-6">
                             <label class="form-label-dark">كلمة المرور</label>
                             <input type="password" name="password" id="edit_password" class="form-control form-control-dark"
-                                   placeholder="اتركها فارغة للإبقاء عليها">
+                                   placeholder="اتركها فارغة للإبقاء عليها" maxlength="150" autocomplete="new-password">
                         </div>
                         <div class="col-md-6">
                             <label class="form-label-dark">
                                 <i class="bi bi-terminal text-info"></i> منفذ SSH
                             </label>
-                            <input type="number" name="port" id="edit_port" class="form-control form-control-dark" required>
+                            <input type="number" name="port" id="edit_port" class="form-control form-control-dark"
+                                   required min="1" max="65535">
                             <small class="text-muted" style="font-size: 0.75rem;">لقطع اتصال المشتركين</small>
                         </div>
                         <div class="col-md-6">
                             <label class="form-label-dark">
                                 <i class="bi bi-plug text-success"></i> منفذ API
                             </label>
-                            <input type="number" name="api_port" id="edit_api_port" class="form-control form-control-dark" required>
-                            <small class="text-muted" style="font-size: 0.75rem;">لمراقبة الترافيك</small>
+                            <input type="number" name="api_port" id="edit_api_port" class="form-control form-control-dark"
+                                   required min="1" max="65535">
+                            <small class="text-muted" style="font-size: 0.75rem;">لمراقبة الترافيك (الافتراضي: 8728)</small>
                         </div>
                     </div>
                 </div>
@@ -497,16 +512,42 @@
 </div>
 
 <script>
-function openEditRouter(id, name, ip, username, port, apiPort, isMaster) {
-    document.getElementById('editRouterForm').action = '/routers/update/' + id;
-    document.getElementById('edit_name').value = name;
-    document.getElementById('edit_ip').value = ip;
-    document.getElementById('edit_username').value = username;
-    document.getElementById('edit_password').value = '';
-    document.getElementById('edit_port').value = port;
-    document.getElementById('edit_api_port').value = apiPort;
-    new bootstrap.Modal(document.getElementById('editRouterModal')).show();
-}
+// ✅ إصلاح: استخدام addEventListener بدل inline onclick
+document.addEventListener('DOMContentLoaded', function () {
+    // === فتح نموذج التعديل ===
+    document.querySelectorAll('.js-edit-router').forEach(function (btn) {
+        btn.addEventListener('click', function () {
+            const id = this.dataset.routerId;
+            const name = this.dataset.routerName;
+            const ip = this.dataset.routerIp;
+            const username = this.dataset.routerUsername;
+            const port = this.dataset.routerPort;
+            const apiPort = this.dataset.routerApiPort;
+
+            const form = document.getElementById('editRouterForm');
+            form.action = '/routers/update/' + id;
+            document.getElementById('edit_name').value = name;
+            document.getElementById('edit_ip').value = ip;
+            document.getElementById('edit_username').value = username;
+            document.getElementById('edit_password').value = '';
+            document.getElementById('edit_port').value = port;
+            document.getElementById('edit_api_port').value = apiPort;
+
+            new bootstrap.Modal(document.getElementById('editRouterModal')).show();
+        });
+    });
+
+    // === تأكيد الحذف ===
+    document.querySelectorAll('.js-delete-router').forEach(function (link) {
+        link.addEventListener('click', function (e) {
+            const name = this.dataset.routerName || 'هذا الراوتر';
+            if (!confirm('هل أنت متأكد من حذف الراوتر "' + name + '"؟')) {
+                e.preventDefault();
+                return false;
+            }
+        });
+    });
+});
 </script>
 
 {% endblock %}
