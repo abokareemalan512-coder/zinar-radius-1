@@ -26,6 +26,7 @@
         }
         .layout { display: flex; min-height: 100vh; }
         
+        /* الشريط الجانبي */
         .sidebar {
             width: 250px;
             background-color: var(--bg-card);
@@ -36,6 +37,7 @@
             flex-direction: column;
         }
         
+        /* شعار ZINAR */
         .brand {
             text-align: center;
             padding: 10px 0 24px;
@@ -78,6 +80,7 @@
             letter-spacing: 1px;
         }
         
+        /* أزرار التنقل */
         .sidebar .nav-item {
             display: flex;
             align-items: center;
@@ -110,6 +113,7 @@
             font-weight: 600;
         }
         
+        /* رابط الاستيراد المميز */
         .sidebar .nav-item.import-link {
             border: 1px dashed rgba(56, 189, 248, 0.4);
             background: rgba(56, 189, 248, 0.05);
@@ -121,6 +125,7 @@
             border-right-color: var(--accent);
         }
         
+        /* زر إضافة مشترك */
         .sidebar .btn-add {
             background: linear-gradient(135deg, #0ea5e9, #38bdf8);
             color: #0f172a;
@@ -220,34 +225,35 @@
             </div>
         </div>
         
-        <a href="/dashboard" class="nav-item {% if request.path == '/dashboard' or request.path == '/' %}active{% endif %}">
+        <a href="{{ url_for('dashboard') }}" class="nav-item {% if request.endpoint == 'dashboard' %}active{% endif %}">
             <i class="bi bi-speedometer2"></i> لوحة التحكم
         </a>
-        <a href="/subscribers" class="nav-item {% if request.path.startswith('/subscribers') %}active{% endif %}">
+        <a href="{{ url_for('subscribers') }}" class="nav-item {% if request.endpoint in ['subscribers','add_subscriber'] %}active{% endif %}">
             <i class="bi bi-people"></i> المشتركين
         </a>
         
-        <a href="/traffic-monitor" class="nav-item {% if request.path == '/traffic-monitor' %}active{% endif %}">
+        <!-- ✅ رابط مراقبة الترافيك (جديد) -->
+        <a href="{{ url_for('traffic_monitor_page') }}" class="nav-item {% if request.endpoint == 'traffic_monitor_page' %}active{% endif %}">
             <i class="bi bi-graph-up-arrow"></i> مراقبة الترافيك
         </a>
         
-        <a href="/import-backup" class="nav-item import-link {% if request.path == '/import-backup' %}active{% endif %}">
+        <a href="{{ url_for('import_backup') }}" class="nav-item import-link {% if request.endpoint == 'import_backup' %}active{% endif %}">
             <i class="bi bi-cloud-upload"></i> استيراد من الميكروتيك
         </a>
-        <a href="/packages" class="nav-item {% if request.path == '/packages' %}active{% endif %}">
+        <a href="{{ url_for('packages') }}" class="nav-item {% if request.endpoint == 'packages' %}active{% endif %}">
             <i class="bi bi-box-seam"></i> الباقات
         </a>
-        <a href="/routers" class="nav-item {% if request.path == '/routers' %}active{% endif %}">
+        <a href="{{ url_for('routers') }}" class="nav-item {% if request.endpoint == 'routers' %}active{% endif %}">
             <i class="bi bi-router"></i> الراوترات
         </a>
-        <a href="/payments" class="nav-item {% if request.path == '/payments' %}active{% endif %}">
+        <a href="{{ url_for('payments') }}" class="nav-item {% if request.endpoint == 'payments' %}active{% endif %}">
             <i class="bi bi-cash-coin"></i> الدفعات
         </a>
-        <a href="/logout" class="nav-item">
+        <a href="{{ url_for('logout') }}" class="nav-item">
             <i class="bi bi-box-arrow-right"></i> خروج
         </a>
         
-        <a href="/add-subscriber" class="btn-add">
+        <a href="{{ url_for('add_subscriber') }}" class="btn-add">
             <i class="bi bi-person-plus"></i> إضافة مشترك
         </a>
     </aside>
