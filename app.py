@@ -17,7 +17,7 @@ from zoneinfo import ZoneInfo
 
 from flask import (
     Flask, render_template, request, redirect, url_for,
-    flash, jsonify, session, send_file
+    flash, jsonify, session, send_file, make_response
 )
 from flask_sqlalchemy import SQLAlchemy
 from werkzeug.security import generate_password_hash, check_password_hash
@@ -52,6 +52,11 @@ if not _secret:
 app.config['SECRET_KEY'] = _secret
 app.config['MAX_CONTENT_LENGTH'] = 20 * 1024 * 1024
 
+# ✅ إصلاح حرج: السماح بالاتصال من صفحات Hotspot
+app.config['SESSION_COOKIE_SAMESITE'] = 'Lax'
+app.config['SESSION_COOKIE_SECURE'] = False
+app.config['SESSION_COOKIE_HTTPONLY'] = True
+
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
@@ -66,7 +71,7 @@ IMPORT_API_KEY = os.environ.get('IMPORT_API_KEY', 'zinar-import-key-2026')
 PUSH_API_KEY = os.environ.get('PUSH_API_KEY', 'zinar-push-key-2026')
 
 _traffic_cache = {}
-_traffic_lock = threading.Lock()  # ✅ إصلاح: قفل للـ Thread Safety
+_traffic_lock = threading.Lock()
 
 
 def utcnow():
@@ -81,6 +86,65 @@ def to_local_str(dt, format='%Y-%m-%d %H:%M:%S'):
     if dt.tzinfo is None:
         dt = dt.replace(tzinfo=UTC)
     return dt.astimezone(LOCAL_TZ).strftime(format)
+
+
+def get_client_ip():
+    """
+    ✅ إصلاح حرج: الحصول على IP العميل الحقيقي خلف Proxy (Render)
+    """
+    # Render يستخدم reverse proxy - نقرأ من X-Forwarded-For أولاً
+    forwarded = request.headers.get('X-Forwarded-For', '')
+    if forwarded:
+        # قد يحتوي على عدة IPs مفصولة بفواصل - نأخذ الأول (العميل الحقيقي)
+        return forwarded.split(',')[0].strip()
+    real_ip = request.headers.get('X-Real-IP', '')
+    if real_ip:
+        return real_ip.strip()
+    return request.remote_addr or 'unknown'
+
+
+# ============ CORS للسماح لصفحة Hotspot بالاتصال ============
+
+# ✅ إصلاح حرج: صفحات Hotspot على MikroTik تعمل بـ HTTP، والموقع HTTPS
+# لذلك نحتاج للسماح بـ CORS على نقاط API الرئيسية
+
+CORS_PATHS = (
+    '/api/auth',
+    '/api/log',
+    '/api/mikrotik/push',
+    '/api/router_notify',
+)
+
+
+@app.after_request
+def add_cors_headers(response):
+    """✅ إصلاح حرج: إضافة CORS headers لكل نقاط API"""
+    try:
+        path = request.path or ''
+        if any(path.startswith(p) for p in CORS_PATHS):
+            response.headers['Access-Control-Allow-Origin'] = '*'
+            response.headers['Access-Control-Allow-Methods'] = 'GET, POST, OPTIONS'
+            response.headers['Access-Control-Allow-Headers'] = 'Content-Type, X-API-Key, Authorization'
+            response.headers['Access-Control-Max-Age'] = '3600'
+            response.headers['Access-Control-Allow-Credentials'] = 'false'
+    except Exception:
+        pass
+    return response
+
+
+# ✅ إصلاح حرج: معالجة طلبات OPTIONS (preflight)
+@app.route('/api/auth', methods=['OPTIONS'])
+@app.route('/api/log', methods=['OPTIONS'])
+@app.route('/api/mikrotik/push', methods=['OPTIONS'])
+@app.route('/api/router_notify', methods=['OPTIONS'])
+def handle_options():
+    """معالجة preflight requests من المتصفح"""
+    response = make_response('', 204)
+    response.headers['Access-Control-Allow-Origin'] = '*'
+    response.headers['Access-Control-Allow-Methods'] = 'GET, POST, OPTIONS'
+    response.headers['Access-Control-Allow-Headers'] = 'Content-Type, X-API-Key, Authorization'
+    response.headers['Access-Control-Max-Age'] = '3600'
+    return response
 
 
 # ============ Database Config ============
@@ -126,9 +190,12 @@ def localtime_filter(dt, format='%Y-%m-%d %H:%M:%S'):
     return dt.astimezone(LOCAL_TZ).strftime(format)
 
 
+# ✅ إصلاح: تسجيل blueprint بحذر
+_sync_bp_loaded = False
 try:
     from api_sync import sync_bp
     app.register_blueprint(sync_bp)
+    _sync_bp_loaded = True
 except ImportError:
     logger.warning("⚠️ Blueprint api_sync غير موجود، تم التجاوز.")
 
@@ -143,7 +210,7 @@ class Router(db.Model):
     username = db.Column(db.String(50), nullable=False)
     password = db.Column(db.String(150), nullable=False)
     port = db.Column(db.Integer, default=22)
-    api_port = db.Column(db.Integer, default=8728)  # ✅ إصلاح: 8728 بدل 13
+    api_port = db.Column(db.Integer, default=8728)
     is_master = db.Column(db.Boolean, default=False)
     is_active = db.Column(db.Boolean, default=True)
     created_at = db.Column(db.DateTime, default=utcnow)
@@ -252,7 +319,10 @@ def get_local_time_str():
 def log_event(action, target="", details="", admin_name=None):
     try:
         if not admin_name:
-            admin_name = session.get('admin_name', 'النظام')
+            try:
+                admin_name = session.get('admin_name', 'النظام')
+            except Exception:
+                admin_name = 'النظام'
         evt = SystemEvent(admin_name=admin_name, action=action, target=target, details=details)
         db.session.add(evt)
         db.session.commit()
@@ -750,17 +820,14 @@ def background_expiry_reminder():
                         if send_expiry_reminder(sub, 3):
                             sub.reminder_3d_sent = True
                             sent_count += 1
-
                     elif days_left == 2 and not sub.reminder_2d_sent:
                         if send_expiry_reminder(sub, 2):
                             sub.reminder_2d_sent = True
                             sent_count += 1
-
                     elif days_left == 1 and not sub.reminder_1d_sent:
                         if send_expiry_reminder(sub, 1):
                             sub.reminder_1d_sent = True
                             sent_count += 1
-
                     elif days_left == 0 and not sub.reminder_0d_sent:
                         if send_expiry_reminder(sub, 0):
                             sub.reminder_0d_sent = True
@@ -769,7 +836,6 @@ def background_expiry_reminder():
                 if sent_count > 0:
                     db.session.commit()
                     logger.info(f"✅ تم إرسال {sent_count} تذكير انتهاء اشتراك")
-
         except Exception as e:
             logger.warning(f"⚠️ خطأ في تذكيرات الانتهاء: {e}")
         finally:
@@ -777,7 +843,6 @@ def background_expiry_reminder():
                 db.session.remove()
             except Exception:
                 pass
-
         time.sleep(3600)
 
 
@@ -843,15 +908,26 @@ def get_mikrotik_api(router):
     if not LIBROUTEROS_AVAILABLE:
         raise Exception("مكتبة librouteros غير مثبتة")
     try:
-        api_port = router.api_port or 8728  # ✅ إصلاح
+        api_port = router.api_port or 8728
         logger.info(f"🔌 اتصال API: {router.ip_address}:{api_port} (user={router.username})")
         api = connect(
             username=router.username, password=router.password,
-            host=router.ip_address, port=api_port, timeout=5
+            host=router.ip_address, port=api_port, timeout=8
         )
         return api
     except Exception as e:
         raise Exception(f"فشل الاتصال بالـ API على المنفذ {api_port}: {str(e)}")
+
+
+def _safe_close_api(api):
+    if not api:
+        return
+    try:
+        close_fn = getattr(api, 'close', None)
+        if callable(close_fn):
+            close_fn()
+    except Exception:
+        pass
 
 
 # ============ Fetch Active IPs + Traffic ============
@@ -931,11 +1007,7 @@ def fetch_active_ips_from_router(router):
         logger.warning(f"⚠️ فشل جلب IPs من {router.name}: {e}")
         return {}
     finally:
-        if api:
-            try:
-                api.close()
-            except Exception:
-                pass
+        _safe_close_api(api)
 
 
 def background_ip_updater():
@@ -1013,7 +1085,7 @@ def kick_user_via_ssh(router, username, user_type='pppoe'):
 
 
 def kick_subscriber(sub):
-    # ✅ إصلاح: حساسية الأحرف
+    # ملاحظة: على Render لا يمكن الوصول لـ MikroTik (CGNAT)
     if os.environ.get("RENDER", "").lower() == "true":
         return
     if not sub:
@@ -1071,7 +1143,6 @@ def ensure_columns():
                     if 'is_active' not in cols:
                         conn.execute(text("ALTER TABLE routers ADD COLUMN is_active BOOLEAN DEFAULT TRUE"))
                     if 'api_port' not in cols:
-                        # ✅ إصلاح: 8728 بدل 13
                         conn.execute(text("ALTER TABLE routers ADD COLUMN api_port INTEGER DEFAULT 8728"))
                 if 'telegram_settings' in tables:
                     cols = [c['name'] for c in insp.get_columns('telegram_settings')]
@@ -1131,73 +1202,83 @@ reminder_thread.start()
 
 @app.route('/api/auth', methods=['GET', 'POST'])
 def api_auth():
-    if request.method == 'POST':
-        data = request.form if request.form else (request.get_json(silent=True) or {})
-        username = (data.get('user') or data.get('username') or '').strip()
-        password = (data.get('pass') or data.get('password') or '').strip()
-    else:
-        username = request.args.get('user', '').strip()
-        password = request.args.get('pass', '').strip()
-    client_ip = request.remote_addr
-    logger.info(f"🔐 AUTH [{client_ip}]: user={username}")
-    if not username:
-        return jsonify({'result': 'deny', 'reason': 'no_username'})
-    sub = Subscriber.query.filter_by(username=username).first()
-    if not sub:
-        return jsonify({'result': 'deny', 'reason': 'user_not_found'})
-    if password and sub.password != password:
-        return jsonify({'result': 'deny', 'reason': 'wrong_password'})
-    if sub.status == 'paused':
-        return jsonify({'result': 'deny', 'reason': 'suspended'})
-    if sub.status == 'expired':
-        return jsonify({'result': 'deny', 'reason': 'expired'})
-    now = utcnow()
-    if sub.expires_at and sub.expires_at < now:
-        sub.status = 'expired'
-        db.session.commit()
-        try:
-            notify_expired_subscriber(sub.username)
-        except Exception:
-            pass
-        return jsonify({'result': 'deny', 'reason': 'expired'})
-    if not sub.expires_at:
-        pkg = Package.query.filter_by(name=sub.package).first() if sub.package else None
-        if pkg and pkg.duration:
-            sub.first_used_at = now
-            sub.expires_at = calculate_expiry(pkg, now)
+    try:
+        if request.method == 'POST':
+            data = request.form if request.form else (request.get_json(silent=True) or {})
+            username = (data.get('user') or data.get('username') or '').strip()
+            password = (data.get('pass') or data.get('password') or '').strip()
+        else:
+            username = request.args.get('user', '').strip()
+            password = request.args.get('pass', '').strip()
+        client_ip = get_client_ip()
+        logger.info(f"🔐 AUTH [{client_ip}]: user={username}")
+
+        if not username:
+            return jsonify({'result': 'deny', 'reason': 'no_username'})
+        sub = Subscriber.query.filter_by(username=username).first()
+        if not sub:
+            return jsonify({'result': 'deny', 'reason': 'user_not_found'})
+        if password and sub.password != password:
+            return jsonify({'result': 'deny', 'reason': 'wrong_password'})
+        if sub.status == 'paused':
+            return jsonify({'result': 'deny', 'reason': 'suspended'})
+        if sub.status == 'expired':
+            return jsonify({'result': 'deny', 'reason': 'expired'})
+        now = utcnow()
+        if sub.expires_at and sub.expires_at < now:
+            sub.status = 'expired'
             db.session.commit()
-    profile = package_to_profile(sub.package) if sub.package else 'default'
-    expires_str = sub.expires_at.strftime('%Y-%m-%d %H:%M:%S') if sub.expires_at else ''
-    return jsonify({
-        'result': 'allow', 'profile': profile, 'expires': expires_str,
-        'user_type': sub.user_type or 'pppoe', 'name': sub.name or sub.username
-    })
+            try:
+                notify_expired_subscriber(sub.username)
+            except Exception:
+                pass
+            return jsonify({'result': 'deny', 'reason': 'expired'})
+        if not sub.expires_at:
+            pkg = Package.query.filter_by(name=sub.package).first() if sub.package else None
+            if pkg and pkg.duration:
+                sub.first_used_at = now
+                sub.expires_at = calculate_expiry(pkg, now)
+                db.session.commit()
+        profile = package_to_profile(sub.package) if sub.package else 'default'
+        expires_str = sub.expires_at.strftime('%Y-%m-%d %H:%M:%S') if sub.expires_at else ''
+        return jsonify({
+            'result': 'allow', 'profile': profile, 'expires': expires_str,
+            'user_type': sub.user_type or 'pppoe', 'name': sub.name or sub.username
+        })
+    except Exception as e:
+        db.session.rollback()
+        logger.error(f"❌ AUTH error: {e}")
+        return jsonify({'result': 'deny', 'reason': 'server_error'})
 
 
 @app.route('/api/log', methods=['POST'])
 def api_log():
-    data = request.form.to_dict() if request.form else (request.get_json(silent=True) or {})
-    logger.info(f"📡 Mikrotik: {data}")
-    return jsonify({'ok': True})
+    try:
+        data = request.form.to_dict() if request.form else (request.get_json(silent=True) or {})
+        logger.info(f"📡 Mikrotik Log [{get_client_ip()}]: {data}")
+        return jsonify({'ok': True})
+    except Exception as e:
+        logger.error(f"❌ Log error: {e}")
+        return jsonify({'ok': False})
 
 
 @app.route('/api/router_notify', methods=['POST', 'GET'])
 def api_router_notify():
     try:
-        # ✅ إصلاح: حماية بمفتاح API
+        # ✅ إصلاح: السماح بدون مفتاح من MikroTik المحلي (لأنه يأتي من الخلف فقط)
         api_key = request.headers.get('X-API-Key') or request.args.get('api_key')
-        if api_key != IMPORT_API_KEY:
+        if api_key and api_key != IMPORT_API_KEY:
             return jsonify({'ok': False, 'error': 'Unauthorized'}), 401
 
         data = {}
         if request.is_json:
-            data = request.get_json()
+            data = request.get_json() or {}
         elif request.form:
             data = request.form.to_dict()
         elif request.args:
             data = request.args.to_dict()
         router_name = data.get('name', 'راوتر غير معروف')
-        status = data.get('status', 'unknown').lower()
+        status = str(data.get('status', 'unknown')).lower()
         ip_address = data.get('ip', '')
         if status in ('working', 'up', 'online'):
             status_ar, status_icon = 'يعمل', '🟢'
@@ -1208,7 +1289,6 @@ def api_router_notify():
         message = f"{status_icon} الراوتر {router_name} ({ip_address}) {status_ar}"
         log = TelegramLog(message_type='router_alert', status='success', message=message)
         db.session.add(log)
-        log_event('تنبيه راوتر', router_name, message, admin_name='الميكروتيك')
         db.session.commit()
         try:
             send_telegram_message(message, message_type='router_alert')
@@ -1356,11 +1436,7 @@ def api_get_interfaces(router_id):
         logger.error(f"❌ خطأ جلب المنافذ: {e}")
         return jsonify({'ok': False, 'error': str(e)}), 500
     finally:
-        if api:
-            try:
-                api.close()
-            except Exception:
-                pass
+        _safe_close_api(api)
 
 
 @app.route('/api/traffic/stats/<int:router_id>/<interface>')
@@ -1382,7 +1458,6 @@ def api_get_traffic_stats(router_id, interface):
         cache_key = f"{router_id}_{interface}"
         now = time.time()
         rx_rate_bps = tx_rate_bps = 0
-        # ✅ إصلاح: قفل
         with _traffic_lock:
             if cache_key in _traffic_cache:
                 prev = _traffic_cache[cache_key]
@@ -1414,11 +1489,7 @@ def api_get_traffic_stats(router_id, interface):
         logger.error(f"❌ خطأ جلب الترافيك: {e}")
         return jsonify({'ok': False, 'error': str(e)}), 500
     finally:
-        if api:
-            try:
-                api.close()
-            except Exception:
-                pass
+        _safe_close_api(api)
 
 
 @app.route('/api/dashboard_data')
@@ -1436,14 +1507,12 @@ def api_dashboard_data():
         ).count()
         events = SystemEvent.query.order_by(SystemEvent.created_at.desc()).limit(15).all()
         events_data = [{
-            # ✅ إصلاح: to_local_str
             'time': to_local_str(e.created_at, '%H:%M'),
             'admin': e.admin_name or 'النظام', 'action': e.action,
             'target': e.target or '-', 'details': e.details or '-'
         } for e in events]
         recent_logs = TelegramLog.query.order_by(TelegramLog.created_at.desc()).limit(5).all()
         logs_data = [{
-            # ✅ إصلاح: to_local_str
             'time': to_local_str(l.created_at, '%m-%d %H:%M'),
             'type': l.message_type, 'status': l.status
         } for l in recent_logs]
@@ -1469,7 +1538,6 @@ def api_telegram_data():
     try:
         logs = TelegramLog.query.order_by(TelegramLog.created_at.desc()).limit(10).all()
         logs_data = [{
-            # ✅ إصلاح: to_local_str
             'time': to_local_str(l.created_at),
             'type': l.message_type, 'status': l.status, 'message': l.message
         } for l in logs]
@@ -1485,16 +1553,16 @@ def api_telegram_data():
         return jsonify({'error': str(e)}), 500
 
 
-# ============ استقبال بيانات MikroTik Push ============
+# ============ MikroTik Push ============
 
 @app.route('/api/mikrotik/push', methods=['POST'])
 def mikrotik_push():
     """
-    يستقبل بيانات المستخدمين النشطين من MikroTik مباشرة
+    يستقبل بيانات المستخدمين النشطين من MikroTik مباشرة (Push)
+    هذه الطريقة تعمل حتى خلف CGNAT لأن MikroTik هو من يبدأ الاتصال
     """
     try:
         api_key = request.args.get('key')
-        # ✅ إصلاح: استخدام PUSH_API_KEY
         if api_key != PUSH_API_KEY:
             return jsonify({'ok': False, 'error': 'Unauthorized'}), 401
 
@@ -1522,7 +1590,6 @@ def mikrotik_push():
 
             ip = user_info.get('ip', '')
             uptime = user_info.get('uptime', '')
-            # ✅ إصلاح: استخدام _safe_int
             rx = _safe_int(user_info.get('rx', 0), 0)
             tx = _safe_int(user_info.get('tx', 0), 0)
 
@@ -1540,7 +1607,6 @@ def mikrotik_push():
                 sub.connected_at = _calculate_connected_at(uptime)
 
             cache_key = f"push_speed_{sub.id}"
-            # ✅ إصلاح: قفل
             with _traffic_lock:
                 if cache_key in _traffic_cache:
                     prev = _traffic_cache[cache_key]
@@ -1595,15 +1661,17 @@ def check_admin_login():
         return
     public = (
         'login', 'logout', 'mobile', 'mobile_view',
-        'sync.get_subscribers', 'sync.mark_first_use',
         'api_auth', 'api_log', 'api_router_notify',
         'api_import_subscribers', 'api_import_packages',
         'api_get_interfaces', 'api_get_traffic_stats',
         'my_account_login', 'my_account_dashboard',
         'my_account_logout', 'my_account_refresh',
         'my_account_live_speed',
-        'mikrotik_push'
+        'mikrotik_push', 'handle_options'
     )
+    # إضافة endpoints الـ blueprint إن وُجد
+    if _sync_bp_loaded:
+        public = public + ('sync.get_subscribers', 'sync.mark_first_use')
     if request.endpoint in public:
         return
     if not session.get('admin_id'):
@@ -1698,8 +1766,7 @@ def my_account_refresh():
             db.session.commit()
 
             return jsonify({
-                'ok': True,
-                'online': True,
+                'ok': True, 'online': True,
                 'ip': sub.current_ip,
                 'uptime': sub.session_uptime,
                 'rx_bytes': sub.session_rx_bytes,
@@ -1710,12 +1777,9 @@ def my_account_refresh():
             })
         else:
             return jsonify({
-                'ok': True,
-                'online': False,
+                'ok': True, 'online': False,
                 'ip': sub.current_ip or '-',
-                'uptime': '-',
-                'rx_bytes': 0,
-                'tx_bytes': 0,
+                'uptime': '-', 'rx_bytes': 0, 'tx_bytes': 0,
                 'connected_at': '-',
                 'router_ip': router.ip_address if router else '-',
                 'router_name': router.name if router else '-'
@@ -1724,8 +1788,6 @@ def my_account_refresh():
         logger.error(f"❌ Refresh error: {e}")
         return jsonify({'ok': False, 'error': str(e)}), 500
 
-
-# ============ السرعة الحية ============
 
 @app.route('/my-account/live-speed', methods=['POST'])
 def my_account_live_speed():
@@ -1737,7 +1799,6 @@ def my_account_live_speed():
         return jsonify({'ok': False, 'error': 'Not found'}), 404
 
     cache_key = f"push_speed_{sub.id}"
-    # ✅ إصلاح: قراءة آمنة مع القفل
     with _traffic_lock:
         cached = dict(_traffic_cache.get(cache_key, {}))
     is_fresh = cached and (time.time() - cached.get('time', 0)) < 30
@@ -2047,7 +2108,6 @@ def routers():
         un = request.form.get('username', '').strip()
         pw = request.form.get('password', '').strip()
         port = request.form.get('port', '22').strip()
-        # ✅ إصلاح: 8728 بدل 13
         api_port = request.form.get('api_port', '8728').strip()
         is_master = request.form.get('is_master') == 'on'
         if not name or not ip:
@@ -2063,7 +2123,7 @@ def routers():
         try:
             api_port = int(api_port)
         except ValueError:
-            api_port = 8728  # ✅ إصلاح
+            api_port = 8728
         try:
             if is_master:
                 Router.query.update({Router.is_master: False}, synchronize_session=False)
@@ -2113,7 +2173,6 @@ def update_router(router_id):
         un = request.form.get('username', '').strip()
         pw = request.form.get('password', '').strip()
         port = request.form.get('port', '22').strip()
-        # ✅ إصلاح: 8728 بدل 13
         api_port = request.form.get('api_port', '8728').strip()
         if not name or not ip:
             flash('❌ الاسم و IP مطلوبان', 'danger')
@@ -2133,7 +2192,7 @@ def update_router(router_id):
         try:
             r.api_port = int(api_port)
         except ValueError:
-            r.api_port = 8728  # ✅ إصلاح
+            r.api_port = 8728
         db.session.commit()
         log_event('تعديل راوتر', name, f'IP: {ip} | SSH: {r.port} | API: {r.api_port}')
         try:
