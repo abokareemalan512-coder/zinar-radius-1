@@ -622,7 +622,6 @@
     }
     .traffic-full-link i { font-size: 0.72rem; }
 
-    /* IP Badge */
     .ip-badge {
         display: inline-flex;
         align-items: center;
@@ -636,7 +635,6 @@
     .ip-online { background: rgba(34, 197, 94, 0.12); color: #22c55e; border: 1px solid rgba(34, 197, 94, 0.35); }
     .ip-offline { background: rgba(148, 163, 184, 0.1); color: #94a3b8; border: 1px solid rgba(148, 163, 184, 0.3); }
 
-    /* زر الدفعات الصغير */
     .payments-quick-btn {
         display: inline-flex;
         align-items: center;
@@ -662,7 +660,6 @@
     }
     .payments-quick-btn i { font-size: 0.8rem; }
 
-    /* Badge للتحميل والرفع */
     .speed-badge {
         display: inline-flex;
         align-items: center;
@@ -676,7 +673,6 @@
     .speed-down { background: rgba(34, 197, 94, 0.12); color: #22c55e; border: 1px solid rgba(34, 197, 94, 0.35); }
     .speed-up { background: rgba(245, 158, 11, 0.12); color: #f59e0b; border: 1px solid rgba(245, 158, 11, 0.35); }
 
-    /* صفوف قابلة للضغط */
     #onlineSubsModal tbody tr {
         cursor: pointer;
         transition: all 0.2s;
@@ -689,7 +685,6 @@
     }
 </style>
 
-<!-- صندوق ترحيب -->
 <div class="welcome-box">
     <div class="welcome-text">
         <h5><i class="bi bi-speedometer2"></i> مرحباً، {{ admin_name }}</h5>
@@ -703,10 +698,8 @@
     </div>
 </div>
 
-<!-- ✅ الصف الأول: بطاقات الإحصائيات -->
 <div class="row g-3 mb-3">
     
-    <!-- 1. MikroTik -->
     <div class="col-xl-3 col-md-6">
         <div class="dashboard-card text-center clickable" data-bs-toggle="modal" data-bs-target="#mikrotikDetailsModal">
             <div class="icon-circle mx-auto" style="background: rgba(56, 189, 248, 0.1); border: 1px solid rgba(56, 189, 248, 0.3);">
@@ -740,7 +733,6 @@
         </div>
     </div>
 
-    <!-- 2. المشتركين -->
     <div class="col-xl-3 col-md-6">
         <div class="dashboard-card text-center clickable" data-bs-toggle="modal" data-bs-target="#subscribersDetailsModal">
             <div class="icon-circle mx-auto" style="background: rgba(34, 197, 94, 0.1); border: 1px solid rgba(34, 197, 94, 0.2);">
@@ -766,7 +758,6 @@
         </div>
     </div>
 
-    <!-- 3. المتصلون الآن -->
     <div class="col-xl-3 col-md-6">
         <div class="dashboard-card text-center">
             <div class="clickable" data-bs-toggle="modal" data-bs-target="#onlineSubsModal">
@@ -803,7 +794,6 @@
         </div>
     </div>
 
-    <!-- 4. التلجرام -->
     <div class="col-xl-3 col-md-6">
         <div class="dashboard-card text-center clickable" data-bs-toggle="modal" data-bs-target="#telegramDetailsModal">
             <div class="icon-circle mx-auto" style="background: rgba(34, 158, 217, 0.1); border: 1px solid rgba(34, 158, 217, 0.3);">
@@ -837,7 +827,6 @@
     </div>
 </div>
 
-<!-- ✅ الصف الثاني: إجراءات سريعة + مراقبة الترافيك -->
 <div class="row g-3 mb-3">
     <div class="col-xl-3 col-md-6">
         <div class="quick-actions-card">
@@ -870,7 +859,7 @@
                         <span class="live-dot"></span> LIVE
                     </span>
                 </div>
-                <a href="{{ url_for('traffic_monitor_page') }}" class="traffic-full-link">
+                <a href="/traffic-monitor" class="traffic-full-link">
                     <i class="bi bi-arrows-fullscreen"></i> الصفحة الكاملة
                 </a>
             </div>
@@ -969,7 +958,6 @@
     </div>
 </div>
 
-<!-- ✅ الصف الثالث: الأحداث + تلجرام -->
 <div class="row g-3 mb-3">
     <div class="col-lg-8">
         <div class="dashboard-card p-0 overflow-hidden">
@@ -1036,7 +1024,6 @@
     </div>
 </div>
 
-<!-- إعدادات المدير -->
 <div class="row g-3 mb-3">
     <div class="col-12">
         <div class="dashboard-card">
@@ -1048,8 +1035,6 @@
         </div>
     </div>
 </div>
-
-<!-- ==================== النوافذ ==================== -->
 
 <!-- MikroTik Modal -->
 <div class="modal fade" id="mikrotikDetailsModal" tabindex="-1">
@@ -1075,7 +1060,7 @@
                                 <td class="fw-bold text-accent">{{ r.name }}</td>
                                 <td><span class="font-monospace text-muted">{{ r.ip_address }}</span></td>
                                 <td>{{ r.port }}</td>
-                                <td><span class="text-info fw-bold">{{ r.api_port or 13 }}</span></td>
+                                <td><span class="text-info fw-bold">{{ r.api_port or 8728 }}</span></td>
                                 <td>
                                     {% if r.is_active %}
                                         <span class="stat-badge success" style="font-size: 0.62rem; padding: 3px 8px;">🟢 متصل</span>
@@ -1141,7 +1126,7 @@
     </div>
 </div>
 
-<!-- ✅ Online Subscribers Modal -->
+<!-- Online Subscribers Modal -->
 <div class="modal fade" id="onlineSubsModal" tabindex="-1">
     <div class="modal-dialog modal-dialog-centered modal-xl">
         <div class="modal-content border-0 shadow-lg" style="border-radius: 12px; background-color: var(--bg-card);">
@@ -1278,7 +1263,7 @@
     </div>
 </div>
 
-<!-- ✅ Modal تفاصيل المشترك -->
+<!-- Sub Detail Modal -->
 <div class="modal fade" id="subDetailModal" tabindex="-1">
     <div class="modal-dialog modal-dialog-centered modal-lg">
         <div class="modal-content border-0 shadow-lg" style="border-radius: 12px; background-color: var(--bg-card);">
@@ -1525,7 +1510,6 @@
     </div>
 </div>
 
-<!-- ==================== JavaScript ==================== -->
 <script>
     let dashUploadChart, dashDownloadChart;
     let dashMonitoringInterval = null;
@@ -1542,7 +1526,6 @@
     let dashDownloadData = [];
     let dashLabels = [];
 
-    // ✅ فتح تفاصيل مشترك
     function openSubDetail(id, name, username, ip, routerIp, routerName, connectedAt, uptime, rxBytes, txBytes, pkg, userType, status, expires, updatedAt) {
         document.getElementById('det_id').textContent = '#' + id;
         document.getElementById('det_name').textContent = name || username;
@@ -1587,7 +1570,6 @@
         new bootstrap.Modal(document.getElementById('subDetailModal')).show();
     }
 
-    // ✅ تحديث فوري للمتصلين
     function refreshOnlineSubs() {
         if (!confirm('سيتم مزامنة جميع الراوترات لجلب المتصلين. متابعة؟')) return;
         const btn = event.target.closest('button');
