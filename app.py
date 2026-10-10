@@ -293,7 +293,6 @@ class TelegramLog(db.Model):
     created_at = db.Column(db.DateTime, default=utcnow)
 
 
-# ✅ الجديد: جدول الأوامر للراوترات
 class RouterCommand(db.Model):
     __tablename__ = 'router_commands'
     id = db.Column(db.Integer, primary_key=True)
@@ -415,7 +414,6 @@ def _calculate_connected_at(uptime_str):
         return None
 
 
-# ✅ الجديد: دالة إضافة أمر للطابور
 def queue_router_command(action, payload, router_name=None):
     """يُنشئ أمراً في الطابور لتنفيذه على MikroTik"""
     try:
@@ -865,7 +863,6 @@ def background_expiry_reminder():
         time.sleep(3600)
 
 
-# ✅ الجديد: تنظيف الأوامر القديمة
 def background_command_cleaner():
     """يحذف الأوامر المنفذة قبل أكثر من 7 أيام"""
     time.sleep(300)
@@ -1379,11 +1376,6 @@ def router_get_commands():
 
 @app.route('/api/router/pending_simple', methods=['GET'])
 def router_pending_simple():
-    """
-    نسخة مبسطة لـ MikroTik (نص عادي، بدون JSON)
-    التنسيق: ID|action|username|password|package
-    كل سطر = أمر واحد
-    """
     try:
         api_key = request.args.get('key')
         if api_key != PUSH_API_KEY:
@@ -1424,7 +1416,6 @@ def router_pending_simple():
                 p = payload.get('password') or '-'
                 lines.append(f"{cmd.id}|resume_user|{u}|{p}|-")
             elif cmd.action == 'sync_all':
-                # كل مستخدم = سطر مستقل
                 for u in payload.get('users', []):
                     un = u.get('username', '')
                     pw = u.get('password', '')
@@ -1447,7 +1438,6 @@ def router_pending_simple():
 
 @app.route('/api/router/command_result', methods=['POST'])
 def router_command_result():
-    """MikroTik يُبلغ نتيجة تنفيذ أمر"""
     try:
         data = request.get_json(silent=True) or {}
         api_key = request.args.get('key') or data.get('key')
@@ -1480,7 +1470,6 @@ def router_command_result():
 
 @app.route('/api/router/batch_report', methods=['POST'])
 def router_batch_report():
-    """MikroTik يرفع صورة كاملة: active users + local users"""
     try:
         data = request.get_json(silent=True) or {}
         api_key = request.args.get('key') or data.get('key')
@@ -1559,7 +1548,6 @@ def router_batch_report():
 
 @app.route('/api/mikrotik/push', methods=['POST'])
 def mikrotik_push():
-    """نقطة قديمة - للتشغيل المتوافق"""
     return router_batch_report()
 
 
@@ -1811,6 +1799,94 @@ def traffic_monitor_page():
     return render_template('traffic_monitor.html', routers=routers_list)
 
 
+@app.route('/logs')
+def logs_page():
+    """صفحة سجل الأحداث (Logs)"""
+    routers_list = Router.query.all()
+    return render_template('logs.html', routers=routers_list)
+
+
+@app.route('/api/logs/<int:router_id>')
+def api_get_router_logs(router_id):
+    """جلب سجل الأحداث من راوتر MikroTik محدد عبر SSH"""
+    router = Router.query.get_or_404(router_id)
+    try:
+        ssh = paramiko.SSHClient()
+        ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
+        ssh.connect(
+            hostname=router.ip_address,
+            port=router.port or 22,
+            username=router.username,
+            password=router.password,
+            timeout=8,
+            allow_agent=False,
+            look_for_keys=False,
+        )
+
+        cmd = '/log print without-paging'
+        stdin, stdout, stderr = ssh.exec_command(cmd)
+        output = stdout.read().decode('utf-8', errors='ignore')
+        ssh.close()
+
+        logs = []
+        lines = output.strip().split('\n')
+
+        # نأخذ آخر 200 سطر فقط لتجنب البطء
+        for line in lines[-200:]:
+            line = line.strip()
+            if not line or line.startswith('Flags:'):
+                continue
+
+            # صيغة السطر: [ID]  Time  Topics  Message
+            # مثال: 979 Oct/10/2026 09:54:14 memory pppoe,info PPPoE connection established from ...
+            match = re.match(
+                r'^\s*(\d+)?\s*([A-Za-z]{3}\/\d{2}\/\d{4}\s\d{2}:\d{2}:\d{2})\s+([a-zA-Z0-9,]+)\s+(.*)$',
+                line
+            )
+            if match:
+                log_id = match.group(1) or ''
+                time_str = match.group(2)
+                topics = match.group(3)
+                message = decode_mikrotik_escapes(match.group(4))
+
+                # تحديد نوع السجل
+                log_type = 'info'
+                msg_lower = message.lower()
+                topics_lower = topics.lower()
+
+                if ('error' in topics_lower or 'critical' in topics_lower or
+                    'auth failed' in msg_lower or 'authentication failed' in msg_lower or
+                    'login failed' in msg_lower or 'invalid username' in msg_lower or
+                    'trying to log in' in msg_lower):
+                    log_type = 'error'
+                elif 'warning' in topics_lower:
+                    log_type = 'warning'
+                elif ('established' in msg_lower or 'logged in' in msg_lower or
+                      'success' in msg_lower):
+                    log_type = 'success'
+
+                logs.append({
+                    'id': log_id,
+                    'time': time_str,
+                    'topics': topics,
+                    'message': message,
+                    'type': log_type
+                })
+
+        # الأحدث أولاً
+        logs.reverse()
+
+        return jsonify({
+            'ok': True,
+            'logs': logs,
+            'count': len(logs),
+            'router': router.name,
+        })
+    except Exception as e:
+        logger.error(f"❌ logs error for router {router_id}: {e}")
+        return jsonify({'ok': False, 'error': str(e)}), 500
+
+
 @app.route('/dashboard')
 def dashboard():
     try:
@@ -1860,7 +1936,6 @@ def dashboard():
         ).order_by(Subscriber.last_seen_at.desc()).all()
         top_online_subs = online_subs[:10]
 
-        # ✅ عدد الأوامر المعلقة
         pending_commands = RouterCommand.query.filter_by(status='pending').count()
 
         return render_template(
@@ -2038,7 +2113,6 @@ def subscribers():
         ).all()
         for s in expired:
             s.status = 'expired'
-            # أرسل أمر تعطيل للميكروتيك
             queue_router_command('pause_user', {'username': s.username})
         if expired:
             db.session.commit()
@@ -2068,12 +2142,10 @@ def subscribers():
 
 @app.route('/subscribers/sync-now', methods=['POST'])
 def sync_subscribers_now():
-    """يطلب من MikroTik رفع تقريره الآن"""
     try:
         routers_list = Router.query.all()
         if not routers_list:
             return jsonify({'ok': False, 'error': 'لا يوجد راوترات'})
-        # ننشئ أمر "report_now" لكل راوتر
         for r in routers_list:
             queue_router_command('report_now', {}, router_name=r.name)
         log_event('طلب مزامنة فورية', f'{len(routers_list)} راوتر')
@@ -2112,7 +2184,6 @@ def add_subscriber():
             ))
             db.session.commit()
 
-            # ✅ إرسال أمر المزامنة إلى MikroTik
             queue_router_command('sync_user', {
                 'username': un,
                 'password': pw,
@@ -2208,7 +2279,6 @@ def bulk_add():
         except Exception:
             db.session.rollback()
 
-        # ✅ إرسال أمر مزامنة جماعي
         if sync_payload:
             queue_router_command('sync_all', {'users': sync_payload})
 
@@ -2298,7 +2368,6 @@ def update_subscriber(sub_id):
         sub.name = request.form.get('name', '').strip() or sub.name
         nun = request.form.get('username', '').strip()
         if nun and nun != sub.username:
-            # حذف القديم وإنشاء الجديد
             queue_router_command('delete_user', {'username': sub.username})
             sub.username = nun
             queue_router_command('sync_user', {
@@ -2526,7 +2595,6 @@ def delete_package(pkg_id):
 
 @app.route('/admin/queue-sync-all', methods=['POST'])
 def admin_queue_sync_all():
-    """زر يدوي: أرسل أمر مزامنة شاملة"""
     if not session.get('admin_id'):
         flash('❌ غير مصرح', 'danger')
         return redirect(url_for('login'))
@@ -2551,7 +2619,6 @@ def admin_queue_sync_all():
 
 @app.route('/admin/commands')
 def admin_commands():
-    """عرض كل الأوامر"""
     if not session.get('admin_id'):
         return redirect(url_for('login'))
     cmds = RouterCommand.query.order_by(RouterCommand.created_at.desc()).limit(100).all()
@@ -2633,7 +2700,7 @@ def payments():
     return render_template('payments.html', payments=pay_list)
 
 
-# ============ Traffic API (يبقى كما هو) ============
+# ============ Traffic API ============
 
 @app.route('/api/traffic/interfaces/<int:router_id>')
 def api_get_interfaces(router_id):
