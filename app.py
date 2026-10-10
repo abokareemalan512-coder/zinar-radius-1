@@ -1304,20 +1304,58 @@ def api_get_interfaces(router_id):
     api = None
     try:
         api = get_mikrotik_api(router)
+
+        # جلب الجلسات النشطة PPPoE
+        ppp_active_names = set()
+        try:
+            for sess in api.path('ppp', 'active'):
+                uname = _safe_str(sess.get('name'))
+                if uname:
+                    ppp_active_names.add(uname)
+        except Exception as e:
+            logger.warning(f"⚠️ فشل جلب PPP active: {e}")
+
+        # جلب كل المنافذ
         interfaces_data = list(api.path('interface'))
         interfaces = []
+
         for iface in interfaces_data:
             name = _safe_str(iface.get('name'))
-            if not name:
-                continue
-            disabled = _safe_bool(iface.get('disabled'), False)
-            if disabled:
-                continue
             iface_type = _safe_str(iface.get('type'), 'unknown')
+            disabled = _safe_bool(iface.get('disabled'), False)
+
+            if not name or disabled:
+                continue
+
+            # تخطى المنافذ الديناميكية العامة
+            if name == 'pppoe-in' or name == '<pppoe-in>':
+                continue
+
             running = _safe_bool(iface.get('running'), False)
-            interfaces.append({'name': name, 'type': iface_type, 'running': running})
+            interfaces.append({
+                'name': name,
+                'type': iface_type,
+                'running': running
+            })
+
+        # أضف جلسات PPPoE النشطة بأسماء حقيقية
+        existing_names = {i['name'] for i in interfaces}
+        for uname in ppp_active_names:
+            real_name = f"<pppoe-{uname}>"
+            if real_name not in existing_names:
+                interfaces.append({
+                    'name': real_name,
+                    'type': 'pppoe-in',
+                    'running': True
+                })
+
         interfaces.sort(key=lambda x: x['name'])
-        return jsonify({'ok': True, 'interfaces': interfaces, 'method': 'API', 'count': len(interfaces)})
+        return jsonify({
+            'ok': True,
+            'interfaces': interfaces,
+            'method': 'API',
+            'count': len(interfaces)
+        })
     except Exception as e:
         logger.error(f"❌ خطأ جلب المنافذ: {e}")
         return jsonify({'ok': False, 'error': str(e)}), 500
@@ -1327,122 +1365,6 @@ def api_get_interfaces(router_id):
                 api.close()
             except Exception:
                 pass
-
-
-@app.route('/api/traffic/stats/<int:router_id>/<interface>')
-def api_get_traffic_stats(router_id, interface):
-    router = Router.query.get_or_404(router_id)
-    api = None
-    try:
-        api = get_mikrotik_api(router)
-        interfaces = list(api.path('interface'))
-        target = None
-        for iface in interfaces:
-            if _safe_str(iface.get('name')) == interface:
-                target = iface
-                break
-        if not target:
-            return jsonify({'ok': False, 'error': f'المنفذ {interface} غير موجود'}), 404
-        rx_byte = _safe_int(target.get('rx-byte', '0'), 0)
-        tx_byte = _safe_int(target.get('tx-byte', '0'), 0)
-        cache_key = f"{router_id}_{interface}"
-        now = time.time()
-        rx_rate_bps = tx_rate_bps = 0
-        if cache_key in _traffic_cache:
-            prev = _traffic_cache[cache_key]
-            elapsed = now - prev['time']
-            if elapsed > 0:
-                rx_diff = max(0, rx_byte - prev['rx_byte'])
-                tx_diff = max(0, tx_byte - prev['tx_byte'])
-                rx_rate_bps = (rx_diff / elapsed) * 8
-                tx_rate_bps = (tx_diff / elapsed) * 8
-        _traffic_cache[cache_key] = {'time': now, 'rx_byte': rx_byte, 'tx_byte': tx_byte}
-        def format_rate(bps):
-            if bps >= 1_000_000_000:
-                return f"{bps / 1_000_000_000:.2f}Gbps"
-            elif bps >= 1_000_000:
-                return f"{bps / 1_000_000:.2f}Mbps"
-            elif bps >= 1_000:
-                return f"{bps / 1_000:.2f}kbps"
-            else:
-                return f"{int(bps)}bps"
-        stats = {
-            'rx_rate': format_rate(rx_rate_bps),
-            'tx_rate': format_rate(tx_rate_bps),
-            'rx_byte': str(rx_byte),
-            'tx_byte': str(tx_byte),
-        }
-        return jsonify({'ok': True, 'stats': stats, 'method': 'API'})
-    except Exception as e:
-        logger.error(f"❌ خطأ جلب الترافيك: {e}")
-        return jsonify({'ok': False, 'error': str(e)}), 500
-    finally:
-        if api:
-            try:
-                api.close()
-            except Exception:
-                pass
-
-
-@app.route('/api/dashboard_data')
-def api_dashboard_data():
-    try:
-        start, end = _day_bounds()
-        today_revenue = db.session.query(db.func.sum(Payment.amount)).filter(
-            Payment.status == 'completed',
-            Payment.created_at >= start,
-            Payment.created_at < end
-        ).scalar() or 0
-        new_users_today = Subscriber.query.filter(
-            Subscriber.created_at >= start,
-            Subscriber.created_at < end
-        ).count()
-        events = SystemEvent.query.order_by(SystemEvent.created_at.desc()).limit(15).all()
-        events_data = [{
-            'time': e.created_at.astimezone(LOCAL_TZ).strftime('%H:%M'),
-            'admin': e.admin_name or 'النظام', 'action': e.action,
-            'target': e.target or '-', 'details': e.details or '-'
-        } for e in events]
-        recent_logs = TelegramLog.query.order_by(TelegramLog.created_at.desc()).limit(5).all()
-        logs_data = [{
-            'time': l.created_at.astimezone(LOCAL_TZ).strftime('%m-%d %H:%M'),
-            'type': l.message_type, 'status': l.status
-        } for l in recent_logs]
-        return jsonify({
-            'routers_count': Router.query.count(),
-            'routers_online': Router.query.filter_by(is_active=True).count(),
-            'sub_count': Subscriber.query.count(),
-            'active_subs': Subscriber.query.filter_by(status='active').count(),
-            'online_count': Subscriber.query.filter(
-                Subscriber.current_ip.isnot(None), Subscriber.current_ip != ''
-            ).count(),
-            'today_revenue': f"{today_revenue:.0f}",
-            'new_users_today': new_users_today,
-            'events': events_data, 'telegram_logs': logs_data
-        })
-    except Exception as e:
-        db.session.rollback()
-        return jsonify({'error': str(e)}), 500
-
-
-@app.route('/api/telegram_data')
-def api_telegram_data():
-    try:
-        logs = TelegramLog.query.order_by(TelegramLog.created_at.desc()).limit(10).all()
-        logs_data = [{
-            'time': l.created_at.astimezone(LOCAL_TZ).strftime('%Y-%m-%d %H:%M:%S'),
-            'type': l.message_type, 'status': l.status, 'message': l.message
-        } for l in logs]
-        return jsonify({
-            'total_notifications': TelegramLog.query.count(),
-            'new_subscribers': TelegramLog.query.filter_by(message_type='new_subscriber').count(),
-            'expired_subscribers': TelegramLog.query.filter_by(message_type='expired_subscriber').count(),
-            'bulk_adds': TelegramLog.query.filter_by(message_type='bulk_add').count(),
-            'logs': logs_data
-        })
-    except Exception as e:
-        db.session.rollback()
-        return jsonify({'error': str(e)}), 500
 
 
 # ============ ✅ استقبال بيانات MikroTik Push (جديد) ============
