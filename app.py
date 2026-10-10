@@ -60,6 +60,8 @@ logger = logging.getLogger(__name__)
 
 if not LIBROUTEROS_AVAILABLE:
     logger.warning("⚠️ مكتبة librouteros غير مثبتة - مراقبة الترافيك معطلة")
+if not radius_sync:
+    logger.warning("⚠️ radius_sync غير موجود - المزامنة مع RADIUS معطلة")
 
 LOCAL_TZ = ZoneInfo("Asia/Damascus")
 UTC = timezone.utc
@@ -93,7 +95,7 @@ def get_client_ip():
     return request.remote_addr or 'unknown'
 
 
-# ============ CORS للسماح لصفحات Hotspot ============
+# ============ CORS ============
 
 CORS_PATHS = (
     '/api/auth',
@@ -412,6 +414,60 @@ def _calculate_connected_at(uptime_str):
         return utcnow() - timedelta(seconds=total_seconds)
     except Exception:
         return None
+
+
+# ============ ✅ دوال مساعدة للـ RADIUS (الجسر المفقود) ============
+
+def sync_user_to_radius(username, password=None):
+    """إرسال/تحديث مستخدم في RADIUS"""
+    if not radius_sync:
+        return False
+    try:
+        radius_sync.sync_user(username, password)
+        logger.info(f"✅ RADIUS sync_user: {username}")
+        return True
+    except Exception as e:
+        logger.warning(f"⚠️ فشل RADIUS sync_user لـ {username}: {e}")
+        return False
+
+
+def delete_user_from_radius(username):
+    """حذف مستخدم من RADIUS"""
+    if not radius_sync:
+        return False
+    try:
+        radius_sync.delete_user(username)
+        logger.info(f"✅ RADIUS delete_user: {username}")
+        return True
+    except Exception as e:
+        logger.warning(f"⚠️ فشل RADIUS delete_user لـ {username}: {e}")
+        return False
+
+
+def pause_user_in_radius(username):
+    """إيقاف مستخدم في RADIUS"""
+    if not radius_sync:
+        return False
+    try:
+        radius_sync.pause_user(username)
+        logger.info(f"✅ RADIUS pause_user: {username}")
+        return True
+    except Exception as e:
+        logger.warning(f"⚠️ فشل RADIUS pause_user لـ {username}: {e}")
+        return False
+
+
+def resume_user_in_radius(username, password=None):
+    """تنشيط مستخدم في RADIUS"""
+    if not radius_sync:
+        return False
+    try:
+        radius_sync.resume_user(username, password)
+        logger.info(f"✅ RADIUS resume_user: {username}")
+        return True
+    except Exception as e:
+        logger.warning(f"⚠️ فشل RADIUS resume_user لـ {username}: {e}")
+        return False
 
 
 def queue_router_command(action, payload, router_name=None):
@@ -864,7 +920,6 @@ def background_expiry_reminder():
 
 
 def background_command_cleaner():
-    """يحذف الأوامر المنفذة قبل أكثر من 7 أيام"""
     time.sleep(300)
     while True:
         try:
@@ -1262,6 +1317,8 @@ def api_import_subscribers():
                     package=package, user_type=user_type, status=status, expires_at=None
                 ))
                 imported += 1
+            # ✅ إرسال لـ RADIUS
+            sync_user_to_radius(username, password)
         db.session.commit()
         return jsonify({
             'ok': True, 'imported': imported, 'updated': updated, 'skipped': skipped,
@@ -1332,7 +1389,6 @@ def api_import_packages():
 
 @app.route('/api/router/commands', methods=['GET'])
 def router_get_commands():
-    """MikroTik يسأل: هل عندك أوامر؟ (JSON)"""
     try:
         api_key = request.args.get('key')
         if api_key != PUSH_API_KEY:
@@ -1778,6 +1834,8 @@ def import_backup():
                         status=s['status'], expires_at=None
                     ))
                     sub_imported += 1
+                # ✅ إرسال لـ RADIUS
+                sync_user_to_radius(s['username'], s['password'])
             db.session.commit()
             log_event('استيراد نسخة احتياطية', f'ملف: {file.filename}',
                       f'باقات: {pkg_imported}+{pkg_updated} | مشتركين: {sub_imported}+{sub_updated}')
@@ -1802,16 +1860,12 @@ def traffic_monitor_page():
 
 @app.route('/logs')
 def logs_page():
-    """صفحة سجل الأحداث (Logs)"""
     routers_list = Router.query.all()
     return render_template('logs.html', routers=routers_list)
 
 
-# ============ ✅ API سجل الأحداث (مصحح) ============
-
 @app.route('/api/logs/<int:router_id>')
 def api_get_router_logs(router_id):
-    """جلب سجل الأحداث من راوتر MikroTik محدد عبر SSH"""
     router = Router.query.get_or_404(router_id)
     ssh = None
     try:
@@ -1834,50 +1888,40 @@ def api_get_router_logs(router_id):
         logs = []
         lines = output.strip().split('\n')
 
-        # ✅ نمط التحليل المصحح: ID | Date Time | Source | Topics | Message
-        # مثال: 972 Oct/10/2026 06:32:12 memory pppoe,info PPPoE connection established from 88:BD:09:C9:CB:0F
         pattern = re.compile(
-            r'^\s*(\d+)\s+'                                        # 1: ID
-            r'([A-Za-z]{3}/\d{2}/\d{4}\s+\d{2}:\d{2}:\d{2})\s+'    # 2: Date + Time
-            r'(\w+)\s+'                                            # 3: Source (memory/disk)
-            r'([a-zA-Z0-9,\-]+)\s+'                                # 4: Topics (comma separated)
-            r'(.+)$'                                               # 5: Message
+            r'^\s*(\d+)\s+'
+            r'([A-Za-z]{3}/\d{2}/\d{4}\s+\d{2}:\d{2}:\d{2})\s+'
+            r'(\w+)\s+'
+            r'([a-zA-Z0-9,\-]+)\s+'
+            r'(.+)$'
         )
 
-        # نأخذ آخر 200 سطر فقط
         for line in lines[-200:]:
             line = line.rstrip()
             if not line or line.startswith('Flags:') or line.startswith(' #'):
                 continue
-
             match = pattern.match(line)
             if not match:
                 continue
-
             log_id = match.group(1)
             time_str = match.group(2)
             source = match.group(3)
             topics = match.group(4)
             message = decode_mikrotik_escapes(match.group(5).strip())
 
-            # ✅ تصنيف ذكي للسجلات
             log_type = 'info'
             msg_lower = message.lower()
             topics_lower = topics.lower()
-
-            # 🔴 أخطاء
             if any(k in msg_lower for k in [
                 'authentication failed', 'login failed',
                 'invalid username', 'invalid password',
                 'failed', 'error', 'denied', 'reject'
             ]) or 'error' in topics_lower:
                 log_type = 'error'
-            # 🟡 تحذيرات
             elif any(k in msg_lower for k in [
                 'warning', 'expired', 'timeout', 'disconnect'
             ]) or 'warning' in topics_lower:
                 log_type = 'warning'
-            # 🟢 نجاح
             elif any(k in msg_lower for k in [
                 'established', 'logged in', 'connected',
                 'success', 'assigned'
@@ -1893,9 +1937,7 @@ def api_get_router_logs(router_id):
                 'type': log_type
             })
 
-        # الأحدث أولاً
         logs.reverse()
-
         return jsonify({
             'ok': True,
             'logs': logs,
@@ -2141,7 +2183,7 @@ def subscribers():
         ).all()
         for s in expired:
             s.status = 'expired'
-            queue_router_command('pause_user', {'username': s.username})
+            pause_user_in_radius(s.username)
         if expired:
             db.session.commit()
         q = Subscriber.query
@@ -2212,6 +2254,10 @@ def add_subscriber():
             ))
             db.session.commit()
 
+            # ✅ إرسال لـ RADIUS
+            sync_user_to_radius(un, pw)
+
+            # الميكروتيك (اختياري)
             queue_router_command('sync_user', {
                 'username': un,
                 'password': pw,
@@ -2223,7 +2269,7 @@ def add_subscriber():
                 notify_new_subscriber(un)
             except Exception:
                 pass
-            flash(f'✅ المشترك "{un}" أُضيف وأُرسل للمزامنة', 'success')
+            flash(f'✅ المشترك "{un}" أُضيف وأُرسل للـ RADIUS', 'success')
             return redirect(url_for('subscribers'))
         except Exception as e:
             db.session.rollback()
@@ -2277,6 +2323,7 @@ def bulk_add():
                 usernames.append(f"{prefix}{''.join(random.choices(M, k=rl))}")
         created = failed = 0
         sync_payload = []
+        radius_payload = []
         for un in usernames:
             if pm == 'same_as_username':
                 pw = un
@@ -2298,6 +2345,7 @@ def bulk_add():
                     'username': un, 'password': pw,
                     'package': pkg or 'default', 'user_type': ut,
                 })
+                radius_payload.append((un, pw))
                 created += 1
             except Exception:
                 db.session.rollback()
@@ -2306,6 +2354,10 @@ def bulk_add():
             db.session.commit()
         except Exception:
             db.session.rollback()
+
+        # ✅ إرسال لـ RADIUS (دفعة واحدة)
+        for un, pw in radius_payload:
+            sync_user_to_radius(un, pw)
 
         if sync_payload:
             queue_router_command('sync_all', {'users': sync_payload})
@@ -2316,7 +2368,7 @@ def bulk_add():
         except Exception:
             pass
         flash(
-            f'✅ تم إنشاء {created} مشترك' + (f' — فشل {failed}' if failed else '') + ' وأُرسلوا للمزامنة',
+            f'✅ تم إنشاء {created} مشترك' + (f' — فشل {failed}' if failed else '') + ' وأُرسلوا للـ RADIUS',
             'success' if not failed else 'warning'
         )
         return redirect(url_for('subscribers'))
@@ -2334,6 +2386,8 @@ def toggle_subscriber(sub_id):
         if sub.status == 'active':
             sub.status = 'paused'
             db.session.commit()
+            # ✅ إيقاف في RADIUS
+            pause_user_in_radius(sub.username)
             queue_router_command('pause_user', {'username': sub.username})
             log_event('إيقاف مشترك', sub.username)
             flash(f'⏸ "{sub.username}" موقوف وأُرسل أمر القطع', 'warning')
@@ -2343,6 +2397,8 @@ def toggle_subscriber(sub_id):
             else:
                 sub.status = 'active'
                 db.session.commit()
+                # ✅ تنشيط في RADIUS
+                resume_user_in_radius(sub.username, sub.password)
                 queue_router_command('resume_user', {'username': sub.username, 'password': sub.password})
                 log_event('تنشيط مشترك', sub.username)
                 flash(f'▶ "{sub.username}" نشط', 'success')
@@ -2360,6 +2416,8 @@ def reset_subscriber(sub_id):
         sub.first_used_at = None
         sub.status = 'active'
         db.session.commit()
+        # ✅ إعادة المزامنة مع RADIUS
+        sync_user_to_radius(sub.username, sub.password)
         log_event('تصفير مشترك', sub.username)
         flash('🔄 تم تصفير عداد المشترك بنجاح', 'success')
     except Exception as e:
@@ -2381,6 +2439,8 @@ def extend_subscriber(sub_id):
         sub.reminder_1d_sent = False
         sub.reminder_0d_sent = False
         db.session.commit()
+        # ✅ إعادة المزامنة مع RADIUS
+        sync_user_to_radius(sub.username, sub.password)
         log_event('تتمديد اشتراك', sub.username, f'جديد: {sub.expires_at.strftime("%Y-%m-%d")}')
         flash(f'➕ ينتهي في {sub.expires_at.strftime("%Y-%m-%d")}', 'success')
     except Exception as e:
@@ -2394,34 +2454,30 @@ def update_subscriber(sub_id):
     try:
         sub = Subscriber.query.get_or_404(sub_id)
         sub.name = request.form.get('name', '').strip() or sub.name
+        old_username = sub.username
         nun = request.form.get('username', '').strip()
         if nun and nun != sub.username:
-            queue_router_command('delete_user', {'username': sub.username})
+            # ✅ حذف من RADIUS بالاسم القديم
+            delete_user_from_radius(old_username)
+            queue_router_command('delete_user', {'username': old_username})
             sub.username = nun
-            queue_router_command('sync_user', {
-                'username': sub.username, 'password': sub.password,
-                'package': sub.package or 'default', 'user_type': sub.user_type,
-            })
+
         pw = request.form.get('password', '').strip()
         if pw:
             sub.password = pw
-            queue_router_command('sync_user', {
-                'username': sub.username, 'password': pw,
-                'package': sub.package or 'default', 'user_type': sub.user_type,
-            })
+
         pkg = request.form.get('package', '').strip()
         if pkg and pkg != sub.package:
             sub.package = pkg
-            queue_router_command('sync_user', {
-                'username': sub.username, 'password': sub.password,
-                'package': pkg, 'user_type': sub.user_type,
-            })
+
         ut = request.form.get('user_type', '').strip()
         if ut in ('pppoe', 'hotspot'):
             sub.user_type = ut
+
         phone = request.form.get('phone', '').strip()
         if phone:
             sub.phone = phone
+
         days_to_add = request.form.get('days_to_add', type=int)
         if days_to_add and days_to_add > 0:
             if sub.expires_at:
@@ -2432,9 +2488,19 @@ def update_subscriber(sub_id):
             sub.reminder_2d_sent = False
             sub.reminder_1d_sent = False
             sub.reminder_0d_sent = False
+
         db.session.commit()
+
+        # ✅ إعادة إرسال لـ RADIUS بالبيانات الجديدة
+        sync_user_to_radius(sub.username, sub.password)
+
+        # الميكروتيك
+        queue_router_command('sync_user', {
+            'username': sub.username, 'password': sub.password,
+            'package': sub.package or 'default', 'user_type': sub.user_type,
+        })
         log_event('تعديل مشترك', sub.username)
-        flash('✅ تم التحديث وأُرسل للمزامنة', 'success')
+        flash('✅ تم التحديث وأُرسل للـ RADIUS', 'success')
     except Exception as e:
         db.session.rollback()
         flash(f'❌ {str(e)}', 'danger')
@@ -2446,6 +2512,8 @@ def delete_subscriber(sub_id):
     try:
         sub = Subscriber.query.get_or_404(sub_id)
         un = sub.username
+        # ✅ حذف من RADIUS
+        delete_user_from_radius(un)
         queue_router_command('delete_user', {'username': un})
         db.session.delete(sub)
         db.session.commit()
@@ -2468,6 +2536,8 @@ def bulk_delete_subscribers():
         subs = Subscriber.query.filter(Subscriber.id.in_(ids_list)).all()
         deleted = 0
         for sub in subs:
+            # ✅ حذف من RADIUS
+            delete_user_from_radius(sub.username)
             queue_router_command('delete_user', {'username': sub.username})
             db.session.delete(sub)
             deleted += 1
@@ -2504,6 +2574,7 @@ def delete_expired_subscribers():
             return redirect(url_for('subscribers'))
         deleted = 0
         for sub in unique:
+            delete_user_from_radius(sub.username)
             queue_router_command('delete_user', {'username': sub.username})
             db.session.delete(sub)
             deleted += 1
@@ -2628,6 +2699,10 @@ def admin_queue_sync_all():
         return redirect(url_for('login'))
     try:
         subs = Subscriber.query.all()
+        # ✅ مزامنة RADIUS أولاً
+        for s in subs:
+            sync_user_to_radius(s.username, s.password)
+        # ثم الميكروتيك
         payload = [{
             'username': s.username,
             'password': s.password,
@@ -2637,7 +2712,7 @@ def admin_queue_sync_all():
         } for s in subs]
         cmd_id = queue_router_command('sync_all', {'users': payload}, router_name='ALL')
         if cmd_id:
-            flash(f'✅ تم وضع {len(subs)} مشترك في قائمة المزامنة (أمر #{cmd_id})', 'success')
+            flash(f'✅ تم إرسال {len(subs)} مشترك للـ RADIUS والميكروتيك', 'success')
         else:
             flash('❌ فشل إنشاء الأمر', 'danger')
     except Exception as e:
