@@ -7,6 +7,7 @@ import logging
 import traceback
 import calendar
 from datetime import datetime, timedelta
+from zoneinfo import ZoneInfo
 
 from flask import (
     Flask, render_template, request, redirect, url_for,
@@ -35,6 +36,19 @@ app.config['MAX_CONTENT_LENGTH'] = 5 * 1024 * 1024
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
+
+# ═══════════════════════════════════════════════════════════════
+# ✅ الإضافة 1: فلتر localtime (ضروري لكل القوالب)
+# ═══════════════════════════════════════════════════════════════
+LOCAL_TZ = ZoneInfo("Asia/Damascus")
+
+@app.template_filter('localtime')
+def localtime_filter(dt, format='%Y-%m-%d %H:%M:%S'):
+    if dt is None:
+        return "-"
+    if dt.tzinfo is None:
+        dt = dt.replace(tzinfo=ZoneInfo("UTC"))
+    return dt.astimezone(LOCAL_TZ).strftime(format)
 
 # ============ Database Config ============
 
@@ -369,8 +383,7 @@ def init_database():
                     email='admin@zinar.com'
                 ))
                 db.session.commit()
-            
-            # تأكد من وجود إعدادات التلجرام الافتراضية
+
             if not TelegramSetting.query.first():
                 db.session.add(TelegramSetting(
                     enabled=False,
@@ -380,7 +393,7 @@ def init_database():
                     notify_admin_action=False
                 ))
                 db.session.commit()
-            
+
             logger.info("✅ تم تهيئة قاعدة البيانات")
         except Exception as e:
             logger.error(f"❌ خطأ تهيئة قاعدة البيانات: {e}")
@@ -512,7 +525,8 @@ def check_admin_login():
     public = (
         'login', 'logout', 'mobile', 'mobile_view',
         'sync.get_subscribers', 'sync.mark_first_use',
-        'api_auth', 'api_log'
+        'api_auth', 'api_log',
+        'push_all_to_radius'
     )
     if request.endpoint in public:
         return
@@ -573,12 +587,36 @@ def dashboard():
             Payment.created_at < end
         ).scalar() or 0
 
+        now = datetime.utcnow()
+        start_month = datetime(now.year, now.month, 1)
+        start_year = datetime(now.year, 1, 1)
+        monthly_revenue = db.session.query(db.func.sum(Payment.amount)).filter(
+            Payment.status == 'completed',
+            Payment.created_at >= start_month
+        ).scalar() or 0
+        yearly_revenue = db.session.query(db.func.sum(Payment.amount)).filter(
+            Payment.status == 'completed',
+            Payment.created_at >= start_year
+        ).scalar() or 0
+
         new_users_today = Subscriber.query.filter(
             Subscriber.created_at >= start,
             Subscriber.created_at < end
         ).count()
 
+        inactive_subs = Subscriber.query.filter(Subscriber.status.in_(['expired', 'paused'])).all()
+        pending_pays = Payment.query.filter_by(status='pending').count()
         events_list = SystemEvent.query.order_by(SystemEvent.created_at.desc()).limit(20).all()
+        current_time = datetime.now(LOCAL_TZ).strftime('%Y-%m-%d %H:%M:%S')
+        telegram_status = TelegramSetting.query.first()
+        recent_telegram_logs = TelegramLog.query.order_by(TelegramLog.created_at.desc()).limit(5).all()
+        recent_subs = Subscriber.query.order_by(Subscriber.created_at.desc()).limit(5).all()
+        recent_payments = Payment.query.filter_by(status='completed').order_by(Payment.created_at.desc()).limit(5).all()
+        recent_routers = Router.query.order_by(Router.created_at.desc()).limit(5).all()
+        online_subs = Subscriber.query.filter(
+            Subscriber.current_ip.isnot(None), Subscriber.current_ip != ''
+        ).order_by(Subscriber.last_seen_at.desc()).all() if hasattr(Subscriber, 'current_ip') else []
+        top_online_subs = online_subs[:10]
 
         return render_template(
             'dashboard.html',
@@ -588,10 +626,22 @@ def dashboard():
             sub_count=sub_count,
             active_subs=active_subs,
             today_revenue=today_revenue,
+            monthly_revenue=monthly_revenue,
+            yearly_revenue=yearly_revenue,
             new_users_today=new_users_today,
+            inactive_subs=inactive_subs,
             has_master=master is not None,
             events=events_list,
             admin_name=session.get('admin_name', 'مدير'),
+            current_time=current_time,
+            telegram_status=telegram_status,
+            recent_telegram_logs=recent_telegram_logs,
+            pending_pays=pending_pays,
+            recent_subs=recent_subs,
+            recent_payments=recent_payments,
+            recent_routers=recent_routers,
+            online_subs=online_subs,
+            top_online_subs=top_online_subs,
         )
     except Exception as e:
         logger.error(f"❌ dashboard error: {e}")
@@ -1393,6 +1443,92 @@ def test_telegram():
 def payments():
     pay_list = Payment.query.order_by(Payment.created_at.desc()).all()
     return render_template('payments.html', payments=pay_list)
+
+
+# ═══════════════════════════════════════════════════════════════
+# ✅ الإضافة 2: صفحة مراقبة الترافيك (فارغة - فقط لمنع خطأ base.html)
+# ═══════════════════════════════════════════════════════════════
+@app.route('/traffic-monitor')
+def traffic_monitor_page():
+    return """
+    <html dir="rtl"><head><meta charset="utf-8"><title>مراقبة الترافيك</title></head>
+    <body style="font-family: Tahoma; padding: 40px; background: #0f172a; color: #fff;">
+        <h1>مراقبة الترافيك</h1>
+        <p>هذه الميزة غير مفعلة في هذه النسخة.</p>
+        <a href="/dashboard" style="color: #38bdf8;">← العودة للوحة التحكم</a>
+    </body></html>
+    """
+
+
+# ═══════════════════════════════════════════════════════════════
+# ✅ الإضافة 3: صفحة استيراد النسخة الاحتياطية (فارغة)
+# ═══════════════════════════════════════════════════════════════
+@app.route('/import-backup', methods=['GET', 'POST'])
+def import_backup():
+    return """
+    <html dir="rtl"><head><meta charset="utf-8"><title>استيراد</title></head>
+    <body style="font-family: Tahoma; padding: 40px; background: #0f172a; color: #fff;">
+        <h1>استيراد من الميكروتيك</h1>
+        <p>هذه الميزة غير مفعلة في هذه النسخة.</p>
+        <a href="/dashboard" style="color: #38bdf8;">← العودة للوحة التحكم</a>
+    </body></html>
+    """
+
+
+# ═══════════════════════════════════════════════════════════════
+# ✅ الإضافة 4: رابط مزامنة RADIUS (الأهم لحل مشكلة 102030)
+# ═══════════════════════════════════════════════════════════════
+@app.route('/push-all-to-radius')
+def push_all_to_radius():
+    if not radius_sync:
+        return """
+        <html dir="rtl"><head><meta charset="utf-8"></head>
+        <body style="font-family: Tahoma; padding: 40px; background: #0f172a; color: #fff;">
+            <h1 style="color: #ef4444;">❌ radius_sync غير موجود</h1>
+        </body></html>
+        """
+    subs = Subscriber.query.all()
+    ok = 0
+    fail = 0
+    errors = []
+    for s in subs:
+        try:
+            radius_sync.sync_user(s.username, s.password)
+            ok += 1
+        except Exception as e:
+            fail += 1
+            if len(errors) < 10:
+                errors.append(f"{s.username}: {str(e)}")
+
+    html = f"""
+    <html dir="rtl">
+    <head><meta charset="utf-8"><title>مزامنة RADIUS</title></head>
+    <body style="font-family: Tahoma; padding: 40px; background: #0f172a; color: #fff;">
+        <h1 style="color: #38bdf8;">🔄 نتيجة المزامنة مع RADIUS</h1>
+        <div style="background: #1e293b; padding: 20px; border-radius: 12px; margin: 20px 0;">
+            <p style="font-size: 22px;">✅ <b style="color: #22c55e;">نجح:</b> {ok}</p>
+            <p style="font-size: 22px;">❌ <b style="color: #ef4444;">فشل:</b> {fail}</p>
+            <p style="font-size: 18px;">📊 <b>الإجمالي:</b> {len(subs)}</p>
+        </div>
+    """
+    if errors:
+        html += "<h3 style='color: #f59e0b;'>أول أخطاء:</h3><ul style='background: #1e293b; padding: 20px; border-radius: 12px;'>"
+        for err in errors:
+            html += f"<li style='color: #f59e0b;'>{err}</li>"
+        html += "</ul>"
+    if fail == 0 and ok > 0:
+        html += """
+        <div style="background: #064e3b; padding: 20px; border-radius: 12px; margin: 20px 0;">
+            <p style="font-size: 20px; color: #6ee7b7;">
+                ✅ كل الحسابات الآن في RADIUS. جرّب الدخول بحساب 010203.
+            </p>
+        </div>
+        """
+    html += """
+        <p><a href="/subscribers" style="color: #38bdf8;">← العودة لصفحة المشتركين</a></p>
+    </body></html>
+    """
+    return html
 
 
 # ============ Main ============
