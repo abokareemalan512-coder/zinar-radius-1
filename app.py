@@ -938,7 +938,7 @@ def background_router_monitor():
                 db.session.remove()
             except Exception:
                 pass
-        time.sleep(60)
+        time.sleep(15)
 
 
 # ============ MikroTik API Helper ============
@@ -1571,6 +1571,7 @@ def check_admin_login():
         'api_auth', 'api_log', 'api_router_notify',
         'api_import_subscribers', 'api_import_packages',
         'api_get_interfaces', 'api_get_traffic_stats',
+        'api_get_router_logs',
         'my_account_login', 'my_account_dashboard',
         'my_account_logout', 'my_account_refresh',
         'my_account_live_speed',
@@ -1806,10 +1807,13 @@ def logs_page():
     return render_template('logs.html', routers=routers_list)
 
 
+# ============ ✅ API سجل الأحداث (مصحح) ============
+
 @app.route('/api/logs/<int:router_id>')
 def api_get_router_logs(router_id):
     """جلب سجل الأحداث من راوتر MikroTik محدد عبر SSH"""
     router = Router.query.get_or_404(router_id)
+    ssh = None
     try:
         ssh = paramiko.SSHClient()
         ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
@@ -1826,52 +1830,68 @@ def api_get_router_logs(router_id):
         cmd = '/log print without-paging'
         stdin, stdout, stderr = ssh.exec_command(cmd)
         output = stdout.read().decode('utf-8', errors='ignore')
-        ssh.close()
 
         logs = []
         lines = output.strip().split('\n')
 
-        # نأخذ آخر 200 سطر فقط لتجنب البطء
+        # ✅ نمط التحليل المصحح: ID | Date Time | Source | Topics | Message
+        # مثال: 972 Oct/10/2026 06:32:12 memory pppoe,info PPPoE connection established from 88:BD:09:C9:CB:0F
+        pattern = re.compile(
+            r'^\s*(\d+)\s+'                                        # 1: ID
+            r'([A-Za-z]{3}/\d{2}/\d{4}\s+\d{2}:\d{2}:\d{2})\s+'    # 2: Date + Time
+            r'(\w+)\s+'                                            # 3: Source (memory/disk)
+            r'([a-zA-Z0-9,\-]+)\s+'                                # 4: Topics (comma separated)
+            r'(.+)$'                                               # 5: Message
+        )
+
+        # نأخذ آخر 200 سطر فقط
         for line in lines[-200:]:
-            line = line.strip()
-            if not line or line.startswith('Flags:'):
+            line = line.rstrip()
+            if not line or line.startswith('Flags:') or line.startswith(' #'):
                 continue
 
-            # صيغة السطر: [ID]  Time  Topics  Message
-            # مثال: 979 Oct/10/2026 09:54:14 memory pppoe,info PPPoE connection established from ...
-            match = re.match(
-                r'^\s*(\d+)?\s*([A-Za-z]{3}\/\d{2}\/\d{4}\s\d{2}:\d{2}:\d{2})\s+([a-zA-Z0-9,]+)\s+(.*)$',
-                line
-            )
-            if match:
-                log_id = match.group(1) or ''
-                time_str = match.group(2)
-                topics = match.group(3)
-                message = decode_mikrotik_escapes(match.group(4))
+            match = pattern.match(line)
+            if not match:
+                continue
 
-                # تحديد نوع السجل
-                log_type = 'info'
-                msg_lower = message.lower()
-                topics_lower = topics.lower()
+            log_id = match.group(1)
+            time_str = match.group(2)
+            source = match.group(3)
+            topics = match.group(4)
+            message = decode_mikrotik_escapes(match.group(5).strip())
 
-                if ('error' in topics_lower or 'critical' in topics_lower or
-                    'auth failed' in msg_lower or 'authentication failed' in msg_lower or
-                    'login failed' in msg_lower or 'invalid username' in msg_lower or
-                    'trying to log in' in msg_lower):
-                    log_type = 'error'
-                elif 'warning' in topics_lower:
-                    log_type = 'warning'
-                elif ('established' in msg_lower or 'logged in' in msg_lower or
-                      'success' in msg_lower):
-                    log_type = 'success'
+            # ✅ تصنيف ذكي للسجلات
+            log_type = 'info'
+            msg_lower = message.lower()
+            topics_lower = topics.lower()
 
-                logs.append({
-                    'id': log_id,
-                    'time': time_str,
-                    'topics': topics,
-                    'message': message,
-                    'type': log_type
-                })
+            # 🔴 أخطاء
+            if any(k in msg_lower for k in [
+                'authentication failed', 'login failed',
+                'invalid username', 'invalid password',
+                'failed', 'error', 'denied', 'reject'
+            ]) or 'error' in topics_lower:
+                log_type = 'error'
+            # 🟡 تحذيرات
+            elif any(k in msg_lower for k in [
+                'warning', 'expired', 'timeout', 'disconnect'
+            ]) or 'warning' in topics_lower:
+                log_type = 'warning'
+            # 🟢 نجاح
+            elif any(k in msg_lower for k in [
+                'established', 'logged in', 'connected',
+                'success', 'assigned'
+            ]):
+                log_type = 'success'
+
+            logs.append({
+                'id': log_id,
+                'time': time_str,
+                'source': source,
+                'topics': topics,
+                'message': message,
+                'type': log_type
+            })
 
         # الأحدث أولاً
         logs.reverse()
@@ -1885,7 +1905,15 @@ def api_get_router_logs(router_id):
     except Exception as e:
         logger.error(f"❌ logs error for router {router_id}: {e}")
         return jsonify({'ok': False, 'error': str(e)}), 500
+    finally:
+        if ssh:
+            try:
+                ssh.close()
+            except Exception:
+                pass
 
+
+# ============ Dashboard ============
 
 @app.route('/dashboard')
 def dashboard():
