@@ -1298,28 +1298,60 @@ def api_import_packages():
 
 # ============ Traffic API ============
 
-@app.route('/api/traffic/interfaces/<int:router_id>')
-def api_get_interfaces(router_id):
+@app.route('/api/traffic/all_ether/<int:router_id>')
+def api_all_ether(router_id):
+    """جلب سرعات 13 منفذ ether1-ether13 دفعة واحدة"""
     router = Router.query.get_or_404(router_id)
     api = None
     try:
         api = get_mikrotik_api(router)
-        interfaces_data = list(api.path('interface'))
-        interfaces = []
-        for iface in interfaces_data:
+        results = []
+        now = time.time()
+
+        def fmt(bps):
+            if bps >= 1_000_000_000: return f"{bps/1_000_000_000:.2f}Gbps"
+            if bps >= 1_000_000: return f"{bps/1_000_000:.2f}Mbps"
+            if bps >= 1_000: return f"{bps/1_000:.2f}kbps"
+            return f"{int(bps)}bps"
+
+        for iface in api.path('interface'):
             name = _safe_str(iface.get('name'))
-            if not name:
+            if not name or not name.startswith('ether'):
                 continue
-            disabled = _safe_bool(iface.get('disabled'), False)
-            if disabled:
+            try:
+                n = int(name.replace('ether', ''))
+                if n < 1 or n > 13:
+                    continue
+            except ValueError:
                 continue
-            iface_type = _safe_str(iface.get('type'), 'unknown')
-            running = _safe_bool(iface.get('running'), False)
-            interfaces.append({'name': name, 'type': iface_type, 'running': running})
-        interfaces.sort(key=lambda x: x['name'])
-        return jsonify({'ok': True, 'interfaces': interfaces, 'method': 'API', 'count': len(interfaces)})
+
+            rx = _safe_int(iface.get('rx-byte', 0), 0)
+            tx = _safe_int(iface.get('tx-byte', 0), 0)
+            ck = f"{router_id}_{name}"
+            rxr = txr = 0
+
+            if ck in _traffic_cache:
+                p = _traffic_cache[ck]
+                el = now - p['time']
+                if el > 0:
+                    rxr = (max(0, rx - p['rx_byte']) / el) * 8
+                    txr = (max(0, tx - p['tx_byte']) / el) * 8
+
+            _traffic_cache[ck] = {'time': now, 'rx_byte': rx, 'tx_byte': tx}
+
+            results.append({
+                'name': name,
+                'running': _safe_bool(iface.get('running'), False),
+                'rx_rate': fmt(rxr),
+                'tx_rate': fmt(txr),
+                'rx_byte': rx,
+                'tx_byte': tx,
+            })
+
+        results.sort(key=lambda x: int(x['name'].replace('ether', '')))
+        return jsonify({'ok': True, 'interfaces': results, 'count': len(results)})
     except Exception as e:
-        logger.error(f"❌ خطأ جلب المنافذ: {e}")
+        logger.error(f"❌ all_ether error: {e}")
         return jsonify({'ok': False, 'error': str(e)}), 500
     finally:
         if api:
