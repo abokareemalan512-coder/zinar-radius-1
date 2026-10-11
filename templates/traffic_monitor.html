@@ -285,7 +285,7 @@
         <select id="routerSelect" class="control-select" onchange="onRouterChange()">
             <option value="">🔌 اختر الراوتر...</option>
             {% for r in routers %}
-            <option value="{{ r.id }}">{{ r.name }} — {{ r.ip_address }}:{{ r.api_port or 13 }}</option>
+            <option value="{{ r.id }}">{{ r.name }} — {{ r.ip_address }}:{{ r.api_port or 8728 }}</option>
             {% endfor %}
         </select>
 
