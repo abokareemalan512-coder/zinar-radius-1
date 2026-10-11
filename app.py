@@ -6,6 +6,7 @@ import string
 import logging
 import traceback
 import calendar
+import time
 from datetime import datetime, timedelta
 from zoneinfo import ZoneInfo
 
@@ -22,11 +23,16 @@ try:
 except ImportError:
     requests = None
 
-# محاولة استيراد radius_sync مع حماية في حال عدم وجود الموديول
 try:
     import radius_sync
 except ImportError:
     radius_sync = None
+
+try:
+    from librouteros import connect
+    LIBROUTEROS_AVAILABLE = True
+except ImportError:
+    LIBROUTEROS_AVAILABLE = False
 
 # ============ الإعدادات ============
 
@@ -37,8 +43,11 @@ app.config['MAX_CONTENT_LENGTH'] = 5 * 1024 * 1024
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
+if not LIBROUTEROS_AVAILABLE:
+    logger.warning("⚠️ مكتبة librouteros غير مثبتة - مراقبة الترافيك معطلة")
+
 # ═══════════════════════════════════════════════════════════════
-# ✅ الإضافة 1: فلتر localtime (ضروري لكل القوالب)
+# ✅ فلتر localtime
 # ═══════════════════════════════════════════════════════════════
 LOCAL_TZ = ZoneInfo("Asia/Damascus")
 
@@ -211,6 +220,69 @@ def _day_bounds(day=None):
         day = datetime.utcnow()
     start = day.replace(hour=0, minute=0, second=0, microsecond=0)
     return start, start + timedelta(days=1)
+
+
+def _safe_str(value, default=''):
+    if value is None:
+        return default
+    if isinstance(value, bytes):
+        try:
+            return value.decode('utf-8', errors='ignore')
+        except Exception:
+            return str(value)
+    return str(value)
+
+
+def _safe_bool(value, default=False):
+    if value is None:
+        return default
+    if isinstance(value, bool):
+        return value
+    if isinstance(value, bytes):
+        try:
+            value = value.decode('utf-8', errors='ignore')
+        except Exception:
+            return default
+    s = str(value).lower()
+    return s in ('true', 'yes', '1')
+
+
+def _safe_int(value, default=0):
+    try:
+        return int(_safe_str(value, str(default)))
+    except (ValueError, TypeError):
+        return default
+
+
+# ============ MikroTik API Helper ============
+
+def get_mikrotik_api(router):
+    if not LIBROUTEROS_AVAILABLE:
+        raise Exception("مكتبة librouteros غير مثبتة")
+    try:
+        api_port = getattr(router, 'api_port', None) or 8728
+        logger.info(f"🔌 اتصال API: {router.ip_address}:{api_port} (user={router.username})")
+        api = connect(
+            username=router.username,
+            password=router.password,
+            host=router.ip_address,
+            port=api_port,
+            timeout=8
+        )
+        return api
+    except Exception as e:
+        raise Exception(f"فشل الاتصال بالـ API على المنفذ {api_port}: {str(e)}")
+
+
+def _safe_close_api(api):
+    if not api:
+        return
+    try:
+        close_fn = getattr(api, 'close', None)
+        if callable(close_fn):
+            close_fn()
+    except Exception:
+        pass
 
 
 # ============ Telegram Helper ============
@@ -507,11 +579,144 @@ def api_log():
     return jsonify({'ok': True})
 
 
+# ═══════════════════════════════════════════════════════════════
+# ✅ API: جلب المنافذ (مع أسماء PPPoE الحقيقية)
+# ═══════════════════════════════════════════════════════════════
+
+@app.route('/api/traffic/interfaces/<int:router_id>')
+def api_get_interfaces(router_id):
+    router = Router.query.get_or_404(router_id)
+    api = None
+    try:
+        api = get_mikrotik_api(router)
+        interfaces = []
+        existing = set()
+
+        # 1. المنافذ الثابتة (ether, VLAN, bridge)
+        try:
+            for iface in api.path('interface'):
+                name = _safe_str(iface.get('name'))
+                iface_type = _safe_str(iface.get('type'), 'unknown')
+
+                if not name:
+                    continue
+                # تخطى pppoe-in الديناميكية (سنأخذ أسماءها من ppp/active)
+                if name in ('pppoe-in', '<pppoe-in>'):
+                    continue
+                if name.startswith('<pppoe-'):
+                    continue
+                if _safe_bool(iface.get('disabled'), False):
+                    continue
+
+                running = _safe_bool(iface.get('running'), False)
+                interfaces.append({
+                    'name': name,
+                    'type': iface_type,
+                    'running': running
+                })
+                existing.add(name)
+        except Exception as e:
+            logger.warning(f"⚠️ interface query: {e}")
+
+        # 2. جلسات PPPoE النشطة (الأسماء الحقيقية)
+        try:
+            count = 0
+            for sess in api.path('ppp', 'active'):
+                uname = _safe_str(sess.get('name'))
+                if not uname:
+                    continue
+                real_name = f"<pppoe-{uname}>"
+                if real_name in existing:
+                    continue
+                interfaces.append({
+                    'name': real_name,
+                    'type': 'pppoe-in',
+                    'running': True
+                })
+                existing.add(real_name)
+                count += 1
+                if count >= 500:
+                    break
+        except Exception as e:
+            logger.warning(f"⚠️ ppp/active query: {e}")
+
+        interfaces.sort(key=lambda x: x.get('name', ''))
+        return jsonify({
+            'ok': True,
+            'interfaces': interfaces,
+            'method': 'API',
+            'count': len(interfaces)
+        })
+    except Exception as e:
+        logger.error(f"❌ خطأ جلب المنافذ: {e}")
+        return jsonify({'ok': False, 'error': str(e)}), 500
+    finally:
+        _safe_close_api(api)
+
+
+@app.route('/api/traffic/stats/<int:router_id>/<interface>')
+def api_get_traffic_stats(router_id, interface):
+    router = Router.query.get_or_404(router_id)
+    api = None
+    try:
+        api = get_mikrotik_api(router)
+        interfaces = list(api.path('interface'))
+        target = None
+        for iface in interfaces:
+            if _safe_str(iface.get('name')) == interface:
+                target = iface
+                break
+        if not target:
+            return jsonify({'ok': False, 'error': f'المنفذ {interface} غير موجود'}), 404
+
+        rx_byte = _safe_int(target.get('rx-byte', '0'), 0)
+        tx_byte = _safe_int(target.get('tx-byte', '0'), 0)
+
+        cache_key = f"{router_id}_{interface}"
+        now = time.time()
+        rx_rate_bps = tx_rate_bps = 0
+
+        if cache_key in _traffic_cache:
+            prev = _traffic_cache[cache_key]
+            elapsed = now - prev['time']
+            if elapsed > 0:
+                rx_diff = max(0, rx_byte - prev['rx_byte'])
+                tx_diff = max(0, tx_byte - prev['tx_byte'])
+                rx_rate_bps = (rx_diff / elapsed) * 8
+                tx_rate_bps = (tx_diff / elapsed) * 8
+
+        _traffic_cache[cache_key] = {'time': now, 'rx_byte': rx_byte, 'tx_byte': tx_byte}
+
+        def format_rate(bps):
+            if bps >= 1_000_000_000:
+                return f"{bps / 1_000_000_000:.2f}Gbps"
+            elif bps >= 1_000_000:
+                return f"{bps / 1_000_000:.2f}Mbps"
+            elif bps >= 1_000:
+                return f"{bps / 1_000:.2f}kbps"
+            else:
+                return f"{int(bps)}bps"
+
+        stats = {
+            'rx_rate': format_rate(rx_rate_bps),
+            'tx_rate': format_rate(tx_rate_bps),
+            'rx_byte': str(rx_byte),
+            'tx_byte': str(tx_byte),
+        }
+        return jsonify({'ok': True, 'stats': stats, 'method': 'API'})
+    except Exception as e:
+        logger.error(f"❌ خطأ جلب الترافيك: {e}")
+        return jsonify({'ok': False, 'error': str(e)}), 500
+    finally:
+        _safe_close_api(api)
+
+
 # ============ Auth Guard ============
 
 @app.route('/mobile')
 def mobile_view():
     return render_template('mobile.html')
+
 
 @app.before_request
 def check_admin_login():
@@ -526,6 +731,7 @@ def check_admin_login():
         'login', 'logout', 'mobile', 'mobile_view',
         'sync.get_subscribers', 'sync.mark_first_use',
         'api_auth', 'api_log',
+        'api_get_interfaces', 'api_get_traffic_stats',
         'push_all_to_radius'
     )
     if request.endpoint in public:
@@ -613,10 +819,6 @@ def dashboard():
         recent_subs = Subscriber.query.order_by(Subscriber.created_at.desc()).limit(5).all()
         recent_payments = Payment.query.filter_by(status='completed').order_by(Payment.created_at.desc()).limit(5).all()
         recent_routers = Router.query.order_by(Router.created_at.desc()).limit(5).all()
-        online_subs = Subscriber.query.filter(
-            Subscriber.current_ip.isnot(None), Subscriber.current_ip != ''
-        ).order_by(Subscriber.last_seen_at.desc()).all() if hasattr(Subscriber, 'current_ip') else []
-        top_online_subs = online_subs[:10]
 
         return render_template(
             'dashboard.html',
@@ -640,8 +842,8 @@ def dashboard():
             recent_subs=recent_subs,
             recent_payments=recent_payments,
             recent_routers=recent_routers,
-            online_subs=online_subs,
-            top_online_subs=top_online_subs,
+            online_subs=[],
+            top_online_subs=[],
         )
     except Exception as e:
         logger.error(f"❌ dashboard error: {e}")
@@ -1445,24 +1647,14 @@ def payments():
     return render_template('payments.html', payments=pay_list)
 
 
-# ═══════════════════════════════════════════════════════════════
-# ✅ الإضافة 2: صفحة مراقبة الترافيك (فارغة - فقط لمنع خطأ base.html)
-# ═══════════════════════════════════════════════════════════════
+# ============ مراقبة الترافيك ============
+
 @app.route('/traffic-monitor')
 def traffic_monitor_page():
-    return """
-    <html dir="rtl"><head><meta charset="utf-8"><title>مراقبة الترافيك</title></head>
-    <body style="font-family: Tahoma; padding: 40px; background: #0f172a; color: #fff;">
-        <h1>مراقبة الترافيك</h1>
-        <p>هذه الميزة غير مفعلة في هذه النسخة.</p>
-        <a href="/dashboard" style="color: #38bdf8;">← العودة للوحة التحكم</a>
-    </body></html>
-    """
+    routers_list = Router.query.all()
+    return render_template('traffic_monitor.html', routers=routers_list)
 
 
-# ═══════════════════════════════════════════════════════════════
-# ✅ الإضافة 3: صفحة استيراد النسخة الاحتياطية (فارغة)
-# ═══════════════════════════════════════════════════════════════
 @app.route('/import-backup', methods=['GET', 'POST'])
 def import_backup():
     return """
@@ -1475,9 +1667,6 @@ def import_backup():
     """
 
 
-# ═══════════════════════════════════════════════════════════════
-# ✅ الإضافة 4: رابط مزامنة RADIUS (الأهم لحل مشكلة 102030)
-# ═══════════════════════════════════════════════════════════════
 @app.route('/push-all-to-radius')
 def push_all_to_radius():
     if not radius_sync:
@@ -1520,7 +1709,7 @@ def push_all_to_radius():
         html += """
         <div style="background: #064e3b; padding: 20px; border-radius: 12px; margin: 20px 0;">
             <p style="font-size: 20px; color: #6ee7b7;">
-                ✅ كل الحسابات الآن في RADIUS. جرّب الدخول بحساب 010203.
+                ✅ كل الحسابات الآن في RADIUS.
             </p>
         </div>
         """
