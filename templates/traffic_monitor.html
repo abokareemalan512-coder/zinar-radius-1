@@ -3,282 +3,167 @@
 
 {% block content %}
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-<link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@400;500;700;800&display=swap" rel="stylesheet">
 
 <style>
     body { font-family: 'Tajawal', sans-serif; }
 
-    .traffic-card {
+    /* ==== بطاقة منفذ صغيرة ==== */
+    .port-card {
         background-color: var(--bg-card);
         border: 1px solid var(--bg-hover);
-        border-radius: 16px;
-        padding: 24px;
-        height: 100%;
-        transition: all 0.3s ease;
+        border-radius: 10px;
+        padding: 10px 12px;
+        cursor: pointer;
+        transition: all 0.2s ease;
+        position: relative;
     }
-    .traffic-card:hover {
+    .port-card:hover {
         border-color: var(--accent);
-        box-shadow: 0 10px 25px -5px rgba(56, 189, 248, 0.1);
+        transform: translateY(-2px);
+        box-shadow: 0 6px 15px -5px rgba(56, 189, 248, 0.2);
     }
-    .traffic-header {
+    .port-card.selected {
+        border-color: var(--accent);
+        background: linear-gradient(135deg, rgba(56, 189, 248, 0.1), rgba(14, 165, 233, 0.02));
+        box-shadow: 0 0 15px rgba(56, 189, 248, 0.3);
+    }
+    .port-card .port-name {
+        font-family: monospace;
+        font-weight: 700;
+        font-size: 0.85rem;
+        color: var(--text-main);
         display: flex;
         justify-content: space-between;
         align-items: center;
-        margin-bottom: 15px;
+        margin-bottom: 6px;
+    }
+    .port-card .port-status {
+        display: inline-flex;
+        align-items: center;
+        gap: 3px;
+        font-size: 0.6rem;
+        padding: 2px 6px;
+        border-radius: 8px;
+    }
+    .port-card .port-status.running {
+        background: rgba(34, 197, 94, 0.15);
+        color: #22c55e;
+    }
+    .port-card .port-status.idle {
+        background: rgba(148, 163, 184, 0.15);
+        color: #94a3b8;
+    }
+    .port-card .port-speeds {
+        display: flex;
+        justify-content: space-between;
+        gap: 6px;
+        font-size: 0.7rem;
+        font-weight: 600;
+    }
+    .port-card .speed-down {
+        color: #22c55e;
+        font-family: monospace;
+    }
+    .port-card .speed-up {
+        color: #f59e0b;
+        font-family: monospace;
+    }
+
+    /* ==== بطاقة المراقبة الكبيرة ==== */
+    .traffic-card {
+        background-color: var(--bg-card);
+        border: 1px solid var(--bg-hover);
+        border-radius: 12px;
+        padding: 14px;
     }
     .traffic-value {
-        font-size: 2.5rem;
+        font-size: 1.8rem;
         font-weight: 800;
-        margin: 10px 0;
+        margin: 4px 0;
     }
     .traffic-unit {
-        font-size: 1.1rem;
+        font-size: 0.85rem;
         font-weight: 500;
         opacity: 0.8;
     }
     .traffic-progress {
-        height: 10px;
+        height: 6px;
         background-color: var(--bg-main);
-        border-radius: 5px;
+        border-radius: 3px;
         overflow: hidden;
-        margin: 15px 0;
+        margin: 8px 0;
     }
     .traffic-progress-bar {
         height: 100%;
-        border-radius: 5px;
+        border-radius: 3px;
         transition: width 0.5s ease;
     }
     .chart-container {
         position: relative;
-        height: 220px;
+        height: 130px;
         width: 100%;
-        margin-top: 15px;
     }
     .upload-color { color: #f59e0b; }
     .download-color { color: #22c55e; }
     .bg-upload { background: linear-gradient(90deg, #f59e0b, #fbbf24); }
     .bg-download { background: linear-gradient(90deg, #22c55e, #4ade80); }
 
-    .status-indicator {
-        display: inline-flex;
-        align-items: center;
-        gap: 8px;
-        font-size: 0.85rem;
-        padding: 6px 14px;
-        border-radius: 20px;
-        background-color: rgba(34, 197, 94, 0.1);
-        color: #22c55e;
-        border: 1px solid rgba(34, 197, 94, 0.3);
-    }
-    .pulse-dot {
-        width: 8px;
-        height: 8px;
-        border-radius: 50%;
-        background-color: currentColor;
-        animation: pulse-animation 1.5s infinite;
-    }
-    @keyframes pulse-animation {
-        0% { box-shadow: 0 0 0 0 currentColor; opacity: 1; }
-        70% { box-shadow: 0 0 0 8px transparent; opacity: 0.7; }
-        100% { box-shadow: 0 0 0 0 transparent; opacity: 1; }
-    }
-    .api-badge {
-        display: inline-flex;
-        align-items: center;
-        gap: 5px;
-        font-size: 0.7rem;
-        padding: 3px 10px;
-        border-radius: 12px;
-        background: linear-gradient(135deg, #38bdf8, #0ea5e9);
-        color: #0f172a;
-        font-weight: 700;
-    }
     .control-select {
-        width: 220px;
         background-color: var(--bg-card);
         color: var(--text-main);
         border: 1px solid var(--bg-hover);
-        padding: 10px 14px;
-        border-radius: 10px;
+        padding: 8px 12px;
+        border-radius: 8px;
         font-weight: 500;
+        font-size: 0.85rem;
     }
     .control-select:focus {
-        background-color: var(--bg-card);
-        color: var(--text-main);
         border-color: var(--accent);
-        box-shadow: 0 0 0 0.2rem var(--accent-glow);
-    }
-
-    /* ✅ خانة البحث للمنافذ */
-    .interface-search-wrapper {
-        position: relative;
-        width: 250px;
-    }
-    .interface-search-wrapper input {
-        width: 100%;
-        padding: 10px 40px 10px 14px;
-        background-color: var(--bg-card);
-        color: var(--text-main);
-        border: 1px solid var(--bg-hover);
-        border-radius: 10px;
-        font-weight: 500;
-        transition: all 0.2s;
-    }
-    .interface-search-wrapper input:focus {
-        background-color: var(--bg-card);
-        color: var(--text-main);
-        border-color: var(--accent);
-        box-shadow: 0 0 0 0.2rem var(--accent-glow);
+        box-shadow: 0 0 0 0.15rem var(--accent-glow);
         outline: none;
     }
-    .interface-search-wrapper input::placeholder {
-        color: var(--text-muted);
+
+    .status-dot {
+        display: inline-block;
+        width: 7px;
+        height: 7px;
+        border-radius: 50%;
+        background-color: #22c55e;
+        animation: pulse 1.5s infinite;
     }
-    .interface-search-wrapper .search-icon {
-        position: absolute;
-        right: 14px;
-        top: 50%;
-        transform: translateY(-50%);
-        color: var(--text-muted);
-        pointer-events: none;
-    }
-    .interface-search-wrapper .clear-btn {
-        position: absolute;
-        left: 14px;
-        top: 50%;
-        transform: translateY(-50%);
-        background: none;
-        border: none;
-        color: var(--text-muted);
-        cursor: pointer;
-        display: none;
-        padding: 0;
-        font-size: 1.1rem;
-    }
-    .interface-search-wrapper .clear-btn:hover {
-        color: #ef4444;
+    @keyframes pulse {
+        0% { box-shadow: 0 0 0 0 currentColor; opacity: 1; }
+        70% { box-shadow: 0 0 0 6px transparent; opacity: 0.7; }
+        100% { box-shadow: 0 0 0 0 transparent; opacity: 1; }
     }
 
-    /* ✅ قائمة المنافذ المنسدلة */
-    .interface-dropdown {
-        position: absolute;
-        top: 100%;
-        right: 0;
-        left: 0;
-        margin-top: 5px;
-        background-color: var(--bg-card);
-        border: 1px solid var(--bg-hover);
-        border-radius: 10px;
-        max-height: 350px;
-        overflow-y: auto;
-        z-index: 1000;
-        box-shadow: 0 10px 25px rgba(0,0,0,0.3);
-        display: none;
-    }
-    .interface-dropdown.show {
-        display: block;
-    }
-    .interface-item {
-        padding: 10px 14px;
-        cursor: pointer;
-        border-bottom: 1px solid var(--bg-hover);
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
-        transition: all 0.15s;
-        color: var(--text-main);
-    }
-    .interface-item:last-child {
-        border-bottom: none;
-    }
-    .interface-item:hover {
-        background-color: rgba(56, 189, 248, 0.1);
-        color: var(--accent);
-    }
-    .interface-item.selected {
-        background-color: rgba(56, 189, 248, 0.15);
-        color: var(--accent);
-        font-weight: 600;
-    }
-    .interface-item .iface-name {
-        font-family: monospace;
-        font-size: 0.9rem;
-    }
-    .interface-item .iface-meta {
-        font-size: 0.75rem;
-        color: var(--text-muted);
-    }
-    .interface-item .iface-status {
+    .badge-small {
         display: inline-flex;
         align-items: center;
         gap: 4px;
+        padding: 3px 10px;
+        border-radius: 10px;
         font-size: 0.7rem;
-        padding: 2px 8px;
-        border-radius: 10px;
-    }
-    .iface-running {
-        background: rgba(34, 197, 94, 0.1);
-        color: #22c55e;
-    }
-    .iface-idle {
-        background: rgba(148, 163, 184, 0.1);
-        color: #94a3b8;
+        font-weight: 700;
     }
 
-    /* زر تبديل الاتجاه */
-    .direction-toggle {
-        display: inline-flex;
-        align-items: center;
-        gap: 8px;
-        background: linear-gradient(135deg, #a855f7, #9333ea);
-        color: white;
-        border: none;
-        padding: 10px 18px;
+    .controls-bar {
+        background-color: var(--bg-card);
+        border: 1px solid var(--bg-hover);
         border-radius: 10px;
-        font-weight: 600;
-        font-size: 0.9rem;
-        cursor: pointer;
-        transition: all 0.3s;
-        box-shadow: 0 4px 12px rgba(168, 85, 247, 0.3);
-    }
-    .direction-toggle:hover {
-        transform: translateY(-2px);
-        box-shadow: 0 6px 18px rgba(168, 85, 247, 0.5);
-        color: white;
-    }
-    .direction-toggle.reversed {
-        background: linear-gradient(135deg, #f59e0b, #d97706);
-        box-shadow: 0 4px 12px rgba(245, 158, 11, 0.3);
-    }
-    .direction-toggle.reversed:hover {
-        box-shadow: 0 6px 18px rgba(245, 158, 11, 0.5);
-    }
-
-    .direction-info {
-        background: rgba(56, 189, 248, 0.08);
-        border: 1px solid rgba(56, 189, 248, 0.2);
-        padding: 10px 15px;
-        border-radius: 10px;
-        font-size: 0.85rem;
-        color: var(--text-muted);
-        margin-bottom: 15px;
-    }
-    .direction-info strong {
-        color: var(--accent);
+        padding: 10px 14px;
+        margin-bottom: 12px;
     }
 </style>
 
 <!-- العنوان والتحكم -->
-<div class="d-flex justify-content-between align-items-center mb-4 flex-wrap gap-3">
-    <div>
-        <h2 class="fw-bold mb-1">
-            <i class="bi bi-graph-up-arrow text-accent"></i>
-            مراقبة حركة المرور
-            <span class="api-badge ms-2">
-                <i class="bi bi-lightning-charge-fill"></i> MikroTik API
-            </span>
-        </h2>
-        <small class="text-muted">مراقبة مباشرة (Live) عبر المنفذ المحدد للـ API</small>
+<div class="controls-bar d-flex justify-content-between align-items-center flex-wrap gap-2">
+    <div class="d-flex align-items-center gap-2">
+        <i class="bi bi-graph-up-arrow text-accent fs-5"></i>
+        <strong>مراقبة الترافيك</strong>
+        <span class="badge-small" style="background: linear-gradient(135deg, #38bdf8, #0ea5e9); color: #0f172a;">
+            <i class="bi bi-lightning-charge-fill"></i> API
+        </span>
     </div>
 
     <div class="d-flex gap-2 flex-wrap align-items-center">
@@ -289,55 +174,34 @@
             {% endfor %}
         </select>
 
-        <div class="interface-search-wrapper">
-            <input type="text" id="interfaceSearch" placeholder="🔍 ابحث عن منفذ..." 
-                   autocomplete="off" disabled
-                   oninput="filterInterfaces()"
-                   onfocus="showInterfaceDropdown()">
-            <i class="bi bi-search search-icon"></i>
-            <button class="clear-btn" id="clearSearchBtn" onclick="clearInterfaceSearch()" type="button">
-                <i class="bi bi-x-circle-fill"></i>
-            </button>
-            
-            <div class="interface-dropdown" id="interfaceDropdown"></div>
-        </div>
-
-        <input type="hidden" id="interfaceSelect" value="">
-
-        <button id="directionBtn" class="direction-toggle" onclick="toggleDirection()" title="تبديل اتجاه الرفع والتحميل">
-            <i class="bi bi-arrow-left-right" id="directionIcon"></i>
-            <span id="directionText">الاتجاه: تلقائي</span>
+        <button id="refreshBtn" class="btn btn-sm btn-primary" onclick="refreshAll()" disabled>
+            <i class="bi bi-arrow-clockwise"></i> تحديث
         </button>
 
-        <button id="startBtn" class="btn btn-primary px-4 py-2 rounded-3" onclick="startMonitoring()">
-            <i class="bi bi-play-fill"></i> بدء المراقبة
+        <button id="toggleBtn" class="btn btn-sm btn-success" onclick="toggleLive()" disabled>
+            <i class="bi bi-play-fill"></i> Live
         </button>
-        <button id="stopBtn" class="btn btn-danger px-4 py-2 rounded-3" onclick="stopMonitoring()" style="display: none;">
-            <i class="bi bi-stop-fill"></i> إيقاف
-        </button>
+
+        <span id="liveStatus" class="badge-small" style="display:none; background: rgba(34, 197, 94, 0.15); color:#22c55e; border: 1px solid rgba(34, 197, 94, 0.3);">
+            <span class="status-dot"></span> مباشر
+        </span>
     </div>
 </div>
 
-<div class="direction-info" id="directionInfo" style="display: none;">
-    <i class="bi bi-info-circle-fill text-info"></i>
-    <span id="directionInfoText">الاتجاه التلقائي: <strong>WAN</strong> (منفذ الإنترنت)</span>
+<!-- شبكة المنافذ 13 -->
+<div id="portsGrid" class="row g-2 mb-3" style="display: none;">
+    <!-- تُملأ بالجافاسكربت -->
 </div>
 
-<div id="connectionStatus" class="mb-3" style="display: none;">
-    <span class="status-indicator">
-        <span class="pulse-dot"></span>
-        <span id="statusText">جاري الاتصال...</span>
-    </span>
-</div>
-
-<div class="row g-4" id="monitoringArea" style="display: none;">
+<!-- منطقة المراقبة للتفاصيل -->
+<div id="detailArea" class="row g-3" style="display: none;">
     <div class="col-md-6">
         <div class="traffic-card">
-            <div class="traffic-header">
-                <h5 class="fw-bold mb-0 download-color">
-                    <i class="bi bi-arrow-down-circle-fill"></i> تحميل (Download)
-                </h5>
-                <span class="badge px-3 py-2" id="downloadRateBadge" style="background: rgba(34, 197, 94, 0.1); color: #22c55e; border: 1px solid rgba(34, 197, 94, 0.3); font-size: 0.85rem;">0 Mbps</span>
+            <div class="d-flex justify-content-between align-items-center mb-2">
+                <h6 class="fw-bold mb-0 download-color">
+                    <i class="bi bi-arrow-down-circle-fill"></i> تحميل
+                </h6>
+                <span class="badge-small" id="downloadRateBadge" style="background: rgba(34,197,94,0.1); color:#22c55e; border:1px solid rgba(34,197,94,0.3);">0 Mbps</span>
             </div>
             <div class="text-center">
                 <div class="traffic-value download-color">
@@ -347,23 +211,21 @@
             <div class="traffic-progress">
                 <div class="traffic-progress-bar bg-download" id="downloadProgress" style="width: 0%;"></div>
             </div>
-            <div class="d-flex justify-content-between text-muted small">
-                <span><i class="bi bi-hdd-stack"></i> إجمالي التحميل:</span>
+            <div class="d-flex justify-content-between text-muted" style="font-size:0.75rem;">
+                <span><i class="bi bi-hdd-stack"></i> إجمالي:</span>
                 <span id="downloadTotal" class="fw-bold">0 GB</span>
             </div>
-            <div class="chart-container">
-                <canvas id="downloadChart"></canvas>
-            </div>
+            <div class="chart-container"><canvas id="downloadChart"></canvas></div>
         </div>
     </div>
 
     <div class="col-md-6">
         <div class="traffic-card">
-            <div class="traffic-header">
-                <h5 class="fw-bold mb-0 upload-color">
-                    <i class="bi bi-arrow-up-circle-fill"></i> رفع (Upload)
-                </h5>
-                <span class="badge px-3 py-2" id="uploadRateBadge" style="background: rgba(245, 158, 11, 0.1); color: #f59e0b; border: 1px solid rgba(245, 158, 11, 0.3); font-size: 0.85rem;">0 Mbps</span>
+            <div class="d-flex justify-content-between align-items-center mb-2">
+                <h6 class="fw-bold mb-0 upload-color">
+                    <i class="bi bi-arrow-up-circle-fill"></i> رفع
+                </h6>
+                <span class="badge-small" id="uploadRateBadge" style="background: rgba(245,158,11,0.1); color:#f59e0b; border:1px solid rgba(245,158,11,0.3);">0 Mbps</span>
             </div>
             <div class="text-center">
                 <div class="traffic-value upload-color">
@@ -373,129 +235,276 @@
             <div class="traffic-progress">
                 <div class="traffic-progress-bar bg-upload" id="uploadProgress" style="width: 0%;"></div>
             </div>
-            <div class="d-flex justify-content-between text-muted small">
-                <span><i class="bi bi-hdd-stack"></i> إجمالي الرفع:</span>
+            <div class="d-flex justify-content-between text-muted" style="font-size:0.75rem;">
+                <span><i class="bi bi-hdd-stack"></i> إجمالي:</span>
                 <span id="uploadTotal" class="fw-bold">0 GB</span>
             </div>
-            <div class="chart-container">
-                <canvas id="uploadChart"></canvas>
-            </div>
+            <div class="chart-container"><canvas id="uploadChart"></canvas></div>
         </div>
     </div>
 </div>
 
-<div class="alert alert-info border-0 rounded-4 small mt-4 d-flex align-items-center gap-2">
-    <i class="bi bi-info-circle-fill fs-5"></i>
-    <div>
-        <strong>كيف تستخدم زر الاتجاه؟</strong>
-        <ul class="mb-0 mt-1" style="padding-right: 20px;">
-            <li>إذا كان <strong>التحميل أعلى من الرفع</strong> — الاتجاه صحيح ✅</li>
-            <li>إذا كان <strong>الرفع أعلى من التحميل</strong> — اضغط زر <strong>الاتجاه</strong> لتبديله 🔄</li>
-        </ul>
-    </div>
-</div>
-
 <script>
-    let uploadChart, downloadChart;
-    let monitoringInterval = null;
+    const MAX_POINTS = 30;
+    const INTERVAL = 3000;
 
-    const MAX_DATA_POINTS = 30;
-    const UPDATE_INTERVAL = 3000;
-    const STORAGE_KEY = 'traffic_monitor_state';
-    const DIRECTION_KEY = 'traffic_direction_reversed';
+    let allPorts = [];              // [{name, running, rx_rate, tx_rate, rx_byte, tx_byte}]
+    let selectedPort = null;        // اسم المنفذ المختار
+    let liveTimer = null;           // مؤقت Live
+    let isLive = false;
+    let currentRouterId = null;
 
+    // اتجاه: {name: 'wan'|'lan'}
+    const directionMap = {};
+
+    let uploadChart = null;
+    let downloadChart = null;
     let uploadData = [];
     let downloadData = [];
     let labels = [];
 
-    let isDirectionReversed = false;
-    let allInterfaces = [];
-    let selectedInterface = '';
+    // ═══════════════════════════════════════════
+    //      HELPER: تنسيق السرعة والبايت
+    // ═══════════════════════════════════════════
+    function fmtSpeed(s) {
+        if (!s) return '0 bps';
+        return s;
+    }
+    function parseSpeedToMbps(s) {
+        if (!s) return 0;
+        s = String(s);
+        if (s.includes('Gbps')) return parseFloat(s) * 1000;
+        if (s.includes('Mbps')) return parseFloat(s);
+        if (s.includes('kbps')) return parseFloat(s) / 1000;
+        const n = parseFloat(s);
+        return isNaN(n) ? 0 : n / 1000000;
+    }
+    function bytesToGB(b) {
+        b = Number(b) || 0;
+        return (b / (1024 * 1024 * 1024)).toFixed(2);
+    }
 
-    function loadDirection() {
-        try {
-            const saved = localStorage.getItem(DIRECTION_KEY);
-            isDirectionReversed = saved === 'true';
-        } catch(e) {
-            isDirectionReversed = false;
+    // ═══════════════════════════════════════════
+    //      تبديل الاتجاه (WAN/LAN) لكل منفذ
+    // ═══════════════════════════════════════════
+    function getDirection(name) {
+        if (!directionMap[name]) directionMap[name] = 'wan';
+        return directionMap[name];
+    }
+    function togglePortDirection(name, event) {
+        if (event) event.stopPropagation();
+        directionMap[name] = (getDirection(name) === 'wan') ? 'lan' : 'wan';
+        renderPorts();
+        if (selectedPort === name) fetchSelectedStats();
+    }
+
+    // ═══════════════════════════════════════════
+    //      جلب قائمة المنافذ
+    // ═══════════════════════════════════════════
+    function onRouterChange() {
+        const rid = document.getElementById('routerSelect').value;
+        currentRouterId = rid;
+
+        if (!rid) {
+            document.getElementById('portsGrid').style.display = 'none';
+            document.getElementById('detailArea').style.display = 'none';
+            document.getElementById('refreshBtn').disabled = true;
+            document.getElementById('toggleBtn').disabled = true;
+            stopLive();
+            return;
         }
-        updateDirectionUI();
+        document.getElementById('refreshBtn').disabled = false;
+        document.getElementById('toggleBtn').disabled = false;
+        selectedPort = null;
+        fetchPorts();
     }
 
-    function saveDirection() {
-        try {
-            localStorage.setItem(DIRECTION_KEY, String(isDirectionReversed));
-        } catch(e) {}
+    function fetchPorts() {
+        if (!currentRouterId) return;
+        fetch(`/api/traffic/interfaces/${currentRouterId}`)
+            .then(r => r.json())
+            .then(data => {
+                if (!data.ok) {
+                    alert('❌ ' + (data.error || 'فشل جلب المنافذ'));
+                    return;
+                }
+                // فلترة: ether1..ether13 فقط
+                allPorts = (data.interfaces || []).filter(p => {
+                    const m = p.name.match(/^ether(\d+)$/);
+                    return m && parseInt(m[1]) >= 1 && parseInt(m[1]) <= 13;
+                }).sort((a, b) => {
+                    const na = parseInt(a.name.replace('ether',''));
+                    const nb = parseInt(b.name.replace('ether',''));
+                    return na - nb;
+                });
+
+                renderPorts();
+                document.getElementById('portsGrid').style.display = 'flex';
+
+                // جلب السرعات لكل المنافذ
+                fetchAllStats();
+            })
+            .catch(err => alert('❌ ' + err.message));
     }
 
-    function updateDirectionUI() {
-        const btn = document.getElementById('directionBtn');
-        const text = document.getElementById('directionText');
-        const info = document.getElementById('directionInfoText');
+    // ═══════════════════════════════════════════
+    //      جلب السرعات لجميع المنافذ (13)
+    // ═══════════════════════════════════════════
+    function fetchAllStats() {
+        if (!currentRouterId || allPorts.length === 0) return;
+        const promises = allPorts.map(p =>
+            fetch(`/api/traffic/stats/${currentRouterId}/${p.name}`)
+                .then(r => r.json())
+                .then(d => d.ok ? { name: p.name, ...d.stats } : null)
+                .catch(() => null)
+        );
+        Promise.all(promises).then(results => {
+            results.forEach(r => {
+                if (!r) return;
+                const port = allPorts.find(p => p.name === r.name);
+                if (port) {
+                    port.rx_rate = r.rx_rate;
+                    port.tx_rate = r.tx_rate;
+                    port.rx_byte = r.rx_byte;
+                    port.tx_byte = r.tx_byte;
+                }
+            });
+            renderPorts();
 
-        if (isDirectionReversed) {
-            btn.classList.add('reversed');
-            text.textContent = 'الاتجاه: معكوس (LAN)';
-            if (info) info.innerHTML = 'الاتجاه الحالي: <strong style="color:#f59e0b;">معكوس</strong> — مناسب لمنافذ LAN';
-        } else {
-            btn.classList.remove('reversed');
-            text.textContent = 'الاتجاه: تلقائي (WAN)';
-            if (info) info.innerHTML = 'الاتجاه الحالي: <strong>تلقائي</strong> — مناسب لمنافذ WAN';
-        }
+            // إذا فيه منفذ مختار، حدّث المخططات
+            if (selectedPort) {
+                const p = allPorts.find(x => x.name === selectedPort);
+                if (p) updateDetail(p);
+            }
+        });
     }
 
-    function toggleDirection() {
-        isDirectionReversed = !isDirectionReversed;
-        saveDirection();
-        updateDirectionUI();
+    // ═══════════════════════════════════════════
+    //      رسم بطاقات المنافذ الـ13
+    // ═══════════════════════════════════════════
+    function renderPorts() {
+        const grid = document.getElementById('portsGrid');
+        grid.innerHTML = allPorts.map(p => {
+            const isSelected = p.name === selectedPort ? 'selected' : '';
+            const statusCls = p.running ? 'running' : 'idle';
+            const statusTxt = p.running ? '🟢' : '⚪';
+            const dir = getDirection(p.name);
 
+            let rxV = parseSpeedToMbps(p.rx_rate || '0').toFixed(1);
+            let txV = parseSpeedToMbps(p.tx_rate || '0').toFixed(1);
+            let downV, upV;
+            if (dir === 'wan') {
+                downV = rxV; upV = txV;
+            } else {
+                downV = txV; upV = rxV;
+            }
+
+            return `
+                <div class="col-xl-2 col-lg-3 col-md-4 col-6">
+                    <div class="port-card ${isSelected}" onclick="selectPort('${p.name}')">
+                        <div class="port-name">
+                            <span>${p.name}</span>
+                            <span class="port-status ${statusCls}">${statusTxt}</span>
+                        </div>
+                        <div class="port-speeds">
+                            <span class="speed-down">⬇ ${downV}</span>
+                            <span class="speed-up">⬆ ${upV}</span>
+                        </div>
+                        <div class="text-center mt-1">
+                            <button class="btn btn-sm p-0 border-0 text-muted" style="font-size:0.6rem;"
+                                    onclick="togglePortDirection('${p.name}', event)"
+                                    title="تبديل الاتجاه (${dir.toUpperCase()})">
+                                <i class="bi bi-arrow-left-right"></i> ${dir.toUpperCase()}
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            `;
+        }).join('');
+    }
+
+    // ═══════════════════════════════════════════
+    //      اختيار منفذ
+    // ═══════════════════════════════════════════
+    function selectPort(name) {
+        selectedPort = name;
+        renderPorts();
+        document.getElementById('detailArea').style.display = 'flex';
+
+        // امسح المخططات
         uploadData.length = 0;
         downloadData.length = 0;
         labels.length = 0;
+        if (uploadChart) { uploadChart.data.labels = labels; uploadChart.data.datasets[0].data = uploadData; uploadChart.update(); }
+        if (downloadChart) { downloadChart.data.labels = labels; downloadChart.data.datasets[0].data = downloadData; downloadChart.update(); }
 
-        if (uploadChart) {
-            uploadChart.data.labels = labels;
-            uploadChart.data.datasets[0].data = uploadData;
-            uploadChart.update();
+        const p = allPorts.find(x => x.name === name);
+        if (p) updateDetail(p);
+    }
+
+    // ═══════════════════════════════════════════
+    //      تحديث تفاصيل المنفذ المختار
+    // ═══════════════════════════════════════════
+    function updateDetail(p) {
+        const dir = getDirection(p.name);
+        let rxV = parseSpeedToMbps(p.rx_rate || '0');
+        let txV = parseSpeedToMbps(p.tx_rate || '0');
+        let rxB = parseInt(p.rx_byte || 0);
+        let txB = parseInt(p.tx_byte || 0);
+
+        let downV, upV, downB, upB;
+        if (dir === 'wan') {
+            downV = rxV; upV = txV; downB = rxB; upB = txB;
+        } else {
+            downV = txV; upV = rxV; downB = txB; upB = rxB;
         }
-        if (downloadChart) {
-            downloadChart.data.labels = labels;
-            downloadChart.data.datasets[0].data = downloadData;
-            downloadChart.update();
+
+        document.getElementById('downloadRate').textContent = downV.toFixed(2);
+        document.getElementById('uploadRate').textContent = upV.toFixed(2);
+        document.getElementById('downloadTotal').textContent = bytesToGB(downB) + ' GB';
+        document.getElementById('uploadTotal').textContent = bytesToGB(upB) + ' GB';
+        document.getElementById('downloadRateBadge').textContent = downV.toFixed(2) + ' Mbps';
+        document.getElementById('uploadRateBadge').textContent = upV.toFixed(2) + ' Mbps';
+        document.getElementById('downloadProgress').style.width = Math.min((downV / 100) * 100, 100) + '%';
+        document.getElementById('uploadProgress').style.width = Math.min((upV / 100) * 100, 100) + '%';
+
+        if (!uploadChart) initCharts();
+
+        const now = new Date().toLocaleTimeString('ar-EG', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+        labels.push(now);
+        uploadData.push(upV);
+        downloadData.push(downV);
+
+        if (labels.length > MAX_POINTS) {
+            labels.shift(); uploadData.shift(); downloadData.shift();
         }
-
-        const routerId = document.getElementById('routerSelect').value;
-        if (routerId && selectedInterface && monitoringInterval) {
-            fetchTrafficData(routerId, selectedInterface);
-        }
+        uploadChart.update('none');
+        downloadChart.update('none');
     }
 
-    function saveState(routerId, interfaceName, isMonitoring) {
-        try {
-            localStorage.setItem(STORAGE_KEY, JSON.stringify({
-                routerId: routerId,
-                interfaceName: interfaceName,
-                isMonitoring: isMonitoring
-            }));
-        } catch(e) {}
+    function fetchSelectedStats() {
+        if (!selectedPort || !currentRouterId) return;
+        fetch(`/api/traffic/stats/${currentRouterId}/${selectedPort}`)
+            .then(r => r.json())
+            .then(d => {
+                if (!d.ok) return;
+                const p = allPorts.find(x => x.name === selectedPort);
+                if (p) {
+                    p.rx_rate = d.stats.rx_rate;
+                    p.tx_rate = d.stats.tx_rate;
+                    p.rx_byte = d.stats.rx_byte;
+                    p.tx_byte = d.stats.tx_byte;
+                    updateDetail(p);
+                }
+            })
+            .catch(() => {});
     }
 
-    function loadState() {
-        try {
-            const raw = localStorage.getItem(STORAGE_KEY);
-            return raw ? JSON.parse(raw) : null;
-        } catch(e) { return null; }
-    }
-
-    function clearState() {
-        try { localStorage.removeItem(STORAGE_KEY); } catch(e) {}
-    }
-
+    // ═══════════════════════════════════════════
+    //      المخططات
+    // ═══════════════════════════════════════════
     function initCharts() {
-        const ctxUpload = document.getElementById('uploadChart').getContext('2d');
-        const ctxDownload = document.getElementById('downloadChart').getContext('2d');
-
-        const commonOptions = {
+        const commonOpts = {
             responsive: true,
             maintainAspectRatio: false,
             animation: { duration: 200 },
@@ -504,316 +513,66 @@
                 x: { display: false },
                 y: {
                     beginAtZero: true,
-                    grid: { color: 'rgba(255, 255, 255, 0.05)' },
-                    ticks: { color: '#94a3b8', font: { size: 10 } }
+                    grid: { color: 'rgba(255,255,255,0.05)' },
+                    ticks: { color: '#94a3b8', font: { size: 9 } }
                 }
             },
             elements: {
-                point: { radius: 0, hitRadius: 10 },
-                line: { tension: 0.4, borderWidth: 2.5 }
+                point: { radius: 0 },
+                line: { tension: 0.4, borderWidth: 2 }
             }
         };
-
-        uploadChart = new Chart(ctxUpload, {
+        uploadChart = new Chart(document.getElementById('uploadChart').getContext('2d'), {
             type: 'line',
-            data: {
-                labels: labels,
-                datasets: [{
-                    data: uploadData,
-                    borderColor: '#f59e0b',
-                    backgroundColor: 'rgba(245, 158, 11, 0.15)',
-                    fill: true
-                }]
-            },
-            options: commonOptions
+            data: { labels: labels, datasets: [{ data: uploadData, borderColor: '#f59e0b', backgroundColor: 'rgba(245,158,11,0.15)', fill: true }] },
+            options: commonOpts
         });
-
-        downloadChart = new Chart(ctxDownload, {
+        downloadChart = new Chart(document.getElementById('downloadChart').getContext('2d'), {
             type: 'line',
-            data: {
-                labels: labels,
-                datasets: [{
-                    data: downloadData,
-                    borderColor: '#22c55e',
-                    backgroundColor: 'rgba(34, 197, 94, 0.15)',
-                    fill: true
-                }]
-            },
-            options: commonOptions
+            data: { labels: labels, datasets: [{ data: downloadData, borderColor: '#22c55e', backgroundColor: 'rgba(34,197,94,0.15)', fill: true }] },
+            options: commonOpts
         });
     }
 
-    function fetchInterfaces(routerId, callback) {
-        const searchInput = document.getElementById('interfaceSearch');
-        const statusDiv = document.getElementById('connectionStatus');
-
-        searchInput.value = '';
-        searchInput.placeholder = '⏳ جاري الجلب...';
-        searchInput.disabled = true;
-        statusDiv.style.display = 'block';
-        document.getElementById('statusText').textContent = 'جاري الاتصال بالـ API...';
-
-        fetch(`/api/traffic/interfaces/${routerId}`)
-            .then(res => {
-                if (!res.ok) {
-                    return res.text().then(text => {
-                        throw new Error(`HTTP ${res.status}: ${text.substring(0, 200)}`);
-                    });
-                }
-                return res.json();
-            })
-            .then(data => {
-                if (data.ok) {
-                    allInterfaces = data.interfaces || [];
-                    searchInput.disabled = false;
-                    searchInput.placeholder = `🔍 ابحث عن منفذ... (${allInterfaces.length})`;
-                    document.getElementById('statusText').textContent = `✅ تم جلب ${allInterfaces.length} منفذ عبر API`;
-                    renderInterfaceDropdown(allInterfaces);
-                    if (callback) callback();
-                } else {
-                    searchInput.placeholder = '❌ خطأ في الجلب';
-                    document.getElementById('statusText').textContent = '❌ ' + (data.error || 'فشل الاتصال');
-                    searchInput.disabled = false;
-                }
-            })
-            .catch(err => {
-                console.error('❌ Fetch Error:', err);
-                searchInput.placeholder = '❌ فشل الاتصال';
-                document.getElementById('statusText').textContent = '❌ ' + err.message;
-                searchInput.disabled = false;
-            });
+    // ═══════════════════════════════════════════
+    //      Live / Refresh / Stop
+    // ═══════════════════════════════════════════
+    function toggleLive() {
+        if (isLive) { stopLive(); } else { startLive(); }
     }
 
-    function renderInterfaceDropdown(interfaces) {
-        const dropdown = document.getElementById('interfaceDropdown');
-        
-        if (interfaces.length === 0) {
-            dropdown.innerHTML = '<div style="padding: 20px; text-align: center; color: var(--text-muted);">لا توجد نتائج</div>';
-            return;
-        }
-
-        dropdown.innerHTML = interfaces.map(iface => {
-            const statusClass = iface.running ? 'iface-running' : 'iface-idle';
-            const statusText = iface.running ? '🟢 يعمل' : '⚪ متوقف';
-            const isSelected = iface.name === selectedInterface;
-            
-            return `
-                <div class="interface-item ${isSelected ? 'selected' : ''}" 
-                     onclick="selectInterface('${iface.name.replace(/'/g, "\\'")}')">
-                    <div>
-                        <div class="iface-name">${iface.name}</div>
-                        <div class="iface-meta">${iface.type || 'unknown'}</div>
-                    </div>
-                    <span class="iface-status ${statusClass}">${statusText}</span>
-                </div>
-            `;
-        }).join('');
+    function startLive() {
+        if (!currentRouterId) return;
+        isLive = true;
+        document.getElementById('liveStatus').style.display = 'inline-flex';
+        document.getElementById('toggleBtn').innerHTML = '<i class="bi bi-stop-fill"></i> إيقاف';
+        document.getElementById('toggleBtn').classList.remove('btn-success');
+        document.getElementById('toggleBtn').classList.add('btn-danger');
+        liveTimer = setInterval(() => {
+            fetchAllStats();
+        }, INTERVAL);
     }
 
-    function filterInterfaces() {
-        const query = document.getElementById('interfaceSearch').value.toLowerCase().trim();
-        const clearBtn = document.getElementById('clearSearchBtn');
-        
-        if (query) {
-            clearBtn.style.display = 'block';
-        } else {
-            clearBtn.style.display = 'none';
-        }
-
-        const filtered = query 
-            ? allInterfaces.filter(iface => 
-                iface.name.toLowerCase().includes(query) || 
-                (iface.type && iface.type.toLowerCase().includes(query))
-            )
-            : allInterfaces;
-
-        renderInterfaceDropdown(filtered);
-        document.getElementById('interfaceDropdown').classList.add('show');
+    function stopLive() {
+        isLive = false;
+        if (liveTimer) clearInterval(liveTimer);
+        liveTimer = null;
+        document.getElementById('liveStatus').style.display = 'none';
+        document.getElementById('toggleBtn').innerHTML = '<i class="bi bi-play-fill"></i> Live';
+        document.getElementById('toggleBtn').classList.remove('btn-danger');
+        document.getElementById('toggleBtn').classList.add('btn-success');
     }
 
-    function showInterfaceDropdown() {
-        if (allInterfaces.length > 0) {
-            document.getElementById('interfaceDropdown').classList.add('show');
-        }
+    function refreshAll() {
+        if (!currentRouterId) return;
+        fetchAllStats();
     }
 
-    function clearInterfaceSearch() {
-        document.getElementById('interfaceSearch').value = '';
-        document.getElementById('clearSearchBtn').style.display = 'none';
-        renderInterfaceDropdown(allInterfaces);
-    }
-
-    function selectInterface(name) {
-        selectedInterface = name;
-        document.getElementById('interfaceSelect').value = name;
-        document.getElementById('interfaceSearch').value = name;
-        document.getElementById('clearSearchBtn').style.display = 'block';
-        document.getElementById('interfaceDropdown').classList.remove('show');
-
-        const routerId = document.getElementById('routerSelect').value;
-        saveState(routerId, name, false);
-    }
-
-    document.addEventListener('click', function(e) {
-        const wrapper = document.querySelector('.interface-search-wrapper');
-        if (wrapper && !wrapper.contains(e.target)) {
-            document.getElementById('interfaceDropdown').classList.remove('show');
-        }
-    });
-
-    function onRouterChange() {
-        const routerId = document.getElementById('routerSelect').value;
-        const searchInput = document.getElementById('interfaceSearch');
-        
-        if (!routerId) {
-            searchInput.value = '';
-            searchInput.disabled = true;
-            searchInput.placeholder = '🔍 ابحث عن منفذ...';
-            document.getElementById('interfaceDropdown').classList.remove('show');
-            document.getElementById('connectionStatus').style.display = 'none';
-            document.getElementById('directionInfo').style.display = 'none';
-            allInterfaces = [];
-            selectedInterface = '';
-            clearState();
-            return;
-        }
-        
-        selectedInterface = '';
-        document.getElementById('interfaceSelect').value = '';
-        document.getElementById('interfaceDropdown').innerHTML = '';
-        
-        document.getElementById('directionInfo').style.display = 'block';
-        saveState(routerId, '', false);
-        fetchInterfaces(routerId, null);
-    }
-
-    function startMonitoring() {
-        const routerId = document.getElementById('routerSelect').value;
-        const interfaceName = selectedInterface;
-
-        if (!routerId || !interfaceName) {
-            alert('⚠️ الرجاء اختيار الراوتر والمنفذ أولاً');
-            return;
-        }
-
-        document.getElementById('monitoringArea').style.display = 'flex';
-        document.getElementById('connectionStatus').style.display = 'block';
-        document.getElementById('directionInfo').style.display = 'block';
-        document.getElementById('startBtn').style.display = 'none';
-        document.getElementById('stopBtn').style.display = 'inline-block';
-        document.getElementById('statusText').textContent = `📡 مراقبة المنفذ: ${interfaceName}`;
-
-        uploadData.length = 0;
-        downloadData.length = 0;
-        labels.length = 0;
-
-        if (!uploadChart) initCharts();
-
-        saveState(routerId, interfaceName, true);
-
-        fetchTrafficData(routerId, interfaceName);
-        monitoringInterval = setInterval(() => fetchTrafficData(routerId, interfaceName), UPDATE_INTERVAL);
-    }
-
-    function stopMonitoring() {
-        clearInterval(monitoringInterval);
-        document.getElementById('startBtn').style.display = 'inline-block';
-        document.getElementById('stopBtn').style.display = 'none';
-        document.getElementById('connectionStatus').style.display = 'none';
-        const routerId = document.getElementById('routerSelect').value;
-        saveState(routerId, selectedInterface, false);
-    }
-
-    function fetchTrafficData(routerId, interfaceName) {
-        fetch(`/api/traffic/stats/${routerId}/${interfaceName}`)
-            .then(res => res.json())
-            .then(data => {
-                if (!data.ok) {
-                    console.warn('خطأ:', data.error);
-                    return;
-                }
-
-                const stats = data.stats;
-                const rx_rate_val = parseSpeedToMbps(stats.rx_rate);
-                const tx_rate_val = parseSpeedToMbps(stats.tx_rate);
-                const rx_byte_val = parseInt(stats.rx_byte);
-                const tx_byte_val = parseInt(stats.tx_byte);
-
-                let uploadRateVal, downloadRateVal, uploadByteVal, downloadByteVal;
-
-                if (isDirectionReversed) {
-                    uploadRateVal = rx_rate_val;
-                    downloadRateVal = tx_rate_val;
-                    uploadByteVal = rx_byte_val;
-                    downloadByteVal = tx_byte_val;
-                } else {
-                    uploadRateVal = tx_rate_val;
-                    downloadRateVal = rx_rate_val;
-                    uploadByteVal = tx_byte_val;
-                    downloadByteVal = rx_byte_val;
-                }
-
-                const uploadGB = (uploadByteVal / (1024 * 1024 * 1024)).toFixed(2);
-                const downloadGB = (downloadByteVal / (1024 * 1024 * 1024)).toFixed(2);
-
-                document.getElementById('uploadRate').textContent = uploadRateVal.toFixed(2);
-                document.getElementById('downloadRate').textContent = downloadRateVal.toFixed(2);
-                document.getElementById('uploadTotal').textContent = uploadGB + ' GB';
-                document.getElementById('downloadTotal').textContent = downloadGB + ' GB';
-
-                document.getElementById('uploadRateBadge').textContent = uploadRateVal.toFixed(2) + ' Mbps';
-                document.getElementById('downloadRateBadge').textContent = downloadRateVal.toFixed(2) + ' Mbps';
-
-                document.getElementById('uploadProgress').style.width = Math.min((uploadRateVal / 100) * 100, 100) + '%';
-                document.getElementById('downloadProgress').style.width = Math.min((downloadRateVal / 100) * 100, 100) + '%';
-
-                const now = new Date().toLocaleTimeString('ar-EG', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
-                labels.push(now);
-                uploadData.push(uploadRateVal);
-                downloadData.push(downloadRateVal);
-
-                if (labels.length > MAX_DATA_POINTS) {
-                    labels.shift();
-                    uploadData.shift();
-                    downloadData.shift();
-                }
-
-                uploadChart.update('none');
-                downloadChart.update('none');
-            })
-            .catch(err => console.error('Error:', err));
-    }
-
-    function parseSpeedToMbps(speedStr) {
-        if (!speedStr) return 0;
-        const s = String(speedStr);
-        if (s.includes('Gbps')) return parseFloat(s) * 1000;
-        if (s.includes('Mbps')) return parseFloat(s);
-        if (s.includes('kbps')) return parseFloat(s) / 1000;
-        const num = parseFloat(s);
-        return isNaN(num) ? 0 : num / 1000000;
-    }
-
+    // ═══════════════════════════════════════════
+    //      Auto-start عند التحميل
+    // ═══════════════════════════════════════════
     window.addEventListener('DOMContentLoaded', function() {
-        loadDirection();
-
-        const state = loadState();
-        if (!state || !state.routerId) return;
-
-        const routerSelect = document.getElementById('routerSelect');
-        routerSelect.value = state.routerId;
-
-        if (routerSelect.value !== state.routerId) return;
-
-        fetchInterfaces(state.routerId, function() {
-            if (state.interfaceName) {
-                selectInterface(state.interfaceName);
-
-                if (state.isMonitoring) {
-                    setTimeout(() => startMonitoring(), 500);
-                }
-            }
-        });
+        // لا شيء - المستخدم يختار الراوتر يدوياً
     });
 </script>
 {% endblock %}
