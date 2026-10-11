@@ -1303,81 +1303,29 @@ def api_get_interfaces(router_id):
     router = Router.query.get_or_404(router_id)
     api = None
     try:
-        # اتصال مع timeout قصير
-        try:
-            api = get_mikrotik_api(router)
-        except Exception as e:
-            logger.error(f"❌ فشل الاتصال بالراوتر {router.name}: {e}")
-            return jsonify({'ok': False, 'error': 'فشل الاتصال بالراوتر'}), 500
-
+        api = get_mikrotik_api(router)
+        interfaces_data = list(api.path('interface'))
         interfaces = []
-        existing_names = set()
-
-        # 1. جلب المنافذ الثابتة فقط (بدون ppp/active)
-        try:
-            for iface in api.path('interface'):
-                try:
-                    name = _safe_str(iface.get('name'))
-                    iface_type = _safe_str(iface.get('type'), 'unknown')
-
-                    # تخطى المنافذ الديناميكية العامة
-                    if not name or name in ('pppoe-in', '<pppoe-in>'):
-                        continue
-
-                    # تخطى المعطلة
-                    if _safe_bool(iface.get('disabled'), False):
-                        continue
-
-                    running = _safe_bool(iface.get('running'), False)
-                    interfaces.append({
-                        'name': name,
-                        'type': iface_type,
-                        'running': running
-                    })
-                    existing_names.add(name)
-                except Exception as inner:
-                    logger.warning(f"⚠️ تخطي منفذ: {inner}")
-                    continue
-        except Exception as e:
-            logger.warning(f"⚠️ فشل جلب المنافذ: {e}")
-
-        # 2. جلب أسماء PPPoE النشطة (بشكل منفصل ومحمي)
-        try:
-            ppp_gen = api.path('ppp', 'active')
-            for sess in ppp_gen:
-                try:
-                    uname = _safe_str(sess.get('name'))
-                    if not uname:
-                        continue
-                    real_name = f"<pppoe-{uname}>"
-                    if real_name not in existing_names:
-                        interfaces.append({
-                            'name': real_name,
-                            'type': 'pppoe-in',
-                            'running': True
-                        })
-                        existing_names.add(real_name)
-                except Exception:
-                    continue
-        except Exception as e:
-            logger.warning(f"⚠️ فشل جلب PPP active: {e}")
-
-        # 3. ترتيب وإرجاع
-        try:
-            interfaces.sort(key=lambda x: x.get('name', ''))
-        except Exception:
-            pass
-
+        for iface in interfaces_data:
+            name = _safe_str(iface.get('name'))
+            if not name:
+                continue
+            disabled = _safe_bool(iface.get('disabled'), False)
+            if disabled:
+                continue
+            iface_type = _safe_str(iface.get('type'), 'unknown')
+            running = _safe_bool(iface.get('running'), False)
+            interfaces.append({'name': name, 'type': iface_type, 'running': running})
+        interfaces.sort(key=lambda x: x['name'])
         return jsonify({
             'ok': True,
             'interfaces': interfaces,
+            'method': 'API',
             'count': len(interfaces)
         })
-
     except Exception as e:
-        logger.error(f"❌ خطأ عام: {e}")
+        logger.error(f"❌ خطأ جلب المنافذ: {e}")
         return jsonify({'ok': False, 'error': str(e)}), 500
-
     finally:
         if api:
             try:
