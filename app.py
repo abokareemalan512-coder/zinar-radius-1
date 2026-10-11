@@ -592,18 +592,23 @@ def api_get_interfaces(router_id):
         interfaces = []
         existing = set()
 
-        # 1. المنافذ الثابتة (ether, VLAN, bridge)
+        # 1. المنافذ (مع الأسماء الحقيقية من default-name)
         try:
             for iface in api.path('interface'):
                 name = _safe_str(iface.get('name'))
+                default_name = _safe_str(iface.get('default-name'))
                 iface_type = _safe_str(iface.get('type'), 'unknown')
 
-                if not name:
+                # للجلسات الديناميكية PPPoE: استخدم default-name
+                if iface_type == 'pppoe-in' or name == 'pppoe-in':
+                    if default_name and default_name.startswith('<pppoe-'):
+                        name = default_name
+                    else:
+                        continue
+                elif not name:
                     continue
-                # تخطى pppoe-in الديناميكية (سنأخذ أسماءها من ppp/active)
-                if name in ('pppoe-in', '<pppoe-in>'):
-                    continue
-                if name.startswith('<pppoe-'):
+
+                if name in existing:
                     continue
                 if _safe_bool(iface.get('disabled'), False):
                     continue
@@ -618,9 +623,8 @@ def api_get_interfaces(router_id):
         except Exception as e:
             logger.warning(f"⚠️ interface query: {e}")
 
-        # 2. جلسات PPPoE النشطة (الأسماء الحقيقية)
+        # 2. أي جلسات PPPoE نشطة ناقصة
         try:
-            count = 0
             for sess in api.path('ppp', 'active'):
                 uname = _safe_str(sess.get('name'))
                 if not uname:
@@ -634,9 +638,6 @@ def api_get_interfaces(router_id):
                     'running': True
                 })
                 existing.add(real_name)
-                count += 1
-                if count >= 500:
-                    break
         except Exception as e:
             logger.warning(f"⚠️ ppp/active query: {e}")
 
@@ -649,63 +650,6 @@ def api_get_interfaces(router_id):
         })
     except Exception as e:
         logger.error(f"❌ خطأ جلب المنافذ: {e}")
-        return jsonify({'ok': False, 'error': str(e)}), 500
-    finally:
-        _safe_close_api(api)
-
-
-@app.route('/api/traffic/stats/<int:router_id>/<interface>')
-def api_get_traffic_stats(router_id, interface):
-    router = Router.query.get_or_404(router_id)
-    api = None
-    try:
-        api = get_mikrotik_api(router)
-        interfaces = list(api.path('interface'))
-        target = None
-        for iface in interfaces:
-            if _safe_str(iface.get('name')) == interface:
-                target = iface
-                break
-        if not target:
-            return jsonify({'ok': False, 'error': f'المنفذ {interface} غير موجود'}), 404
-
-        rx_byte = _safe_int(target.get('rx-byte', '0'), 0)
-        tx_byte = _safe_int(target.get('tx-byte', '0'), 0)
-
-        cache_key = f"{router_id}_{interface}"
-        now = time.time()
-        rx_rate_bps = tx_rate_bps = 0
-
-        if cache_key in _traffic_cache:
-            prev = _traffic_cache[cache_key]
-            elapsed = now - prev['time']
-            if elapsed > 0:
-                rx_diff = max(0, rx_byte - prev['rx_byte'])
-                tx_diff = max(0, tx_byte - prev['tx_byte'])
-                rx_rate_bps = (rx_diff / elapsed) * 8
-                tx_rate_bps = (tx_diff / elapsed) * 8
-
-        _traffic_cache[cache_key] = {'time': now, 'rx_byte': rx_byte, 'tx_byte': tx_byte}
-
-        def format_rate(bps):
-            if bps >= 1_000_000_000:
-                return f"{bps / 1_000_000_000:.2f}Gbps"
-            elif bps >= 1_000_000:
-                return f"{bps / 1_000_000:.2f}Mbps"
-            elif bps >= 1_000:
-                return f"{bps / 1_000:.2f}kbps"
-            else:
-                return f"{int(bps)}bps"
-
-        stats = {
-            'rx_rate': format_rate(rx_rate_bps),
-            'tx_rate': format_rate(tx_rate_bps),
-            'rx_byte': str(rx_byte),
-            'tx_byte': str(tx_byte),
-        }
-        return jsonify({'ok': True, 'stats': stats, 'method': 'API'})
-    except Exception as e:
-        logger.error(f"❌ خطأ جلب الترافيك: {e}")
         return jsonify({'ok': False, 'error': str(e)}), 500
     finally:
         _safe_close_api(api)
