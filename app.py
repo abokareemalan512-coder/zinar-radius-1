@@ -2739,11 +2739,10 @@ def test_telegram():
         return jsonify({'success': True})
     return jsonify({'success': False, 'error': msg})
 
-
 @app.route('/payments')
 def payments():
     pay_list = Payment.query.order_by(Payment.created_at.desc()).all()
- return render_template('payments.html', payments=pay_list)
+    return render_template('payments.html', payments=pay_list)
 
 # ===== ZINAR RADIUS FIX - انشاء جداول الراديوس تلقائيا =====
 def ensure_radius_tables():
@@ -2763,16 +2762,6 @@ def ensure_radius_tables():
                 value VARCHAR(253) NOT NULL
             );
         """)
-        cur.execute("""
-            CREATE TABLE IF NOT EXISTS radreply (
-                id SERIAL PRIMARY KEY,
-                username VARCHAR(64) NOT NULL,
-                attribute VARCHAR(64) NOT NULL,
-                op VARCHAR(2) NOT NULL,
-                value VARCHAR(253) NOT NULL
-            );
-        """)
-        cur.execute("CREATE INDEX IF NOT EXISTS idx_radcheck_user ON radcheck(username);")
         conn.commit()
         cur.close()
         conn.close()
