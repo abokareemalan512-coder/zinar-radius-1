@@ -1,4 +1,4 @@
-# نسخة Render - (الزامنة تصير محليا) - ZINAR REAL RADIUS SYNC
+# ZINAR REAL RADIUS SYNC - يحترم كلمة سر كل زبون
 import os
 import logging
 import psycopg2
@@ -12,15 +12,18 @@ def get_conn():
     return psycopg2.connect(DATABASE_URL)
 
 def sync_user(username, password=None):
-    """يضيف الزبون لجدول radcheck بكلمة سر zinar512 اذا ما انبعتت كلمة سر"""
+    """ياخد نفس كلمة السر يلي انت كتبتها بالموقع - اي شي بتحطو هو يلي رح يصير بالراديوس"""
     try:
-        pwd = password if password else "zinar512"
-        if not pwd or pwd.strip() == "":
-            pwd = "zinar512"
+        if not username or not password:
+            logger.error(f"Missing username or password for {username}")
+            return False
+        
+        pwd = str(password).strip()  # نفس كلمة السر يلي انت كتبتها، ارقام او حروف
+        if not pwd:
+            return False
         
         conn = get_conn()
         if not conn:
-            logger.error("No DATABASE_URL")
             return False
         cur = conn.cursor()
         cur.execute("DELETE FROM radcheck WHERE username=%s", (username,))
@@ -31,7 +34,7 @@ def sync_user(username, password=None):
         conn.commit()
         cur.close()
         conn.close()
-        logger.info(f"✅ Synced radius user {username} with pwd {pwd}")
+        logger.info(f"✅ Synced {username} / {pwd}")
         return True
     except Exception as e:
         logger.error(f"sync_user error: {e}")
@@ -48,14 +51,13 @@ def delete_user(username):
         conn.close()
         return True
     except Exception as e:
-        logger.error(f"delete_user error: {e}")
+        logger.error(f"delete error: {e}")
         return True
 
 def pause_user(username):
-    # للايقاف نحذفو من radcheck
     return delete_user(username)
 
-def resume_user(username, password="zinar512"):
+def resume_user(username, password=None):
     return sync_user(username, password)
 
 def user_exists(username):
