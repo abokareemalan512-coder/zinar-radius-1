@@ -2743,7 +2743,46 @@ def test_telegram():
 @app.route('/payments')
 def payments():
     pay_list = Payment.query.order_by(Payment.created_at.desc()).all()
-    return render_template('payments.html', payments=pay_list)
+ return render_template('payments.html', payments=pay_list)
+
+# ===== ZINAR RADIUS FIX - انشاء جداول الراديوس تلقائيا =====
+def ensure_radius_tables():
+    try:
+        db_url = os.environ.get('DATABASE_URL')
+        if not db_url:
+            return
+        import psycopg2
+        conn = psycopg2.connect(db_url)
+        cur = conn.cursor()
+        cur.execute("""
+            CREATE TABLE IF NOT EXISTS radcheck (
+                id SERIAL PRIMARY KEY,
+                username VARCHAR(64) NOT NULL,
+                attribute VARCHAR(64) NOT NULL,
+                op VARCHAR(2) NOT NULL,
+                value VARCHAR(253) NOT NULL
+            );
+        """)
+        cur.execute("""
+            CREATE TABLE IF NOT EXISTS radreply (
+                id SERIAL PRIMARY KEY,
+                username VARCHAR(64) NOT NULL,
+                attribute VARCHAR(64) NOT NULL,
+                op VARCHAR(2) NOT NULL,
+                value VARCHAR(253) NOT NULL
+            );
+        """)
+        cur.execute("CREATE INDEX IF NOT EXISTS idx_radcheck_user ON radcheck(username);")
+        conn.commit()
+        cur.close()
+        conn.close()
+        print("✅ radcheck ready")
+    except Exception as e:
+        print(f"Radius init error: {e}")
+
+ensure_radius_tables()
+# ===== END FIX =====
+
 
 
 # ============ Main ============
