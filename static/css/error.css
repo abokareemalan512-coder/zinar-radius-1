@@ -1,0 +1,94 @@
+/* ============ Error Page ============ */
+
+.error-container {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 60vh;
+    padding: 20px;
+}
+
+.error-card {
+    background: var(--bg-card);
+    border: 1px solid var(--bg-hover);
+    border-radius: 20px;
+    padding: 40px 30px;
+    text-align: center;
+    max-width: 500px;
+    width: 100%;
+    position: relative;
+    overflow: hidden;
+    animation: fadeIn 0.4s ease;
+}
+.error-card::before {
+    content: '';
+    position: absolute;
+    top: 0; right: 0; left: 0;
+    height: 4px;
+    background: linear-gradient(90deg, #ef4444, #f59e0b, #38bdf8);
+}
+
+@keyframes fadeIn {
+    from { opacity: 0; transform: translateY(-10px); }
+    to   { opacity: 1; transform: translateY(0); }
+}
+
+.error-icon {
+    font-size: 4rem;
+    margin-bottom: 12px;
+    line-height: 1;
+    animation: pulse 2s infinite;
+}
+@keyframes pulse {
+    0%, 100% { transform: scale(1); }
+    50%      { transform: scale(1.08); }
+}
+
+.error-code {
+    font-size: 2.8rem;
+    font-weight: 900;
+    background: linear-gradient(135deg, #ef4444, #f59e0b);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+    margin: 0 0 8px;
+    line-height: 1;
+    font-family: 'Courier New', monospace;
+}
+
+.error-title {
+    font-size: 1.3rem;
+    font-weight: 700;
+    color: var(--text-main);
+    margin: 0 0 12px;
+}
+
+.error-message {
+    color: var(--text-muted);
+    font-size: 0.9rem;
+    line-height: 1.7;
+    margin: 0 0 24px;
+    word-break: break-word;
+}
+
+.error-actions {
+    display: flex;
+    gap: 10px;
+    justify-content: center;
+    flex-wrap: wrap;
+}
+.error-actions .btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 10px 20px;
+    border-radius: 10px;
+    font-weight: 600;
+}
+
+@media (max-width: 480px) {
+    .error-card { padding: 30px 20px; }
+    .error-icon { font-size: 3rem; }
+    .error-code { font-size: 2rem; }
+    .error-actions .btn { flex: 1 1 auto; }
+}
