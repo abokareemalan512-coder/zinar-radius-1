@@ -1,0 +1,70 @@
+/* ============ Packages Page ============ */
+
+.card-header {
+    background-color: var(--bg-hover) !important;
+    border-bottom: 1px solid var(--bg-hover) !important;
+    color: var(--text-main);
+}
+
+.speed-badge {
+    display: inline-block;
+    padding: 4px 10px;
+    border-radius: 6px;
+    background: rgba(56, 189, 248, 0.1);
+    color: var(--accent);
+    border: 1px solid rgba(56, 189, 248, 0.3);
+    font-family: 'Courier New', monospace;
+    font-size: 0.8rem;
+    font-weight: 700;
+}
+
+/* Sticky top للعمود على الشاشات الكبيرة */
+@media (min-width: 992px) {
+    .sticky-top {
+        position: sticky;
+        z-index: 1;
+    }
+}
+
+/* زر التعديل */
+.js-edit-pkg {
+    transition: all 0.2s;
+}
+.js-edit-pkg:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 4px 8px rgba(14, 165, 233, 0.3);
+}
+
+/* زر الحذف */
+.js-delete-pkg {
+    transition: all 0.2s;
+}
+.js-delete-pkg:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 4px 8px rgba(239, 68, 68, 0.3);
+}
+
+/* إبراز الصفوف */
+tbody tr:hover {
+    background-color: rgba(56, 189, 248, 0.05) !important;
+    transition: background-color 0.2s;
+}
+
+/* الحقول في المودال */
+.modal .form-control,
+.modal .form-select {
+    background-color: var(--bg-main) !important;
+    border: 1px solid var(--bg-hover) !important;
+    color: var(--text-main) !important;
+}
+.modal .form-control:focus,
+.modal .form-select:focus {
+    border-color: var(--accent) !important;
+    box-shadow: 0 0 0 0.2rem var(--accent-glow) !important;
+}
+.modal .form-label {
+    color: var(--text-muted) !important;
+}
+.modal .font-monospace {
+    letter-spacing: 1px;
+}
