@@ -1,0 +1,178 @@
+/* ============ Subscribers Page ============ */
+
+/* الجدول */
+.table > :not(caption) > * > * {
+    padding: 1rem 0.75rem;
+    vertical-align: middle;
+}
+.table-hover tbody tr:hover {
+    background-color: rgba(14, 165, 233, 0.05);
+    transition: all 0.2s ease;
+}
+
+/* أزرار الإجراءات */
+.btn-icon {
+    width: 32px; height: 32px; padding: 0;
+    display: inline-flex;
+    align-items: center; justify-content: center;
+    border-radius: 8px;
+}
+
+/* القوائم المنسدلة */
+.dropdown-menu {
+    border: 1px solid var(--bg-hover);
+    box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.3);
+    border-radius: 12px;
+    min-width: 200px;
+    padding: 10px;
+    background-color: var(--bg-card);
+}
+.dropdown-item.btn-mikrotik-style {
+    border: 1px dashed var(--text-muted);
+    border-radius: 8px;
+    margin-bottom: 8px;
+    padding: 8px 12px;
+    color: var(--text-main);
+    font-weight: 500;
+    transition: all 0.2s ease;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    background-color: transparent;
+}
+.dropdown-item.btn-mikrotik-style:last-child { margin-bottom: 0; }
+.dropdown-item.btn-mikrotik-style:hover {
+    background-color: rgba(56, 189, 248, 0.1);
+    border-color: var(--accent);
+    color: var(--accent);
+    transform: translateY(-1px);
+}
+.dropdown-item.btn-mikrotik-style.delete-style {
+    border-color: rgba(239, 68, 68, 0.5);
+    color: #ef4444;
+}
+.dropdown-item.btn-mikrotik-style.delete-style:hover {
+    background-color: rgba(239, 68, 68, 0.1);
+    border-color: #ef4444;
+    color: #ef4444;
+}
+
+/* البحث */
+.search-group .input-group-text {
+    background-color: var(--bg-main) !important;
+    border: 1px solid var(--bg-hover) !important;
+    border-left: none !important;
+    color: var(--text-muted) !important;
+}
+.search-group .form-control {
+    background-color: var(--bg-main) !important;
+    border: 1px solid var(--bg-hover) !important;
+    border-right: none !important;
+    color: var(--text-main) !important;
+}
+.search-group .form-control:focus {
+    border-color: var(--accent) !important;
+    box-shadow: none !important;
+}
+
+/* أزرار الفلترة */
+.filter-btn {
+    background-color: var(--bg-main) !important;
+    border: 1px solid var(--bg-hover) !important;
+    color: var(--text-muted) !important;
+}
+.filter-btn:hover {
+    background-color: var(--bg-hover) !important;
+    color: var(--text-main) !important;
+}
+.filter-btn.active {
+    background-color: var(--accent) !important;
+    border-color: var(--accent) !important;
+    color: #0f172a !important;
+    font-weight: bold;
+}
+
+/* Pagination */
+.pagination-container {
+    background-color: var(--bg-card);
+    border-top: 1px solid var(--bg-hover);
+    padding: 20px;
+    border-radius: 0 0 12px 12px;
+}
+.pagination-info {
+    color: var(--text-muted);
+    font-size: 0.9rem;
+    margin-bottom: 15px;
+    font-weight: 500;
+}
+.pagination .page-link {
+    background-color: var(--bg-main);
+    border-color: var(--bg-hover);
+    color: var(--text-main);
+    margin: 0 5px;
+    border-radius: 8px !important;
+    transition: all 0.2s;
+    font-weight: 600;
+    min-width: 40px;
+    text-align: center;
+}
+.pagination .page-link:hover {
+    background-color: var(--bg-hover);
+    color: var(--accent);
+    border-color: var(--accent);
+    transform: translateY(-2px);
+}
+.pagination .page-item.active .page-link {
+    background-color: var(--accent);
+    border-color: var(--accent);
+    color: #0f172a;
+    font-weight: bold;
+    box-shadow: 0 0 10px var(--accent-glow);
+}
+.pagination .page-item.disabled .page-link {
+    background-color: var(--bg-main);
+    border-color: var(--bg-hover);
+    color: var(--text-muted);
+    opacity: 0.5;
+}
+
+/* IP Badge */
+.ip-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    padding: 5px 10px;
+    border-radius: 8px;
+    font-size: 0.78rem;
+    font-weight: 600;
+    font-family: 'Courier New', monospace;
+    transition: all 0.2s;
+}
+.ip-online {
+    background: rgba(34, 197, 94, 0.12);
+    color: #22c55e;
+    border: 1px solid rgba(34, 197, 94, 0.35);
+}
+.ip-offline {
+    background: rgba(148, 163, 184, 0.1);
+    color: #94a3b8;
+    border: 1px solid rgba(148, 163, 184, 0.3);
+}
+.ip-time {
+    display: block;
+    font-size: 0.62rem;
+    opacity: 0.7;
+    margin-top: 2px;
+}
+
+/* Modal body فقط (base.html يغطي الباقي) */
+.modal-body .form-control {
+    background-color: var(--bg-main) !important;
+    border: 1px solid var(--bg-hover) !important;
+    color: var(--text-main) !important;
+}
+.modal-body .form-control:focus {
+    border-color: var(--accent) !important;
+    box-shadow: 0 0 0 0.25rem var(--accent-glow) !important;
+}
+.modal-body .form-label { color: var(--text-muted) !important; }
