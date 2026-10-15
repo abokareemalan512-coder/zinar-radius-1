@@ -1,0 +1,113 @@
+/* ============ Admin Settings Page ============ */
+
+.settings-card {
+    background: var(--bg-card);
+    border: 1px solid var(--bg-hover);
+    border-radius: 12px;
+}
+
+.settings-header {
+    background: linear-gradient(90deg, #0d6efd, #0b5ed7) !important;
+    color: #fff;
+    border-bottom: none;
+    border-radius: 12px 12px 0 0;
+    padding: 12px 16px;
+}
+
+/* إحصائيات */
+.stat-box {
+    background: var(--bg-main);
+    border: 1px solid var(--bg-hover);
+    border-radius: 10px;
+    padding: 14px 8px;
+    transition: transform 0.2s, border-color 0.2s;
+}
+.stat-box:hover {
+    transform: translateY(-2px);
+    border-color: var(--accent);
+}
+
+/* Badges للحالة */
+.status-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 6px 14px;
+    border-radius: 20px;
+    font-size: 0.85rem;
+    font-weight: 600;
+}
+.status-active {
+    background: rgba(34, 197, 94, 0.1);
+    color: #22c55e;
+    border: 1px solid rgba(34, 197, 94, 0.3);
+}
+.status-inactive {
+    background: rgba(148, 163, 184, 0.1);
+    color: #94a3b8;
+    border: 1px solid rgba(148, 163, 184, 0.3);
+}
+.pulse-dot {
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    background-color: currentColor;
+    animation: pulse-animation 1.5s infinite;
+}
+@keyframes pulse-animation {
+    0% { box-shadow: 0 0 0 0 currentColor; opacity: 1; }
+    70% { box-shadow: 0 0 0 6px transparent; opacity: 0.7; }
+    100% { box-shadow: 0 0 0 0 transparent; opacity: 1; }
+}
+
+/* سجل الإشعارات */
+.telegram-logs {
+    max-height: 300px;
+    overflow-y: auto;
+    padding: 0;
+}
+.telegram-logs .list-group-item {
+    background: transparent;
+    color: var(--text-main);
+    border-color: var(--bg-hover);
+    padding: 10px 0;
+}
+.telegram-logs .list-group-item:hover {
+    background: rgba(56, 189, 248, 0.05);
+}
+
+/* حقول الإدخال */
+.settings-card .form-control,
+.settings-card .form-select {
+    background-color: var(--bg-main) !important;
+    border: 1px solid var(--bg-hover) !important;
+    color: var(--text-main) !important;
+}
+.settings-card .form-control:focus {
+    border-color: var(--accent) !important;
+    box-shadow: 0 0 0 0.2rem var(--accent-glow) !important;
+}
+.settings-card .form-control::placeholder {
+    color: var(--text-muted);
+    opacity: 0.6;
+}
+.settings-card .form-label {
+    color: var(--text-main);
+    font-size: 0.9rem;
+}
+.settings-card .text-muted {
+    color: var(--text-muted) !important;
+    font-size: 0.75rem;
+}
+
+/* Switch */
+.form-check-input:checked {
+    background-color: #0d6efd;
+    border-color: #0d6efd;
+}
+
+/* Monospace */
+.font-monospace {
+    font-family: 'Courier New', monospace;
+    letter-spacing: 0.5px;
+}
