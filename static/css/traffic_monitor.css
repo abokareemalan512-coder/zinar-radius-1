@@ -1,0 +1,299 @@
+/* ============ Traffic Monitor Page ============ */
+
+.traffic-card {
+    background-color: var(--bg-card);
+    border: 1px solid var(--bg-hover);
+    border-radius: 16px;
+    padding: 24px;
+    height: 100%;
+    transition: all 0.3s ease;
+}
+.traffic-card:hover {
+    border-color: var(--accent);
+    box-shadow: 0 10px 25px -5px rgba(56, 189, 248, 0.1);
+}
+.traffic-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 15px;
+}
+.traffic-value {
+    font-size: 2.5rem;
+    font-weight: 800;
+    margin: 10px 0;
+}
+.traffic-unit {
+    font-size: 1.1rem;
+    font-weight: 500;
+    opacity: 0.8;
+}
+.traffic-progress {
+    height: 10px;
+    background-color: var(--bg-main);
+    border-radius: 5px;
+    overflow: hidden;
+    margin: 15px 0;
+}
+.traffic-progress-bar {
+    height: 100%;
+    border-radius: 5px;
+    transition: width 0.5s ease;
+}
+.chart-container {
+    position: relative;
+    height: 220px;
+    width: 100%;
+    margin-top: 15px;
+}
+
+/* الألوان */
+.upload-color { color: #f59e0b; }
+.download-color { color: #22c55e; }
+.bg-upload { background: linear-gradient(90deg, #f59e0b, #fbbf24); }
+.bg-download { background: linear-gradient(90deg, #22c55e, #4ade80); }
+
+/* Badges */
+.rate-badge {
+    font-size: 0.85rem;
+    font-weight: 700;
+}
+.download-badge {
+    background: rgba(34, 197, 94, 0.1);
+    color: #22c55e;
+    border: 1px solid rgba(34, 197, 94, 0.3);
+}
+.upload-badge {
+    background: rgba(245, 158, 11, 0.1);
+    color: #f59e0b;
+    border: 1px solid rgba(245, 158, 11, 0.3);
+}
+
+/* Status indicator */
+.status-indicator {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 0.85rem;
+    padding: 6px 14px;
+    border-radius: 20px;
+    background-color: rgba(34, 197, 94, 0.1);
+    color: #22c55e;
+    border: 1px solid rgba(34, 197, 94, 0.3);
+}
+.pulse-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background-color: currentColor;
+    animation: pulse-animation 1.5s infinite;
+}
+@keyframes pulse-animation {
+    0%   { box-shadow: 0 0 0 0 currentColor; opacity: 1; }
+    70%  { box-shadow: 0 0 0 8px transparent; opacity: 0.7; }
+    100% { box-shadow: 0 0 0 0 transparent; opacity: 1; }
+}
+
+/* API Badge */
+.api-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    font-size: 0.7rem;
+    padding: 3px 10px;
+    border-radius: 12px;
+    background: linear-gradient(135deg, #38bdf8, #0ea5e9);
+    color: #0f172a;
+    font-weight: 700;
+}
+
+/* Control Select */
+.control-select {
+    width: 260px;
+    max-width: 100%;
+    background-color: var(--bg-card);
+    color: var(--text-main);
+    border: 1px solid var(--bg-hover);
+    padding: 10px 14px;
+    border-radius: 10px;
+    font-weight: 500;
+}
+.control-select:focus {
+    background-color: var(--bg-card);
+    color: var(--text-main);
+    border-color: var(--accent);
+    box-shadow: 0 0 0 0.2rem var(--accent-glow);
+    outline: none;
+}
+
+/* Search Wrapper */
+.interface-search-wrapper {
+    position: relative;
+    width: 260px;
+    max-width: 100%;
+}
+.interface-search-wrapper input {
+    width: 100%;
+    padding: 10px 40px 10px 14px;
+    background-color: var(--bg-card);
+    color: var(--text-main);
+    border: 1px solid var(--bg-hover);
+    border-radius: 10px;
+    font-weight: 500;
+    transition: all 0.2s;
+}
+.interface-search-wrapper input:focus {
+    background-color: var(--bg-card);
+    color: var(--text-main);
+    border-color: var(--accent);
+    box-shadow: 0 0 0 0.2rem var(--accent-glow);
+    outline: none;
+}
+.interface-search-wrapper input::placeholder {
+    color: var(--text-muted);
+}
+.interface-search-wrapper input:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+}
+.interface-search-wrapper .search-icon {
+    position: absolute;
+    right: 14px;
+    top: 50%;
+    transform: translateY(-50%);
+    color: var(--text-muted);
+    pointer-events: none;
+}
+.interface-search-wrapper .clear-btn {
+    position: absolute;
+    left: 14px;
+    top: 50%;
+    transform: translateY(-50%);
+    background: none;
+    border: none;
+    color: var(--text-muted);
+    cursor: pointer;
+    display: none;
+    padding: 0;
+    font-size: 1.1rem;
+    transition: color 0.2s;
+}
+.interface-search-wrapper .clear-btn:hover { color: #ef4444; }
+
+/* Dropdown */
+.interface-dropdown {
+    position: absolute;
+    top: 100%;
+    right: 0;
+    left: 0;
+    margin-top: 5px;
+    background-color: var(--bg-card);
+    border: 1px solid var(--bg-hover);
+    border-radius: 10px;
+    max-height: 350px;
+    overflow-y: auto;
+    z-index: 1000;
+    box-shadow: 0 10px 25px rgba(0, 0, 0, 0.3);
+    display: none;
+}
+.interface-dropdown.show { display: block; }
+
+.interface-item {
+    padding: 10px 14px;
+    cursor: pointer;
+    border-bottom: 1px solid var(--bg-hover);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    transition: all 0.15s;
+    color: var(--text-main);
+    gap: 8px;
+}
+.interface-item:last-child { border-bottom: none; }
+.interface-item:hover {
+    background-color: rgba(56, 189, 248, 0.1);
+    color: var(--accent);
+}
+.interface-item.selected {
+    background-color: rgba(56, 189, 248, 0.15);
+    color: var(--accent);
+    font-weight: 600;
+}
+.interface-item .iface-info { min-width: 0; flex: 1; }
+.interface-item .iface-name {
+    font-family: 'Courier New', monospace;
+    font-size: 0.9rem;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+.interface-item .iface-meta {
+    font-size: 0.72rem;
+    color: var(--text-muted);
+    margin-top: 2px;
+}
+.interface-item .iface-status {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    font-size: 0.7rem;
+    padding: 2px 8px;
+    border-radius: 10px;
+    flex-shrink: 0;
+}
+.iface-running {
+    background: rgba(34, 197, 94, 0.1);
+    color: #22c55e;
+}
+.iface-idle {
+    background: rgba(148, 163, 184, 0.1);
+    color: #94a3b8;
+}
+
+/* Direction Toggle */
+.direction-toggle {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    background: linear-gradient(135deg, #a855f7, #9333ea);
+    color: white;
+    border: none;
+    padding: 10px 18px;
+    border-radius: 10px;
+    font-weight: 600;
+    font-size: 0.9rem;
+    cursor: pointer;
+    transition: all 0.3s;
+    box-shadow: 0 4px 12px rgba(168, 85, 247, 0.3);
+}
+.direction-toggle:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 6px 18px rgba(168, 85, 247, 0.5);
+    color: white;
+}
+.direction-toggle.reversed {
+    background: linear-gradient(135deg, #f59e0b, #d97706);
+    box-shadow: 0 4px 12px rgba(245, 158, 11, 0.3);
+}
+.direction-toggle.reversed:hover {
+    box-shadow: 0 6px 18px rgba(245, 158, 11, 0.5);
+}
+
+/* Direction info */
+.direction-info {
+    background: rgba(56, 189, 248, 0.08);
+    border: 1px solid rgba(56, 189, 248, 0.2);
+    padding: 10px 15px;
+    border-radius: 10px;
+    font-size: 0.85rem;
+    color: var(--text-muted);
+    margin-bottom: 15px;
+}
+.direction-info strong { color: var(--accent); }
+
+/* Mobile */
+@media (max-width: 768px) {
+    .control-select,
+    .interface-search-wrapper { width: 100%; }
+    .traffic-value { font-size: 2rem; }
+}
