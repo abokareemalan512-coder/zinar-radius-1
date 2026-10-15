@@ -2,8 +2,9 @@
 {% block title %}إضافة مشترك{% endblock %}
 
 {% block content %}
-<div class="d-flex justify-content-between align-items-center mb-4">
-    <h2>➕ إضافة مشترك جديد</h2>
+
+<div class="d-flex justify-content-between align-items-center mb-4 flex-wrap gap-2">
+    <h2 class="fw-bold mb-0">➕ إضافة مشترك جديد</h2>
     <div class="d-flex gap-2">
         <a href="{{ url_for('bulk_add') }}" class="btn btn-warning">
             <i class="bi bi-people-fill"></i> إضافة جماعية
@@ -17,14 +18,14 @@
 <div class="row g-4">
     <div class="col-lg-8">
         <div class="card p-4">
-            <form method="POST" action="{{ url_for('add_subscriber') }}">
+            <form method="POST" action="{{ url_for('add_subscriber') }}" id="addSubForm" autocomplete="off">
 
                 <!-- نوع المستخدم -->
                 <div class="mb-3">
-                    <label class="form-label">
+                    <label class="form-label fw-bold">
                         <i class="bi bi-diagram-3 text-accent"></i> نوع المستخدم *
                     </label>
-                    <div class="d-flex gap-3">
+                    <div class="d-flex gap-3 flex-wrap">
                         <div class="form-check">
                             <input class="form-check-input" type="radio"
                                    name="user_type" value="pppoe"
@@ -44,65 +45,113 @@
                     </div>
                 </div>
 
-                <div class="mb-3">
-                    <label class="form-label">
-                        <i class="bi bi-person-badge text-accent"></i> اسم المشترك
-                    </label>
-                    <input type="text" name="name" class="form-control"
-                           placeholder="مثال: أحمد محمد">
+                <div class="row">
+                    <div class="col-md-6 mb-3">
+                        <label class="form-label fw-bold">
+                            <i class="bi bi-person-badge text-accent"></i> اسم المشترك
+                        </label>
+                        <input type="text" name="name" id="input_name"
+                               class="form-control" maxlength="100"
+                               placeholder="مثال: أحمد محمد">
+                        <small class="text-muted">اتركه فارغاً لاستخدام اسم المستخدم</small>
+                    </div>
+                    <div class="col-md-6 mb-3">
+                        <label class="form-label fw-bold">
+                            <i class="bi bi-telephone text-accent"></i> رقم الهاتف
+                        </label>
+                        <input type="tel" name="phone" id="input_phone"
+                               class="form-control" maxlength="20"
+                               placeholder="09XXXXXXXX"
+                               pattern="[0-9]*">
+                        <small class="text-muted">اختياري — للتواصل عبر واتساب/تيليجرام</small>
+                    </div>
                 </div>
 
                 <div class="row">
                     <div class="col-md-6 mb-3">
-                        <label class="form-label">
+                        <label class="form-label fw-bold">
                             <i class="bi bi-person text-accent"></i> اسم المستخدم *
                         </label>
-                        <input type="text" name="username" class="form-control"
-                               placeholder="ahmed123" required autofocus>
+                        <div class="input-group">
+                            <span class="input-group-text bg-secondary text-light border-secondary">
+                                <i class="bi bi-at"></i>
+                            </span>
+                            <input type="text" name="username" id="input_username"
+                                   class="form-control" required autofocus
+                                   maxlength="64" placeholder="ahmed123"
+                                   pattern="[A-Za-z0-9_\-\.]+">
+                        </div>
+                        <small class="text-muted">حروف إنجليزية، أرقام، أو _ - . فقط</small>
                     </div>
                     <div class="col-md-6 mb-3">
-                        <label class="form-label">
+                        <label class="form-label fw-bold">
                             <i class="bi bi-key text-accent"></i> كلمة المرور *
                         </label>
-                        <input type="text" name="password" class="form-control"
-                               placeholder="••••••" required>
+                        <div class="input-group">
+                            <input type="text" name="password" id="input_password"
+                                   class="form-control font-monospace" required
+                                   maxlength="150" placeholder="••••••"
+                                   style="letter-spacing: 1px;">
+                            <button type="button" class="btn btn-outline-secondary"
+                                    id="togglePwBtn" title="عرض/إخفاء">
+                                <i class="bi bi-eye" id="togglePwIcon"></i>
+                            </button>
+                            <button type="button" class="btn btn-outline-info"
+                                    id="generatePwBtn" title="توليد كلمة مرور">
+                                <i class="bi bi-shuffle"></i>
+                            </button>
+                        </div>
+                        <small class="text-muted">يُحفظ بنفس الشكل — أرقام أو حروف</small>
                     </div>
                 </div>
 
                 <div class="mb-3">
-                    <label class="form-label">
+                    <label class="form-label fw-bold">
                         <i class="bi bi-box-seam text-accent"></i> الباقة
                     </label>
-                    <select name="package" class="form-select">
+                    <select name="package" id="input_package" class="form-select">
                         <option value="">— اختر باقة —</option>
                         {% for pkg in packages %}
-                        <option value="{{ pkg.name }}">
-                            {{ pkg.name }} — {{ pkg.duration }}
+                        <option value="{{ pkg.name }}"
+                                data-type="{{ pkg.user_type }}"
+                                data-duration="{{ pkg.duration }}"
+                                data-duration-unit="{{ pkg.duration_unit }}"
+                                data-price="{{ pkg.price }}">
+                            {{ pkg.name }}
+                            — {{ pkg.duration }}
                             {% if pkg.duration_unit == 'months' %}شهر{% else %}يوم{% endif %}
-                            — {{ pkg.price }} ل.س
+                            — {{ pkg.price|int }} ل.س
                             ({{ 'هوت سبوت' if pkg.user_type == 'hotspot' else 'برودباند' }})
                         </option>
                         {% endfor %}
                     </select>
+                    <small class="text-muted" id="pkgHint">
+                        اختر نوع المستخدم أولاً لفلترة الباقات
+                    </small>
                 </div>
 
                 <div class="mb-4">
-                    <label class="form-label">
+                    <label class="form-label fw-bold">
                         <i class="bi bi-router text-accent"></i> الراوتر
                     </label>
-                    <select name="router_id" class="form-select">
-                        <option value="">— بدون راوتر —</option>
+                    <select name="router_id" id="input_router" class="form-select">
+                        <option value="">— بدون راوتر محدد —</option>
                         {% for r in routers %}
-                        <option value="{{ r.id }}">{{ r.name }} — {{ r.ip_address }}</option>
+                        <option value="{{ r.id }}">
+                            {{ r.name }} — {{ r.ip_address }}
+                        </option>
                         {% endfor %}
                     </select>
+                    <small class="text-muted">
+                        يُحدَّد تلقائياً عند أول اتصال إذا تُرك فارغاً
+                    </small>
                 </div>
 
                 <div class="d-flex gap-2">
                     <button type="submit" class="btn btn-primary flex-grow-1 py-2 fw-bold">
                         <i class="bi bi-save"></i> حفظ المشترك
                     </button>
-                    <a href="{{ url_for('subscribers') }}" class="btn btn-secondary">إلغاء</a>
+                    <a href="{{ url_for('subscribers') }}" class="btn btn-secondary px-4">إلغاء</a>
                 </div>
             </form>
         </div>
@@ -110,14 +159,162 @@
 
     <div class="col-lg-4">
         <div class="alert alert-info">
-            💡 <strong>ملاحظات:</strong>
+            💡 <strong>ملاحظات مهمة:</strong>
             <ul class="mb-0 mt-2" style="line-height: 1.9;">
-                <li><strong>برودباند (PPPoE):</strong> للنظام التقليدي بالكابل</li>
-                <li><strong>هوت سبوت (Hotspot):</strong> للواي فاي</li>
-                <li>تاريخ الانتهاء يُحسب تلقائيًا من الباقة</li>
-                <li>يُنشأ المستخدم تلقائيًا على الراوتر إذا اخترته</li>
+                <li><strong>برودباند:</strong> للكابل / DSL</li>
+                <li><strong>هوت سبوت:</strong> للواي فاي</li>
+                <li>الانتهاء يُحسب تلقائياً من الباقة</li>
+                <li>لا حاجة لإضافة المستخدم يدوياً على MikroTik</li>
+                <li>يكفي أن يكون <strong>RADIUS</strong> مفعّلاً على الراوتر</li>
             </ul>
+        </div>
+
+        <div class="card p-3 mt-3" style="background: var(--bg-card); border: 1px solid var(--bg-hover);">
+            <h6 class="fw-bold text-accent mb-2">
+                <i class="bi bi-info-circle"></i> ماذا يحدث بعد الحفظ؟
+            </h6>
+            <ol class="mb-0 ps-3" style="font-size: 0.85rem; line-height: 2;">
+                <li>حفظ في قاعدة البيانات</li>
+                <li>Trigger يُضيفه إلى <code>radcheck</code> (كلمة المرور)</li>
+                <li>Trigger يُضيف السرعة إلى <code>radreply</code></li>
+                <li>Trigger يضبط الانتهاء في <code>radcheck</code></li>
+                <li>FreeRADIUS يقرأ البيانات فوراً</li>
+                <li>المشترك يتصل بـ MikroTik مباشرة</li>
+            </ol>
         </div>
     </div>
 </div>
+
+{% endblock %}
+
+{% block scripts %}
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+    const form = document.getElementById('addSubForm');
+    const userTypeRadios = document.querySelectorAll('input[name="user_type"]');
+    const pkgSelect = document.getElementById('input_package');
+    const pkgHint = document.getElementById('pkgHint');
+    const passwordInput = document.getElementById('input_password');
+    const toggleBtn = document.getElementById('togglePwBtn');
+    const toggleIcon = document.getElementById('togglePwIcon');
+    const generateBtn = document.getElementById('generatePwBtn');
+
+    // ============ فلترة الباقات حسب نوع المستخدم ============
+    function filterPackages() {
+        const selectedType = document.querySelector('input[name="user_type"]:checked').value;
+        const options = pkgSelect.querySelectorAll('option[data-type]');
+        let visibleCount = 0;
+
+        options.forEach(opt => {
+            const pkgType = opt.dataset.type;
+            if (pkgType === selectedType) {
+                opt.style.display = '';
+                visibleCount++;
+            } else {
+                opt.style.display = 'none';
+                if (opt.selected) {
+                    pkgSelect.value = '';
+                }
+            }
+        });
+
+        pkgHint.textContent = `تم عرض ${visibleCount} باقة متوافقة مع نوع المستخدم المختار`;
+    }
+
+    userTypeRadios.forEach(r => r.addEventListener('change', filterPackages));
+    filterPackages(); // أول تشغيل
+
+    // ============ عرض/إخفاء كلمة المرور ============
+    toggleBtn.addEventListener('click', function () {
+        if (passwordInput.type === 'password') {
+            passwordInput.type = 'text';
+            toggleIcon.className = 'bi bi-eye-slash';
+            toggleBtn.classList.add('active');
+        } else {
+            passwordInput.type = 'password';
+            toggleIcon.className = 'bi bi-eye';
+            toggleBtn.classList.remove('active');
+        }
+    });
+
+    // ============ توليد كلمة مرور عشوائية ============
+    generateBtn.addEventListener('click', function () {
+        const chars = 'abcdefghijkmnpqrstuvwxyzABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+        let pw = '';
+        for (let i = 0; i < 8; i++) {
+            pw += chars.charAt(Math.floor(Math.random() * chars.length));
+        }
+        passwordInput.value = pw;
+        passwordInput.type = 'text';
+        toggleIcon.className = 'bi bi-eye-slash';
+    });
+
+    // ============ التحقق قبل الإرسال ============
+    form.addEventListener('submit', function (e) {
+        const username = document.getElementById('input_username').value.trim();
+        const password = passwordInput.value.trim();
+        const selectedType = document.querySelector('input[name="user_type"]:checked').value;
+        const pkg = pkgSelect.value;
+        const phone = document.getElementById('input_phone').value.trim();
+
+        // التحقق من اسم المستخدم
+        if (!/^[A-Za-z0-9_\-\.]+$/.test(username)) {
+            e.preventDefault();
+            alert('❌ اسم المستخدم يحتوي على رموز غير مسموحة');
+            return false;
+        }
+
+        // التحقق من كلمة المرور
+        if (password.length < 3) {
+            e.preventDefault();
+            alert('❌ كلمة المرور قصيرة جداً (3 أحرف على الأقل)');
+            return false;
+        }
+
+        // التحقق من الباقة ونوع المستخدم
+        if (pkg) {
+            const selectedOpt = pkgSelect.querySelector(`option[value="${pkg}"]`);
+            if (selectedOpt && selectedOpt.dataset.type !== selectedType) {
+                e.preventDefault();
+                alert(`❌ الباقة "${pkg}" مخصّصة لـ ${selectedOpt.dataset.type === 'hotspot' ? 'هوت سبوت' : 'برودباند'}، وليس ${selectedType}`);
+                return false;
+            }
+        }
+
+        // التحقق من رقم الهاتف
+        if (phone && !/^[0-9]+$/.test(phone)) {
+            e.preventDefault();
+            alert('❌ رقم الهاتف يجب أن يكون أرقاماً فقط');
+            return false;
+        }
+
+        return true;
+    });
+
+    // ============ التنبيه عند وجود باقة سابقة ============
+    const usernameInput = document.getElementById('input_username');
+    let debounceTimer;
+    usernameInput.addEventListener('input', function () {
+        clearTimeout(debounceTimer);
+        const un = this.value.trim();
+        if (un.length < 3) return;
+
+        debounceTimer = setTimeout(async () => {
+            try {
+                const res = await fetch(`/api/subscriber/check/${encodeURIComponent(un)}`);
+                const data = await res.json();
+                if (data.exists) {
+                    usernameInput.classList.add('is-invalid');
+                    usernameInput.classList.remove('is-valid');
+                } else {
+                    usernameInput.classList.remove('is-invalid');
+                    usernameInput.classList.add('is-valid');
+                }
+            } catch (e) {
+                // تجاهل
+            }
+        }, 500);
+    });
+});
+</script>
 {% endblock %}
