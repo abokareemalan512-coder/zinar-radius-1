@@ -2,517 +2,17 @@
 <html lang="ar" dir="rtl" data-bs-theme="dark">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <meta name="theme-color" content="#0f172a">
+    <meta name="robots" content="noindex, nofollow">
     <title>حسابي | ZINAR</title>
+
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>⚡</text></svg>">
+
+    <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.rtl.min.css" rel="stylesheet">
     <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css" rel="stylesheet">
-    <link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@400;500;700;800&display=swap" rel="stylesheet">
-    <style>
-        :root {
-            --bg-main: #0f172a;
-            --bg-card: #1e293b;
-            --bg-hover: #334155;
-            --text-main: #f1f5f9;
-            --text-muted: #94a3b8;
-            --accent: #38bdf8;
-            --success: #22c55e;
-            --warning: #f59e0b;
-            --danger: #ef4444;
-        }
-        * { box-sizing: border-box; }
-        body {
-            background-color: var(--bg-main);
-            color: var(--text-main);
-            font-family: 'Tajawal', sans-serif;
-            margin: 0;
-            padding-bottom: 40px;
-            min-height: 100vh;
-        }
-        .top-bar {
-            background: linear-gradient(135deg, #1e293b, #0f172a);
-            padding: 14px 20px;
-            border-bottom: 1px solid var(--bg-hover);
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            position: sticky;
-            top: 0;
-            z-index: 100;
-            box-shadow: 0 4px 15px rgba(0,0,0,0.3);
-        }
-        .brand-mini { display: flex; align-items: center; gap: 10px; }
-        .brand-icon-mini {
-            width: 38px; height: 38px;
-            background: linear-gradient(135deg, #38bdf8, #0ea5e9);
-            border-radius: 10px;
-            display: inline-flex;
-            align-items: center;
-            justify-content: center;
-            font-size: 1.2rem;
-            box-shadow: 0 4px 12px rgba(56, 189, 248, 0.4);
-        }
-        .brand-name-mini {
-            font-size: 1.1rem; font-weight: 800;
-            background: linear-gradient(135deg, #38bdf8, #7dd3fc);
-            -webkit-background-clip: text;
-            -webkit-text-fill-color: transparent;
-            letter-spacing: 1.5px;
-        }
-        .btn-logout {
-            background: rgba(239, 68, 68, 0.15);
-            border: 1px solid rgba(239, 68, 68, 0.4);
-            color: #fca5a5;
-            padding: 8px 14px;
-            border-radius: 10px;
-            font-weight: 600;
-            font-size: 0.8rem;
-            text-decoration: none;
-            transition: all 0.3s;
-            display: inline-flex;
-            align-items: center;
-            gap: 5px;
-        }
-        .btn-logout:hover {
-            background: rgba(239, 68, 68, 0.3);
-            color: #fff;
-            transform: translateY(-1px);
-        }
-        .main-container { max-width: 900px; margin: 0 auto; padding: 20px; }
-
-        .profile-header {
-            background: var(--bg-card);
-            border: 1px solid var(--bg-hover);
-            border-radius: 18px;
-            padding: 25px;
-            text-align: center;
-            position: relative;
-            overflow: hidden;
-            margin-bottom: 20px;
-        }
-        .profile-header::before {
-            content: '';
-            position: absolute;
-            top: 0; right: 0; left: 0;
-            height: 3px;
-            background: linear-gradient(90deg, #22c55e, #38bdf8, #f59e0b);
-        }
-        .avatar {
-            width: 85px; height: 85px;
-            margin: 0 auto 12px;
-            background: linear-gradient(135deg, #22c55e, #16a34a);
-            border-radius: 50%;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-size: 2.5rem;
-            color: #fff;
-            box-shadow: 0 8px 25px rgba(34, 197, 94, 0.4);
-        }
-        .profile-name { font-size: 1.4rem; font-weight: 800; margin-bottom: 4px; }
-        .profile-username { color: var(--text-muted); font-family: 'Courier New', monospace; font-size: 0.9rem; margin-bottom: 12px; }
-        .status-badge {
-            display: inline-flex;
-            align-items: center;
-            gap: 6px;
-            padding: 6px 16px;
-            border-radius: 20px;
-            font-size: 0.8rem;
-            font-weight: 700;
-            color: #fff;
-            text-shadow: 0 1px 2px rgba(0,0,0,0.2);
-        }
-        .status-online { background: linear-gradient(135deg, #22c55e, #16a34a); }
-        .status-offline { background: linear-gradient(135deg, #64748b, #475569); }
-        .status-expired { background: linear-gradient(135deg, #ef4444, #dc2626); }
-        .status-paused { background: linear-gradient(135deg, #f59e0b, #d97706); }
-        .pulse-dot {
-            width: 7px; height: 7px;
-            border-radius: 50%;
-            background-color: currentColor;
-            display: inline-block;
-            animation: pulse-animation 1.5s infinite;
-        }
-        @keyframes pulse-animation {
-            0% { box-shadow: 0 0 0 0 currentColor; opacity: 1; }
-            70% { box-shadow: 0 0 0 8px transparent; opacity: 0.7; }
-            100% { box-shadow: 0 0 0 0 transparent; opacity: 1; }
-        }
-
-        /* ✅ تنبيه انتهاء الاشتراك */
-        .expiry-alert {
-            display: flex;
-            gap: 15px;
-            align-items: flex-start;
-            padding: 18px 20px;
-            border-radius: 14px;
-            margin-bottom: 16px;
-            border: 2px solid;
-            position: relative;
-            overflow: hidden;
-            animation: slideDown 0.5s ease;
-        }
-        @keyframes slideDown {
-            from { opacity: 0; transform: translateY(-15px); }
-            to { opacity: 1; transform: translateY(0); }
-        }
-
-        .expiry-alert-icon {
-            font-size: 2rem;
-            flex-shrink: 0;
-            line-height: 1;
-            animation: pulse-alert 2s infinite;
-        }
-        @keyframes pulse-alert {
-            0%, 100% { transform: scale(1); }
-            50% { transform: scale(1.15); }
-        }
-
-        .expiry-alert-content { flex: 1; }
-        .expiry-alert-title {
-            font-size: 1.1rem;
-            font-weight: 800;
-            margin: 0 0 6px;
-        }
-        .expiry-alert-text {
-            font-size: 0.88rem;
-            margin: 0 0 10px;
-            line-height: 1.6;
-        }
-        .expiry-alert-info {
-            display: flex;
-            gap: 15px;
-            flex-wrap: wrap;
-            font-size: 0.78rem;
-            padding-top: 10px;
-            border-top: 1px dashed rgba(255, 255, 255, 0.15);
-        }
-        .expiry-alert-info span {
-            display: flex;
-            align-items: center;
-            gap: 5px;
-        }
-
-        /* ألوان التنبيهات */
-        .expiry-alert.critical {
-            background: linear-gradient(135deg, rgba(239, 68, 68, 0.15), rgba(220, 38, 38, 0.05));
-            border-color: #ef4444;
-            color: #fca5a5;
-        }
-        .expiry-alert.critical .expiry-alert-title { color: #ef4444; }
-
-        .expiry-alert.danger {
-            background: linear-gradient(135deg, rgba(249, 115, 22, 0.15), rgba(234, 88, 12, 0.05));
-            border-color: #f97316;
-            color: #fdba74;
-        }
-        .expiry-alert.danger .expiry-alert-title { color: #f97316; }
-
-        .expiry-alert.warning {
-            background: linear-gradient(135deg, rgba(245, 158, 11, 0.15), rgba(217, 119, 6, 0.05));
-            border-color: #f59e0b;
-            color: #fcd34d;
-        }
-        .expiry-alert.warning .expiry-alert-title { color: #f59e0b; }
-
-        .expiry-alert.info {
-            background: linear-gradient(135deg, rgba(56, 189, 248, 0.15), rgba(14, 165, 233, 0.05));
-            border-color: #38bdf8;
-            color: #7dd3fc;
-        }
-        .expiry-alert.info .expiry-alert-title { color: #38bdf8; }
-
-        .expiry-alert.expired {
-            background: linear-gradient(135deg, rgba(220, 38, 38, 0.2), rgba(153, 27, 27, 0.1));
-            border-color: #dc2626;
-            color: #fca5a5;
-        }
-        .expiry-alert.expired .expiry-alert-title { color: #dc2626; }
-
-        /* قسم السرعة الحية */
-        .live-speed-section {
-            background: var(--bg-card);
-            border: 1px solid var(--bg-hover);
-            border-radius: 16px;
-            padding: 18px;
-            margin-bottom: 16px;
-            position: relative;
-            overflow: hidden;
-        }
-        .live-speed-section::before {
-            content: '';
-            position: absolute;
-            top: 0; right: 0; left: 0;
-            height: 3px;
-            background: linear-gradient(90deg, #22c55e, #38bdf8, #f59e0b);
-        }
-        .live-header {
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            margin-bottom: 15px;
-            padding-bottom: 10px;
-            border-bottom: 1px solid var(--bg-hover);
-        }
-        .live-title {
-            display: flex;
-            align-items: center;
-            gap: 8px;
-            font-size: 0.95rem;
-            font-weight: 700;
-            color: var(--text-main);
-        }
-        .live-title i { color: var(--success); font-size: 1.1rem; }
-        .live-badge {
-            display: inline-flex;
-            align-items: center;
-            gap: 5px;
-            padding: 4px 12px;
-            border-radius: 20px;
-            font-size: 0.7rem;
-            font-weight: 700;
-            background: rgba(239, 68, 68, 0.15);
-            color: #ef4444;
-            border: 1px solid rgba(239, 68, 68, 0.4);
-        }
-        .live-dot-anim {
-            width: 7px; height: 7px;
-            border-radius: 50%;
-            background-color: #ef4444;
-            animation: live-pulse 1.2s infinite;
-        }
-        @keyframes live-pulse {
-            0% { opacity: 1; transform: scale(1); }
-            50% { opacity: 0.5; transform: scale(1.3); }
-            100% { opacity: 1; transform: scale(1); }
-        }
-
-        .speed-box {
-            background: var(--bg-main);
-            border: 1px solid var(--bg-hover);
-            border-radius: 12px;
-            padding: 16px 12px;
-            text-align: center;
-            transition: all 0.3s;
-        }
-        .speed-box.download { border-right: 4px solid var(--success); }
-        .speed-box.upload { border-right: 4px solid var(--warning); }
-        .speed-box:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 8px 20px rgba(0,0,0,0.2);
-        }
-        .speed-icon-box {
-            width: 42px; height: 42px;
-            margin: 0 auto 8px;
-            border-radius: 50%;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-size: 1.3rem;
-        }
-        .speed-icon-box.download {
-            background: rgba(34, 197, 94, 0.15);
-            color: var(--success);
-        }
-        .speed-icon-box.upload {
-            background: rgba(245, 158, 11, 0.15);
-            color: var(--warning);
-        }
-        .speed-live-value {
-            font-size: 1.8rem;
-            font-weight: 800;
-            font-family: 'Courier New', monospace;
-            line-height: 1;
-            margin-bottom: 4px;
-            display: flex;
-            align-items: baseline;
-            justify-content: center;
-            gap: 4px;
-        }
-        .speed-live-value.download { color: var(--success); }
-        .speed-live-value.upload { color: var(--warning); }
-        .speed-live-unit {
-            font-size: 0.75rem;
-            font-weight: 600;
-            opacity: 0.8;
-        }
-        .speed-live-label {
-            color: var(--text-muted);
-            font-size: 0.72rem;
-            font-weight: 600;
-            margin-top: 6px;
-        }
-
-        .total-section {
-            margin-top: 15px;
-            padding-top: 15px;
-            border-top: 1px dashed rgba(148, 163, 184, 0.2);
-        }
-        .total-row {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            margin-bottom: 10px;
-        }
-        .total-label {
-            display: flex;
-            align-items: center;
-            gap: 6px;
-            font-size: 0.78rem;
-            font-weight: 600;
-            color: var(--text-muted);
-        }
-        .total-label.download i { color: var(--success); }
-        .total-label.upload i { color: var(--warning); }
-        .total-value {
-            font-family: 'Courier New', monospace;
-            font-weight: 700;
-            font-size: 0.85rem;
-        }
-        .total-value.download { color: var(--success); }
-        .total-value.upload { color: var(--warning); }
-
-        .progress-live {
-            height: 10px;
-            background-color: var(--bg-hover);
-            border-radius: 5px;
-            overflow: hidden;
-            display: flex;
-            margin-top: 8px;
-        }
-        .progress-live .bar-down {
-            background: linear-gradient(90deg, #22c55e, #4ade80);
-            height: 100%;
-            transition: width 0.8s ease;
-        }
-        .progress-live .bar-up {
-            background: linear-gradient(90deg, #f59e0b, #fbbf24);
-            height: 100%;
-            transition: width 0.8s ease;
-        }
-
-        .info-card {
-            background: var(--bg-card);
-            border: 1px solid var(--bg-hover);
-            border-radius: 14px;
-            padding: 18px;
-            margin-bottom: 12px;
-        }
-        .info-card-header {
-            display: flex;
-            align-items: center;
-            gap: 8px;
-            font-weight: 700;
-            font-size: 0.9rem;
-            color: var(--accent);
-            margin-bottom: 12px;
-            padding-bottom: 10px;
-            border-bottom: 1px solid var(--bg-hover);
-        }
-        .info-row {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            padding: 9px 0;
-            border-bottom: 1px dashed rgba(148, 163, 184, 0.1);
-        }
-        .info-row:last-child { border-bottom: none; }
-        .info-label {
-            color: var(--text-muted);
-            font-size: 0.82rem;
-            font-weight: 600;
-            display: flex;
-            align-items: center;
-            gap: 6px;
-        }
-        .info-label i { color: var(--accent); font-size: 0.9rem; }
-        .info-value {
-            color: var(--text-main);
-            font-weight: 600;
-            font-size: 0.85rem;
-            font-family: 'Courier New', monospace;
-            text-align: left;
-        }
-
-        .days-card {
-            background: linear-gradient(135deg, rgba(56, 189, 248, 0.1), rgba(14, 165, 233, 0.02));
-            border: 1px solid rgba(56, 189, 248, 0.3);
-            border-radius: 14px;
-            padding: 18px;
-            text-align: center;
-            margin-bottom: 12px;
-        }
-        .days-number { font-size: 2.5rem; font-weight: 800; color: var(--accent); line-height: 1; margin-bottom: 4px; }
-        .days-label { color: var(--text-muted); font-size: 0.82rem; font-weight: 600; }
-        .days-card.warning {
-            background: linear-gradient(135deg, rgba(245, 158, 11, 0.1), rgba(217, 119, 6, 0.02));
-            border-color: rgba(245, 158, 11, 0.3);
-        }
-        .days-card.warning .days-number { color: var(--warning); }
-        .days-card.danger {
-            background: linear-gradient(135deg, rgba(239, 68, 68, 0.1), rgba(220, 38, 38, 0.02));
-            border-color: rgba(239, 68, 68, 0.3);
-        }
-        .days-card.danger .days-number { color: var(--danger); }
-
-        .btn-refresh {
-            background: linear-gradient(135deg, #38bdf8, #0ea5e9);
-            color: #0f172a !important;
-            border: none;
-            padding: 12px 20px;
-            border-radius: 12px;
-            font-weight: 700;
-            font-size: 0.85rem;
-            width: 100%;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            gap: 8px;
-            transition: all 0.3s;
-            box-shadow: 0 4px 15px rgba(56, 189, 248, 0.35);
-            margin-top: 12px;
-        }
-        .btn-refresh:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 8px 25px rgba(56, 189, 248, 0.55);
-        }
-        .btn-refresh:disabled { opacity: 0.6; cursor: not-allowed; }
-        .last-update { text-align: center; color: var(--text-muted); font-size: 0.72rem; margin-top: 8px; }
-
-        /* ✅ زر الاتصال بالمدير */
-        .contact-admin-btn {
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            gap: 8px;
-            padding: 12px 20px;
-            background: linear-gradient(135deg, #25d366, #128c7e);
-            color: #ffffff !important;
-            border: none;
-            border-radius: 12px;
-            font-weight: 700;
-            font-size: 0.85rem;
-            text-decoration: none;
-            width: 100%;
-            margin-top: 10px;
-            box-shadow: 0 4px 15px rgba(37, 211, 102, 0.35);
-            transition: all 0.3s;
-        }
-        .contact-admin-btn:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 8px 25px rgba(37, 211, 102, 0.55);
-            color: #ffffff !important;
-        }
-        .contact-admin-btn i { font-size: 1.1rem; }
-
-        @media (max-width: 576px) {
-            .main-container { padding: 12px; }
-            .profile-name { font-size: 1.15rem; }
-            .speed-live-value { font-size: 1.4rem; }
-            .expiry-alert { padding: 14px; }
-            .expiry-alert-icon { font-size: 1.6rem; }
-            .expiry-alert-title { font-size: 0.95rem; }
-        }
-    </style>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/my_account.css') }}">
 </head>
 <body>
 
@@ -548,7 +48,7 @@
         </div>
     </div>
 
-    <!-- ✅ تنبيه انتهاء الاشتراك -->
+    <!-- تنبيه انتهاء الاشتراك -->
     {% if days_left is not none %}
         {% if days_left <= 3 and days_left >= 0 %}
             <div class="expiry-alert {% if days_left == 0 %}critical{% elif days_left == 1 %}danger{% elif days_left == 2 %}warning{% else %}info{% endif %}">
@@ -560,26 +60,28 @@
                 </div>
                 <div class="expiry-alert-content">
                     <h4 class="expiry-alert-title">
-                        {% if days_left == 0 %}
-                            اشتراكك ينتهي اليوم!
-                        {% elif days_left == 1 %}
-                            اشتراكك ينتهي غداً!
-                        {% elif days_left == 2 %}
-                            اشتراكك ينتهي خلال يومين
-                        {% else %}
-                            اشتراكك ينتهي خلال 3 أيام
-                        {% endif %}
+                        {% if days_left == 0 %}اشتراكك ينتهي اليوم!
+                        {% elif days_left == 1 %}اشتراكك ينتهي غداً!
+                        {% elif days_left == 2 %}اشتراكك ينتهي خلال يومين
+                        {% else %}اشتراكك ينتهي خلال 3 أيام{% endif %}
                     </h4>
                     <p class="expiry-alert-text">
                         {% if days_left == 0 %}
                             يرجى تجديد اشتراكك <strong>فوراً</strong> لتجنب انقطاع الخدمة.
                         {% else %}
-                            يرجى التواصل مع إدارة الشبكة لتجديد اشتراكك قبل <strong>{{ sub.expires_at.strftime('%Y-%m-%d') }}</strong>.
+                            يرجى التواصل مع الإدارة لتجديد اشتراكك قبل
+                            <strong>{{ sub.expires_at.strftime('%Y-%m-%d') }}</strong>.
                         {% endif %}
                     </p>
                     <div class="expiry-alert-info">
-                        <span><i class="bi bi-calendar-check"></i> تاريخ الانتهاء: <strong>{{ sub.expires_at.strftime('%Y-%m-%d') }}</strong></span>
-                        <span><i class="bi bi-hourglass-split"></i> المتبقي: <strong>{{ days_left }} يوم</strong></span>
+                        <span>
+                            <i class="bi bi-calendar-check"></i>
+                            تاريخ الانتهاء: <strong>{{ sub.expires_at.strftime('%Y-%m-%d') }}</strong>
+                        </span>
+                        <span>
+                            <i class="bi bi-hourglass-split"></i>
+                            المتبقي: <strong>{{ days_left }} يوم</strong>
+                        </span>
                     </div>
                 </div>
             </div>
@@ -590,7 +92,7 @@
                     <h4 class="expiry-alert-title">اشتراكك منتهي!</h4>
                     <p class="expiry-alert-text">
                         انتهى اشتراكك بتاريخ <strong>{{ sub.expires_at.strftime('%Y-%m-%d') }}</strong>.
-                        يرجى التجديد لتستعيد الخدمة.
+                        يرجى التجديد لاستعادة الخدمة.
                     </p>
                 </div>
             </div>
@@ -608,7 +110,8 @@
     {% endif %}
 
     <!-- السرعة الحية -->
-    <div class="live-speed-section">
+    <div class="live-speed-section" id="liveSpeedSection"
+         data-endpoint="{{ url_for('my_account_live_speed') }}">
         <div class="live-header">
             <div class="live-title">
                 <i class="bi bi-speedometer2"></i>
@@ -703,16 +206,23 @@
         </div>
     </div>
 
-    <!-- ✅ زر التواصل مع المدير -->
+    <!-- زر التواصل مع المدير -->
     {% if days_left is not none and days_left <= 5 %}
-    <a href="https://wa.me/?text={{ ('السلام عليكم، اشتراكي ينتهي بتاريخ ' + (sub.expires_at.strftime('%Y-%m-%d') if sub.expires_at else '') + ' وأرغب بتجديده. اسم المستخدم: ' + sub.username) | urlencode }}"
-       target="_blank" class="contact-admin-btn">
-        <i class="bi bi-whatsapp"></i>
-        تواصل مع الإدارة لتجديد الاشتراك
-    </a>
+        {% set wa_number = config.get('WHATSAPP_ADMIN', '') if config else '' %}
+        {% set wa_msg = 'السلام عليكم، اشتراكي ينتهي بتاريخ ' + (sub.expires_at.strftime('%Y-%m-%d') if sub.expires_at else '') + ' وأرغب بتجديده. اسم المستخدم: ' + sub.username %}
+        {% if wa_number %}
+            {% set wa_url = 'https://wa.me/' + wa_number + '?text=' + (wa_msg | urlencode) %}
+        {% else %}
+            {% set wa_url = 'https://wa.me/?text=' + (wa_msg | urlencode) %}
+        {% endif %}
+        <a href="{{ wa_url }}" target="_blank" rel="noopener" class="contact-admin-btn">
+            <i class="bi bi-whatsapp"></i>
+            تواصل مع الإدارة لتجديد الاشتراك
+        </a>
     {% endif %}
 
-    <button class="btn-refresh" id="refreshBtn" onclick="refreshData()">
+    <button class="btn-refresh" id="refreshBtn"
+            data-endpoint="{{ url_for('my_account_refresh') }}">
         <i class="bi bi-arrow-clockwise"></i> تحديث البيانات الكاملة
     </button>
 
@@ -722,109 +232,6 @@
 
 </div>
 
-<script>
-    function formatBytes(bytes) {
-        bytes = Number(bytes) || 0;
-        if (bytes === 0) return '0 B';
-        const units = ['B', 'KB', 'MB', 'GB', 'TB'];
-        const i = Math.floor(Math.log(bytes) / Math.log(1024));
-        return (bytes / Math.pow(1024, i)).toFixed(2) + ' ' + units[i];
-    }
-
-    function updateLiveSpeed() {
-        fetch('{{ url_for("my_account_live_speed") }}', { method: 'POST' })
-            .then(r => r.json())
-            .then(data => {
-                if (!data.ok) return;
-
-                const statusEl = document.getElementById('liveStatus');
-
-                if (data.online) {
-                    document.getElementById('liveDownload').textContent = data.download_speed;
-                    document.getElementById('liveDownloadUnit').textContent = data.download_unit;
-                    document.getElementById('liveUpload').textContent = data.upload_speed;
-                    document.getElementById('liveUploadUnit').textContent = data.upload_unit;
-
-                    document.getElementById('totalDownload').textContent = formatBytes(data.download_total);
-                    document.getElementById('totalUpload').textContent = formatBytes(data.upload_total);
-
-                    const total = Number(data.download_total) + Number(data.upload_total);
-                    if (total > 0) {
-                        const downPct = (Number(data.download_total) / total * 100).toFixed(1);
-                        const upPct = (Number(data.upload_total) / total * 100).toFixed(1);
-                        document.getElementById('barDown').style.width = downPct + '%';
-                        document.getElementById('barUp').style.width = upPct + '%';
-                    }
-
-                    statusEl.innerHTML = '<span class="live-dot-anim"></span> مباشر';
-                    statusEl.style.background = 'rgba(239, 68, 68, 0.15)';
-                    statusEl.style.color = '#ef4444';
-                    statusEl.style.borderColor = 'rgba(239, 68, 68, 0.4)';
-                } else {
-                    document.getElementById('liveDownload').textContent = '0.0';
-                    document.getElementById('liveDownloadUnit').textContent = 'kbps';
-                    document.getElementById('liveUpload').textContent = '0.0';
-                    document.getElementById('liveUploadUnit').textContent = 'kbps';
-
-                    statusEl.innerHTML = '<i class="bi bi-wifi-off"></i> غير متصل';
-                    statusEl.style.background = 'rgba(100,116,139,0.15)';
-                    statusEl.style.color = '#94a3b8';
-                    statusEl.style.borderColor = 'rgba(148,163,184,0.4)';
-                }
-            })
-            .catch(err => console.error('Live speed error:', err));
-    }
-
-    function refreshData() {
-        const btn = document.getElementById('refreshBtn');
-        const originalHTML = btn.innerHTML;
-        btn.disabled = true;
-        btn.innerHTML = '<span class="spinner-border spinner-border-sm"></span> جاري التحديث...';
-
-        fetch('{{ url_for("my_account_refresh") }}', { method: 'POST' })
-            .then(r => r.json())
-            .then(data => {
-                if (data.ok) {
-                    document.getElementById('ipValue').textContent = data.ip || '—';
-                    document.getElementById('connectedAt').textContent = data.connected_at || '—';
-                    document.getElementById('uptimeValue').textContent = data.uptime || '—';
-                    document.getElementById('totalDownload').textContent = formatBytes(data.tx_bytes);
-                    document.getElementById('totalUpload').textContent = formatBytes(data.rx_bytes);
-
-                    const total = Number(data.rx_bytes) + Number(data.tx_bytes);
-                    if (total > 0) {
-                        const downPct = (Number(data.tx_bytes) / total * 100).toFixed(1);
-                        const upPct = (Number(data.rx_bytes) / total * 100).toFixed(1);
-                        document.getElementById('barDown').style.width = downPct + '%';
-                        document.getElementById('barUp').style.width = upPct + '%';
-                    }
-
-                    const now = new Date().toLocaleTimeString('ar-EG', {
-                        hour: '2-digit', minute: '2-digit', second: '2-digit'
-                    });
-                    document.getElementById('lastUpdate').textContent = 'آخر تحديث: ' + now;
-
-                    btn.innerHTML = '<i class="bi bi-check-circle-fill"></i> تم التحديث';
-                    setTimeout(() => {
-                        btn.disabled = false;
-                        btn.innerHTML = originalHTML;
-                    }, 1500);
-                } else {
-                    btn.disabled = false;
-                    btn.innerHTML = originalHTML;
-                }
-            })
-            .catch(err => {
-                btn.disabled = false;
-                btn.innerHTML = originalHTML;
-            });
-    }
-
-    window.addEventListener('DOMContentLoaded', function() {
-        updateLiveSpeed();
-        setInterval(updateLiveSpeed, 1500);
-    });
-</script>
-
+<script src="{{ url_for('static', filename='js/my_account.js') }}"></script>
 </body>
 </html>
