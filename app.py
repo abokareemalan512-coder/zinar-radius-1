@@ -1,3 +1,8 @@
+# ============================================================================
+# ZINAR - نظام إدارة شبكات MikroTik
+# النسخة النهائية المُحسّنة - 2026
+# ============================================================================
+
 import os
 import re
 import io
@@ -45,7 +50,10 @@ app = Flask(__name__)
 app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', 'zinar-secret-key-2024')
 app.config['MAX_CONTENT_LENGTH'] = 20 * 1024 * 1024
 
-logging.basicConfig(level=logging.INFO)
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s [%(levelname)s] %(name)s: %(message)s',
+)
 logger = logging.getLogger(__name__)
 
 if not LIBROUTEROS_AVAILABLE:
@@ -53,6 +61,8 @@ if not LIBROUTEROS_AVAILABLE:
 
 LOCAL_TZ = ZoneInfo("Asia/Damascus")
 IMPORT_API_KEY = os.environ.get('IMPORT_API_KEY', 'zinar-import-key-2026')
+PUSH_API_KEY = os.environ.get('PUSH_API_KEY', 'zinar-push-key-2026')
+WHATSAPP_ADMIN = os.environ.get('WHATSAPP_ADMIN', '')
 
 _traffic_cache = {}
 
@@ -70,13 +80,18 @@ else:
 app.config['SQLALCHEMY_DATABASE_URI'] = database_url
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 
+# إعدادات محسّنة لـ Neon Serverless
 app.config['SQLALCHEMY_ENGINE_OPTIONS'] = {
     'pool_pre_ping': True,
-    'pool_recycle': 180,
-    'pool_size': 5,
-    'max_overflow': 10,
+    'pool_recycle': 280,
+    'pool_size': 3,
+    'max_overflow': 5,
     'pool_timeout': 30,
-    'connect_args': {"sslmode": "require"} if 'postgresql' in database_url else {}
+    'connect_args': {
+        "sslmode": "require",
+        "connect_timeout": 10,
+        "application_name": "zinar-radius",
+    } if 'postgresql' in database_url else {}
 }
 
 _masked = database_url.split('@')[-1] if '@' in database_url else database_url
@@ -99,11 +114,21 @@ def localtime_filter(dt, format='%Y-%m-%d %H:%M:%S'):
     return dt.astimezone(LOCAL_TZ).strftime(format)
 
 
+# ============ Blueprints ============
+
 try:
     from api_sync import sync_bp
     app.register_blueprint(sync_bp)
+    logger.info("✅ Blueprint api_sync مُسجّل")
 except ImportError:
-    logger.warning("⚠️ Blueprint api_sync غير موجود، تم التجاوز.")
+    logger.warning("⚠️ Blueprint api_sync غير موجود")
+
+try:
+    from hotspot import hotspot_bp
+    app.register_blueprint(hotspot_bp)
+    logger.info("✅ Blueprint hotspot مُسجّل")
+except ImportError:
+    logger.warning("⚠️ Blueprint hotspot غير موجود")
 
 
 # ============ Models ============
@@ -116,7 +141,7 @@ class Router(db.Model):
     username = db.Column(db.String(50), nullable=False)
     password = db.Column(db.String(150), nullable=False)
     port = db.Column(db.Integer, default=22)
-    api_port = db.Column(db.Integer, default=13)
+    api_port = db.Column(db.Integer, default=8728)  # ✅ 8728 بدل 13
     is_master = db.Column(db.Boolean, default=False)
     is_active = db.Column(db.Boolean, default=True)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
@@ -525,7 +550,7 @@ def parse_mikrotik_rsc(content):
     return packages, subscribers, debug_info
 
 
-# ============ Telegram Helper ============
+# ============ Telegram Helpers ============
 
 def get_telegram_settings():
     try:
@@ -571,39 +596,6 @@ def send_telegram_message(message, message_type='info', force=False):
     except Exception as e:
         log_telegram(str(e), message_type=message_type, status='failed')
         return False, str(e)
-
-
-@app.route('/api/telegram/webhook', methods=['POST'])
-def telegram_webhook():
-    try:
-        data = request.get_json(silent=True)
-        if not data:
-            return jsonify({'ok': True})
-        msg = data.get('message') or data.get('channel_post')
-        if msg:
-            chat_id = msg.get('chat', {}).get('id')
-            text = msg.get('text', '')
-            chat_title = msg.get('chat', {}).get('title', '')
-            user_info = msg.get('from', {})
-            if user_info.get('is_bot', False):
-                return jsonify({'ok': True})
-            user_name = user_info.get('username') or user_info.get('first_name', 'مستخدم')
-            log = TelegramLog(
-                message_type='incoming_group' if chat_title else 'incoming',
-                status='success',
-                message=f"📥 {chat_title} | {user_name}:\n{text}" if chat_title else f"📥 {user_name}:\n{text}"
-            )
-            db.session.add(log)
-            db.session.commit()
-            if text.strip() == '/start' and not chat_title:
-                send_telegram_message(
-                    f"أهلاً بك يا {user_name} 👋\nتم استلام رسالتك وربط حسابك بنجاح مع النظام.",
-                    message_type='reply', force=True
-                )
-        return jsonify({'ok': True})
-    except Exception as e:
-        db.session.rollback()
-        return jsonify({'ok': False}), 500
 
 
 def notify_new_subscriber(username):
@@ -702,6 +694,8 @@ def send_expiry_reminder(sub, days_left):
     return ok
 
 
+# ============ Background Threads ============
+
 def background_expiry_reminder():
     time.sleep(60)
     while True:
@@ -723,17 +717,14 @@ def background_expiry_reminder():
                         if send_expiry_reminder(sub, 3):
                             sub.reminder_3d_sent = True
                             sent_count += 1
-
                     elif days_left == 2 and not sub.reminder_2d_sent:
                         if send_expiry_reminder(sub, 2):
                             sub.reminder_2d_sent = True
                             sent_count += 1
-
                     elif days_left == 1 and not sub.reminder_1d_sent:
                         if send_expiry_reminder(sub, 1):
                             sub.reminder_1d_sent = True
                             sent_count += 1
-
                     elif days_left == 0 and not sub.reminder_0d_sent:
                         if send_expiry_reminder(sub, 0):
                             sub.reminder_0d_sent = True
@@ -742,7 +733,6 @@ def background_expiry_reminder():
                 if sent_count > 0:
                     db.session.commit()
                     logger.info(f"✅ تم إرسال {sent_count} تذكير انتهاء اشتراك")
-
         except Exception as e:
             logger.warning(f"⚠️ خطأ في تذكيرات الانتهاء: {e}")
         finally:
@@ -750,11 +740,8 @@ def background_expiry_reminder():
                 db.session.remove()
             except Exception:
                 pass
-
         time.sleep(3600)
 
-
-# ============ Background Router Monitor ============
 
 def is_private_ip(ip):
     try:
@@ -807,7 +794,7 @@ def background_router_monitor():
                 db.session.remove()
             except Exception:
                 pass
-        time.sleep(60)
+        time.sleep(600)  # ✅ 10 دقائق بدل دقيقة
 
 
 # ============ MikroTik API Helper ============
@@ -816,7 +803,7 @@ def get_mikrotik_api(router):
     if not LIBROUTEROS_AVAILABLE:
         raise Exception("مكتبة librouteros غير مثبتة")
     try:
-        api_port = router.api_port or 13
+        api_port = router.api_port or 8728  # ✅ 8728 بدل 13
         logger.info(f"🔌 اتصال API: {router.ip_address}:{api_port} (user={router.username})")
         api = connect(
             username=router.username, password=router.password,
@@ -826,8 +813,6 @@ def get_mikrotik_api(router):
     except Exception as e:
         raise Exception(f"فشل الاتصال بالـ API على المنفذ {router.api_port}: {str(e)}")
 
-
-# ============ Fetch Active IPs + Traffic ============
 
 def fetch_active_ips_from_router(router):
     if not LIBROUTEROS_AVAILABLE:
@@ -955,7 +940,7 @@ def background_ip_updater():
                 db.session.remove()
             except Exception:
                 pass
-        time.sleep(120)
+        time.sleep(600)  # ✅ 10 دقائق
 
 
 # ============ Kick via SSH ============
@@ -1043,7 +1028,7 @@ def ensure_columns():
                     if 'is_active' not in cols:
                         conn.execute(text("ALTER TABLE routers ADD COLUMN is_active BOOLEAN DEFAULT TRUE"))
                     if 'api_port' not in cols:
-                        conn.execute(text("ALTER TABLE routers ADD COLUMN api_port INTEGER DEFAULT 13"))
+                        conn.execute(text("ALTER TABLE routers ADD COLUMN api_port INTEGER DEFAULT 8728"))
                 if 'telegram_settings' in tables:
                     cols = [c['name'] for c in insp.get_columns('telegram_settings')]
                     if 'notify_router_status' not in cols:
@@ -1088,14 +1073,48 @@ def ensure_columns():
 init_database()
 ensure_columns()
 
+# تشغيل Background threads
 monitor_thread = threading.Thread(target=background_router_monitor, daemon=True)
 monitor_thread.start()
 
-ip_updater_thread = threading.Thread(target=background_ip_updater, daemon=True)
-ip_updater_thread.start()
+# ip_updater معطّل — MikroTik Push يقوم بالمهمة
+# ip_updater_thread = threading.Thread(target=background_ip_updater, daemon=True)
+# ip_updater_thread.start()
+logger.info("ℹ️ background_ip_updater معطّل — MikroTik Push يتولى التحديث")
 
 reminder_thread = threading.Thread(target=background_expiry_reminder, daemon=True)
 reminder_thread.start()
+
+
+# ============ Error Handlers ============
+
+@app.errorhandler(404)
+def not_found_error(error):
+    return render_template(
+        'error.html',
+        code=404,
+        error='الصفحة التي تبحث عنها غير موجودة أو تم نقلها.',
+    ), 404
+
+
+@app.errorhandler(403)
+def forbidden_error(error):
+    return render_template(
+        'error.html',
+        code=403,
+        error='ليس لديك صلاحية للوصول إلى هذه الصفحة.',
+    ), 403
+
+
+@app.errorhandler(500)
+def internal_error(error):
+    db.session.rollback()
+    logger.error(f'Internal error: {error}')
+    return render_template(
+        'error.html',
+        code=500,
+        error='حدث خطأ في الخادم. يرجى المحاولة لاحقًا أو التواصل مع الدعم.',
+    ), 500
 
 
 # ============ API للميكروتيك ============
@@ -1445,17 +1464,59 @@ def api_telegram_data():
         return jsonify({'error': str(e)}), 500
 
 
-# ============ ✅ استقبال بيانات MikroTik Push (جديد) ============
+# ============ ✅ APIs للقوالب الجديدة ============
+
+@app.route('/api/subscriber/password/<int:sub_id>', methods=['GET'])
+def api_subscriber_password(sub_id):
+    """جلب كلمة مرور مشترك — يتطلب تسجيل دخول المدير"""
+    if not session.get('admin_id'):
+        return jsonify({'ok': False, 'error': 'غير مصرح'}), 401
+
+    sub = Subscriber.query.get(sub_id)
+    if not sub:
+        return jsonify({'ok': False, 'error': 'غير موجود'}), 404
+
+    return jsonify({
+        'ok': True,
+        'password': sub.password or '',
+        'username': sub.username,
+    })
+
+
+@app.route('/api/subscriber/check/<username>', methods=['GET'])
+def api_check_subscriber_username(username):
+    """التحقق من توفّر اسم المستخدم"""
+    if not session.get('admin_id'):
+        return jsonify({'ok': False, 'error': 'غير مصرح'}), 401
+
+    exists = Subscriber.query.filter_by(username=username).first() is not None
+    return jsonify({'ok': True, 'exists': exists})
+
+
+@app.route('/api/mobile/routers', methods=['GET'])
+def api_mobile_routers():
+    """قائمة الراوترات للواجهة المحمولة"""
+    if not session.get('admin_id'):
+        return jsonify({'ok': False, 'error': 'غير مصرح'}), 401
+
+    routers = Router.query.order_by(Router.name).all()
+    return jsonify({
+        'ok': True,
+        'routers': [
+            {'id': r.id, 'name': r.name, 'ip': r.ip_address, 'api_port': r.api_port or 8728}
+            for r in routers
+        ],
+    })
+
+
+# ============ MikroTik Push ============
 
 @app.route('/api/mikrotik/push', methods=['POST'])
 def mikrotik_push():
-    """
-    يستقبل بيانات المستخدمين النشطين من MikroTik مباشرة
-    MikroTik يرسلها كل 5 ثواني تلقائياً
-    """
+    """يستقبل بيانات المستخدمين النشطين من MikroTik مباشرة"""
     try:
         api_key = request.args.get('key')
-        if api_key != 'zinar-push-key-2026':
+        if api_key != PUSH_API_KEY:
             return jsonify({'ok': False, 'error': 'Unauthorized'}), 401
 
         data = request.get_json(silent=True)
@@ -1543,11 +1604,6 @@ def mikrotik_push():
 
 # ============ Auth Guard ============
 
-@app.route('/mobile')
-def mobile_view():
-    return render_template('mobile.html')
-
-
 @app.before_request
 def check_admin_login():
     if request.endpoint is None:
@@ -1555,6 +1611,8 @@ def check_admin_login():
     if request.endpoint.startswith('static'):
         return
     if request.path.startswith('/api/'):
+        return
+    if request.path.startswith('/hotspot/'):
         return
     public = (
         'login', 'logout', 'mobile', 'mobile_view',
@@ -1565,7 +1623,8 @@ def check_admin_login():
         'my_account_login', 'my_account_dashboard',
         'my_account_logout', 'my_account_refresh',
         'my_account_live_speed',
-        'mikrotik_push'
+        'mikrotik_push',
+        'telegram_webhook',
     )
     if request.endpoint in public:
         return
@@ -1598,7 +1657,10 @@ def my_account_login():
         log_event('دخول مشترك', sub.username, 'دخول بوابة المشتركين', admin_name=sub.username)
         return redirect(url_for('my_account_dashboard'))
 
-    return render_template('my_account_login.html')
+    return render_template(
+        'my_account_login.html',
+        current_year=datetime.now().year,
+    )
 
 
 @app.route('/my-account/dashboard')
@@ -1625,7 +1687,8 @@ def my_account_dashboard():
         'my_account.html',
         sub=sub,
         router=router,
-        days_left=days_left
+        days_left=days_left,
+        whatsapp_admin=WHATSAPP_ADMIN,
     )
 
 
@@ -1688,8 +1751,6 @@ def my_account_refresh():
         return jsonify({'ok': False, 'error': str(e)}), 500
 
 
-# ============ ✅ السرعة الحية (تُقرأ من Cache الذي يعبّئه MikroTik Push) ============
-
 @app.route('/my-account/live-speed', methods=['POST'])
 def my_account_live_speed():
     if not session.get('subscriber_id'):
@@ -1739,7 +1800,7 @@ def my_account_logout():
     return redirect(url_for('my_account_login'))
 
 
-# ============ Main Routes ============
+# ============ Auth ============
 
 @app.route('/')
 def index():
@@ -1762,7 +1823,10 @@ def login():
             flash('✅ تم تسجيل الدخول', 'success')
             return redirect(url_for('dashboard'))
         flash('❌ بيانات غير صحيحة', 'danger')
-    return render_template('login.html')
+    return render_template(
+        'login.html',
+        current_year=datetime.now().year,
+    )
 
 
 @app.route('/logout')
@@ -1773,232 +1837,18 @@ def logout():
     return redirect(url_for('login'))
 
 
-@app.route('/import-backup', methods=['GET', 'POST'])
-def import_backup():
-    if request.method == 'POST':
-        try:
-            if 'backup_file' not in request.files:
-                flash('❌ الرجاء اختيار ملف النسخة الاحتياطية', 'danger')
-                return redirect(url_for('import_backup'))
-            file = request.files['backup_file']
-            if not file.filename:
-                flash('❌ لم يتم اختيار أي ملف', 'danger')
-                return redirect(url_for('import_backup'))
-            if not file.filename.lower().endswith(('.rsc', '.txt')):
-                flash('❌ يجب أن يكون الملف بصيغة .rsc أو .txt', 'danger')
-                return redirect(url_for('import_backup'))
-            raw_bytes = file.read()
-            try:
-                content = raw_bytes.decode('utf-8')
-            except UnicodeDecodeError:
-                try:
-                    content = raw_bytes.decode('windows-1256')
-                except UnicodeDecodeError:
-                    content = raw_bytes.decode('utf-8', errors='ignore')
-            if content[:5] == 'PK\x03\x04' or raw_bytes[:4] == b'\x00\x00\x00\x00':
-                flash('❌ هذا ملف Backup ثنائي وليس RSC!', 'danger')
-                return redirect(url_for('import_backup'))
-            packages, subscribers, debug_info = parse_mikrotik_rsc(content)
-            if not packages and not subscribers:
-                preview = debug_info['preview'].replace('\n', '<br>').replace('<', '&lt;').replace('>', '&gt;')[:800]
-                sections = ', '.join(debug_info['sections_found']) or 'لا يوجد'
-                error_msg = (
-                    f'⚠️ لم يتم العثور على بيانات!<br>'
-                    f'📄 صيغة الملف: <strong>{debug_info["format"]}</strong><br>'
-                    f'📄 عدد الأسطر: {debug_info["lines_read"]}<br>'
-                    f'🔍 الأقسام المكتشفة: {sections}<br>'
-                    f'📊 أسطر Profiles: {debug_info["profile_lines"]} | أسطر Secrets: {debug_info["secret_lines"]}<br>'
-                    f'<br><strong>معاينة أول أسطر الملف:</strong><br>'
-                    f'<code style="display:block; max-height:200px; overflow:auto; background:#000; padding:10px; margin-top:5px; text-align:left; direction:ltr; color:#0f0; font-size:11px;">{preview}</code>'
-                )
-                flash(error_msg, 'warning')
-                return redirect(url_for('import_backup'))
-            pkg_imported = pkg_updated = 0
-            for p in packages:
-                existing = Package.query.filter_by(name=p['name']).first()
-                if existing:
-                    existing.speed = p['speed'] or existing.speed
-                    pkg_updated += 1
-                else:
-                    db.session.add(Package(**p))
-                    pkg_imported += 1
-            sub_imported = sub_updated = 0
-            for s in subscribers:
-                existing = Subscriber.query.filter_by(username=s['username']).first()
-                if existing:
-                    existing.password = s['password']
-                    existing.package = s['package']
-                    existing.user_type = s['user_type']
-                    existing.status = s['status']
-                    existing.name = s['name']
-                    sub_updated += 1
-                else:
-                    db.session.add(Subscriber(
-                        name=s['name'], username=s['username'], password=s['password'],
-                        package=s['package'], user_type=s['user_type'],
-                        status=s['status'], expires_at=None
-                    ))
-                    sub_imported += 1
-            db.session.commit()
-            log_event(
-                'استيراد نسخة احتياطية', f'ملف: {file.filename}',
-                f'باقات: {pkg_imported}+{pkg_updated} | مشتركين: {sub_imported}+{sub_updated}',
-                admin_name=session.get('admin_name', 'المدير')
-            )
-            flash(
-                f'✅ تم الاستيراد بنجاح! (صيغة: {debug_info["format"]}) | '
-                f'📦 الباقات: {pkg_imported} جديدة، {pkg_updated} محدّثة | '
-                f'👥 المشتركون: {sub_imported} جديد، {sub_updated} محدّث',
-                'success'
-            )
-            return redirect(url_for('import_backup'))
-        except Exception as e:
-            db.session.rollback()
-            logger.error(f"❌ Backup import error: {e}")
-            logger.error(traceback.format_exc())
-            flash(f'❌ خطأ في الاستيراد: {str(e)}', 'danger')
-            return redirect(url_for('import_backup'))
-    return render_template('import_backup.html',
-        total_packages=Package.query.count(),
-        total_subscribers=Subscriber.query.count()
+# ============ Mobile ============
+
+@app.route('/mobile')
+def mobile_view():
+    return render_template(
+        'mobile.html',
+        sub_count=Subscriber.query.count(),
+        router_count=Router.query.count(),
     )
 
 
-@app.route('/traffic-monitor')
-def traffic_monitor_page():
-    routers_list = Router.query.all()
-    return render_template('traffic_monitor.html', routers=routers_list)
-
-
-@app.route('/dashboard')
-def dashboard():
-    try:
-        routers_list = Router.query.all()
-        routers_count = len(routers_list)
-        routers_online = Router.query.filter_by(is_active=True).count()
-        master = Router.query.filter_by(is_master=True).first()
-        sub_count = Subscriber.query.count()
-        active_subs = Subscriber.query.filter_by(status='active').count()
-
-        start, end = _day_bounds()
-        today_revenue = db.session.query(db.func.sum(Payment.amount)).filter(
-            Payment.status == 'completed',
-            Payment.created_at >= start,
-            Payment.created_at < end
-        ).scalar() or 0
-
-        now = datetime.utcnow()
-        start_month = datetime(now.year, now.month, 1)
-        start_year = datetime(now.year, 1, 1)
-
-        monthly_revenue = db.session.query(db.func.sum(Payment.amount)).filter(
-            Payment.status == 'completed',
-            Payment.created_at >= start_month
-        ).scalar() or 0
-
-        yearly_revenue = db.session.query(db.func.sum(Payment.amount)).filter(
-            Payment.status == 'completed',
-            Payment.created_at >= start_year
-        ).scalar() or 0
-
-        inactive_subs = Subscriber.query.filter(
-            Subscriber.status.in_(['expired', 'paused'])
-        ).all()
-
-        new_users_today = Subscriber.query.filter(
-            Subscriber.created_at >= start,
-            Subscriber.created_at < end
-        ).count()
-
-        pending_pays = Payment.query.filter_by(status='pending').count()
-        events_list = SystemEvent.query.order_by(SystemEvent.created_at.desc()).limit(15).all()
-        current_time = get_local_time_str()
-        telegram_status = TelegramSetting.query.first()
-        recent_telegram_logs = TelegramLog.query.order_by(TelegramLog.created_at.desc()).limit(5).all()
-
-        recent_subs = Subscriber.query.order_by(Subscriber.created_at.desc()).limit(5).all()
-        recent_payments = Payment.query.filter_by(status='completed').order_by(Payment.created_at.desc()).limit(5).all()
-        recent_routers = Router.query.order_by(Router.created_at.desc()).limit(5).all()
-
-        online_subs = Subscriber.query.filter(
-            Subscriber.current_ip.isnot(None),
-            Subscriber.current_ip != ''
-        ).order_by(Subscriber.last_seen_at.desc()).all()
-        top_online_subs = online_subs[:10]
-
-        return render_template(
-            'dashboard.html',
-            routers_count=routers_count,
-            routers_online=routers_online,
-            routers=routers_list,
-            sub_count=sub_count,
-            active_subs=active_subs,
-            today_revenue=today_revenue,
-            monthly_revenue=monthly_revenue,
-            yearly_revenue=yearly_revenue,
-            inactive_subs=inactive_subs,
-            new_users_today=new_users_today,
-            has_master=master is not None,
-            events=events_list,
-            admin_name=session.get('admin_name', 'مدير'),
-            current_time=current_time,
-            telegram_status=telegram_status,
-            recent_telegram_logs=recent_telegram_logs,
-            pending_pays=pending_pays,
-            active_sessions=0,
-            recent_subs=recent_subs,
-            recent_payments=recent_payments,
-            recent_routers=recent_routers,
-            online_subs=online_subs,
-            top_online_subs=top_online_subs,
-        )
-    except Exception as e:
-        db.session.rollback()
-        logger.error(f"❌ dashboard error: {e}")
-        flash(f'❌ {str(e)}', 'danger')
-        return render_template('error.html', error=str(e)), 500
-
-
-@app.route('/admin/change-credentials', methods=['POST'])
-def change_admin_credentials():
-    admin_id = session.get('admin_id')
-    if not admin_id:
-        flash('❌ غير مصرح', 'danger')
-        return redirect(url_for('login'))
-    admin = AdminUser.query.get(admin_id)
-    if not admin:
-        flash('❌ المستخدم غير موجود', 'danger')
-        return redirect(url_for('login'))
-    try:
-        nu = request.form.get('new_username', '').strip()
-        cp = request.form.get('current_password', '').strip()
-        np = request.form.get('new_password', '').strip()
-        cf = request.form.get('confirm_password', '').strip()
-        if not cp or not check_password_hash(admin.password, cp):
-            flash('❌ كلمة المرور الحالية غير صحيحة', 'danger')
-            return redirect(url_for('dashboard'))
-        if nu and nu != admin.username:
-            if AdminUser.query.filter_by(username=nu).first():
-                flash('❌ اسم المستخدم موجود', 'danger')
-                return redirect(url_for('dashboard'))
-            admin.username = nu
-            session['admin_name'] = nu
-        if np:
-            if np != cf:
-                flash('❌ كلمتا المرور غير متطابقتين', 'danger')
-                return redirect(url_for('dashboard'))
-            if len(np) < 6:
-                flash('❌ 6 أحرف على الأقل', 'danger')
-                return redirect(url_for('dashboard'))
-            admin.password = generate_password_hash(np)
-        db.session.commit()
-        log_event('تعديل بيانات الحساب', 'المدير', f'تحديث بيانات المدير {admin.username}')
-        flash('✅ تم التحديث بنجاح', 'success')
-    except Exception as e:
-        db.session.rollback()
-        flash(f'❌ {str(e)}', 'danger')
-    return redirect(url_for('dashboard'))
-
+# ============ Router Management ============
 
 @app.route('/routers', methods=['GET', 'POST'])
 def routers():
@@ -2008,7 +1858,7 @@ def routers():
         un = request.form.get('username', '').strip()
         pw = request.form.get('password', '').strip()
         port = request.form.get('port', '22').strip()
-        api_port = request.form.get('api_port', '13').strip()
+        api_port = request.form.get('api_port', '8728').strip()
         is_master = request.form.get('is_master') == 'on'
         if not name or not ip:
             flash('❌ الاسم و IP مطلوبان', 'danger')
@@ -2023,7 +1873,7 @@ def routers():
         try:
             api_port = int(api_port)
         except ValueError:
-            api_port = 13
+            api_port = 8728
         try:
             if is_master:
                 Router.query.update({Router.is_master: False}, synchronize_session=False)
@@ -2073,7 +1923,7 @@ def update_router(router_id):
         un = request.form.get('username', '').strip()
         pw = request.form.get('password', '').strip()
         port = request.form.get('port', '22').strip()
-        api_port = request.form.get('api_port', '13').strip()
+        api_port = request.form.get('api_port', '8728').strip()
         if not name or not ip:
             flash('❌ الاسم و IP مطلوبان', 'danger')
             return redirect(url_for('routers'))
@@ -2092,7 +1942,7 @@ def update_router(router_id):
         try:
             r.api_port = int(api_port)
         except ValueError:
-            r.api_port = 13
+            r.api_port = 8728
         db.session.commit()
         log_event('تعديل راوتر', name, f'IP: {ip} | SSH: {r.port} | API: {r.api_port}')
         try:
@@ -2125,6 +1975,8 @@ def delete_router(router_id):
     return redirect(url_for('routers'))
 
 
+# ============ Subscribers ============
+
 @app.route('/subscribers')
 def subscribers():
     search = request.args.get('q', '').strip()
@@ -2133,19 +1985,17 @@ def subscribers():
     per_page = 50
     now = datetime.utcnow()
     try:
-        expired = Subscriber.query.filter(
-            Subscriber.expires_at.isnot(None),
-            Subscriber.expires_at < now,
-            Subscriber.status == 'active'
-        ).all()
-        for s in expired:
-            s.status = 'expired'
-            try:
-                kick_subscriber(s)
-            except Exception:
-                pass
-        if expired:
+        # ✅ إزالة kick_subscriber — تحديث الحالة فقط (أسرع بكثير)
+        try:
+            Subscriber.query.filter(
+                Subscriber.expires_at.isnot(None),
+                Subscriber.expires_at < now,
+                Subscriber.status == 'active'
+            ).update({Subscriber.status: 'expired'}, synchronize_session=False)
             db.session.commit()
+        except Exception:
+            db.session.rollback()
+
         q = Subscriber.query
         if search:
             q = q.filter(db.or_(
@@ -2230,36 +2080,57 @@ def add_subscriber():
         pkg = request.form.get('package', '').strip()
         ut = request.form.get('user_type', 'pppoe').strip()
         phone = request.form.get('phone', '').strip()
+        router_id = request.form.get('router_id', '').strip()  # ✅ جديد
+
         if ut not in ('pppoe', 'hotspot'):
             ut = 'pppoe'
         if not un or not pw:
-            flash('❌ الاسم وكلمة المرور مطلوبان', 'danger')
+            flash('❌ اسم المستخدم وكلمة المرور مطلوبان', 'danger')
             return redirect(url_for('add_subscriber'))
         if Subscriber.query.filter_by(username=un).first():
             flash(f'❌ "{un}" موجود مسبقاً', 'danger')
             return redirect(url_for('add_subscriber'))
+
+        # ✅ تحقق من رقم الهاتف
+        if phone and not phone.isdigit():
+            flash('❌ رقم الهاتف يجب أن يكون أرقاماً فقط', 'danger')
+            return redirect(url_for('add_subscriber'))
+
+        # ✅ تحقق من راوتر
+        router_id_int = None
+        if router_id:
+            try:
+                router_id_int = int(router_id)
+            except ValueError:
+                router_id_int = None
+
         try:
-            db.session.add(Subscriber(
-                name=name or un, username=un, password=pw, package=pkg,
-                user_type=ut, expires_at=None, status='active',
-                phone=phone
-            ))
+            sub = Subscriber(
+                name=name or un, username=un, password=pw,
+                package=pkg, user_type=ut, status='active',
+                phone=phone or None, router_id=router_id_int,  # ✅ جديد
+            )
+            db.session.add(sub)
             db.session.commit()
+
             if radius_sync:
                 try:
                     radius_sync.sync_user(un, pw)
                 except Exception:
                     pass
-            log_event('إضافة مشترك', un, f'الباقة: {pkg}')
+
+            log_event('إضافة مشترك', un, f'الباقة: {pkg} | النوع: {ut}')
             try:
                 notify_new_subscriber(un)
             except Exception:
                 pass
+
             flash(f'✅ المشترك "{un}" أُضيف بنجاح', 'success')
             return redirect(url_for('subscribers'))
         except Exception as e:
             db.session.rollback()
             flash(f'❌ {e}', 'danger')
+
     return render_template(
         'add_subscriber.html',
         packages=Package.query.order_by(Package.name).all(),
@@ -2614,6 +2485,8 @@ def export_subscribers(format):
     return redirect(url_for('subscribers'))
 
 
+# ============ Packages ============
+
 @app.route('/packages', methods=['GET', 'POST'])
 def packages():
     if request.method == 'POST':
@@ -2681,6 +2554,239 @@ def delete_package(pkg_id):
     return redirect(url_for('packages'))
 
 
+# ============ Import Backup ============
+
+@app.route('/import-backup', methods=['GET', 'POST'])
+def import_backup():
+    if request.method == 'POST':
+        try:
+            if 'backup_file' not in request.files:
+                flash('❌ الرجاء اختيار ملف النسخة الاحتياطية', 'danger')
+                return redirect(url_for('import_backup'))
+            file = request.files['backup_file']
+            if not file.filename:
+                flash('❌ لم يتم اختيار أي ملف', 'danger')
+                return redirect(url_for('import_backup'))
+            if not file.filename.lower().endswith(('.rsc', '.txt')):
+                flash('❌ يجب أن يكون الملف بصيغة .rsc أو .txt', 'danger')
+                return redirect(url_for('import_backup'))
+            raw_bytes = file.read()
+            try:
+                content = raw_bytes.decode('utf-8')
+            except UnicodeDecodeError:
+                try:
+                    content = raw_bytes.decode('windows-1256')
+                except UnicodeDecodeError:
+                    content = raw_bytes.decode('utf-8', errors='ignore')
+            if content[:5] == 'PK\x03\x04' or raw_bytes[:4] == b'\x00\x00\x00\x00':
+                flash('❌ هذا ملف Backup ثنائي وليس RSC!', 'danger')
+                return redirect(url_for('import_backup'))
+            packages, subscribers, debug_info = parse_mikrotik_rsc(content)
+            if not packages and not subscribers:
+                preview = debug_info['preview'].replace('\n', '<br>').replace('<', '&lt;').replace('>', '&gt;')[:800]
+                sections = ', '.join(debug_info['sections_found']) or 'لا يوجد'
+                error_msg = (
+                    f'⚠️ لم يتم العثور على بيانات!<br>'
+                    f'📄 صيغة الملف: <strong>{debug_info["format"]}</strong><br>'
+                    f'📄 عدد الأسطر: {debug_info["lines_read"]}<br>'
+                    f'🔍 الأقسام المكتشفة: {sections}<br>'
+                    f'📊 أسطر Profiles: {debug_info["profile_lines"]} | أسطر Secrets: {debug_info["secret_lines"]}<br>'
+                    f'<br><strong>معاينة أول أسطر الملف:</strong><br>'
+                    f'<code style="display:block; max-height:200px; overflow:auto; background:#000; padding:10px; margin-top:5px; text-align:left; direction:ltr; color:#0f0; font-size:11px;">{preview}</code>'
+                )
+                flash(error_msg, 'warning')
+                return redirect(url_for('import_backup'))
+            pkg_imported = pkg_updated = 0
+            for p in packages:
+                existing = Package.query.filter_by(name=p['name']).first()
+                if existing:
+                    existing.speed = p['speed'] or existing.speed
+                    pkg_updated += 1
+                else:
+                    db.session.add(Package(**p))
+                    pkg_imported += 1
+            sub_imported = sub_updated = 0
+            for s in subscribers:
+                existing = Subscriber.query.filter_by(username=s['username']).first()
+                if existing:
+                    existing.password = s['password']
+                    existing.package = s['package']
+                    existing.user_type = s['user_type']
+                    existing.status = s['status']
+                    existing.name = s['name']
+                    sub_updated += 1
+                else:
+                    db.session.add(Subscriber(
+                        name=s['name'], username=s['username'], password=s['password'],
+                        package=s['package'], user_type=s['user_type'],
+                        status=s['status'], expires_at=None
+                    ))
+                    sub_imported += 1
+            db.session.commit()
+            log_event(
+                'استيراد نسخة احتياطية', f'ملف: {file.filename}',
+                f'باقات: {pkg_imported}+{pkg_updated} | مشتركين: {sub_imported}+{sub_updated}',
+                admin_name=session.get('admin_name', 'المدير')
+            )
+            flash(
+                f'✅ تم الاستيراد بنجاح! (صيغة: {debug_info["format"]}) | '
+                f'📦 الباقات: {pkg_imported} جديدة، {pkg_updated} محدّثة | '
+                f'👥 المشتركون: {sub_imported} جديد، {sub_updated} محدّث',
+                'success'
+            )
+            return redirect(url_for('import_backup'))
+        except Exception as e:
+            db.session.rollback()
+            logger.error(f"❌ Backup import error: {e}")
+            logger.error(traceback.format_exc())
+            flash(f'❌ خطأ في الاستيراد: {str(e)}', 'danger')
+            return redirect(url_for('import_backup'))
+    return render_template('import_backup.html',
+        total_packages=Package.query.count(),
+        total_subscribers=Subscriber.query.count()
+    )
+
+
+# ============ Dashboard ============
+
+@app.route('/traffic-monitor')
+def traffic_monitor_page():
+    routers_list = Router.query.all()
+    return render_template('traffic_monitor.html', routers=routers_list)
+
+
+@app.route('/dashboard')
+def dashboard():
+    try:
+        routers_list = Router.query.all()
+        routers_count = len(routers_list)
+        routers_online = Router.query.filter_by(is_active=True).count()
+        master = Router.query.filter_by(is_master=True).first()
+        sub_count = Subscriber.query.count()
+        active_subs = Subscriber.query.filter_by(status='active').count()
+
+        start, end = _day_bounds()
+        today_revenue = db.session.query(db.func.sum(Payment.amount)).filter(
+            Payment.status == 'completed',
+            Payment.created_at >= start,
+            Payment.created_at < end
+        ).scalar() or 0
+
+        now = datetime.utcnow()
+        start_month = datetime(now.year, now.month, 1)
+        start_year = datetime(now.year, 1, 1)
+
+        monthly_revenue = db.session.query(db.func.sum(Payment.amount)).filter(
+            Payment.status == 'completed',
+            Payment.created_at >= start_month
+        ).scalar() or 0
+
+        yearly_revenue = db.session.query(db.func.sum(Payment.amount)).filter(
+            Payment.status == 'completed',
+            Payment.created_at >= start_year
+        ).scalar() or 0
+
+        inactive_subs = Subscriber.query.filter(
+            Subscriber.status.in_(['expired', 'paused'])
+        ).all()
+
+        new_users_today = Subscriber.query.filter(
+            Subscriber.created_at >= start,
+            Subscriber.created_at < end
+        ).count()
+
+        pending_pays = Payment.query.filter_by(status='pending').count()
+        events_list = SystemEvent.query.order_by(SystemEvent.created_at.desc()).limit(15).all()
+        current_time = get_local_time_str()
+        telegram_status = TelegramSetting.query.first()
+        recent_telegram_logs = TelegramLog.query.order_by(TelegramLog.created_at.desc()).limit(5).all()
+
+        recent_subs = Subscriber.query.order_by(Subscriber.created_at.desc()).limit(5).all()
+        recent_payments = Payment.query.filter_by(status='completed').order_by(Payment.created_at.desc()).limit(5).all()
+        recent_routers = Router.query.order_by(Router.created_at.desc()).limit(5).all()
+
+        online_subs = Subscriber.query.filter(
+            Subscriber.current_ip.isnot(None),
+            Subscriber.current_ip != ''
+        ).order_by(Subscriber.last_seen_at.desc()).all()
+        top_online_subs = online_subs[:10]
+
+        return render_template(
+            'dashboard.html',
+            routers_count=routers_count,
+            routers_online=routers_online,
+            routers=routers_list,
+            sub_count=sub_count,
+            active_subs=active_subs,
+            today_revenue=today_revenue,
+            monthly_revenue=monthly_revenue,
+            yearly_revenue=yearly_revenue,
+            inactive_subs=inactive_subs,
+            new_users_today=new_users_today,
+            has_master=master is not None,
+            events=events_list,
+            admin_name=session.get('admin_name', 'مدير'),
+            current_time=current_time,
+            telegram_status=telegram_status,
+            recent_telegram_logs=recent_telegram_logs,
+            pending_pays=pending_pays,
+            active_sessions=0,
+            recent_subs=recent_subs,
+            recent_payments=recent_payments,
+            recent_routers=recent_routers,
+            online_subs=online_subs,
+            top_online_subs=top_online_subs,
+        )
+    except Exception as e:
+        db.session.rollback()
+        logger.error(f"❌ dashboard error: {e}")
+        flash(f'❌ {str(e)}', 'danger')
+        return render_template('error.html', code=500, error=str(e)), 500
+
+
+@app.route('/admin/change-credentials', methods=['POST'])
+def change_admin_credentials():
+    admin_id = session.get('admin_id')
+    if not admin_id:
+        flash('❌ غير مصرح', 'danger')
+        return redirect(url_for('login'))
+    admin = AdminUser.query.get(admin_id)
+    if not admin:
+        flash('❌ المستخدم غير موجود', 'danger')
+        return redirect(url_for('login'))
+    try:
+        nu = request.form.get('new_username', '').strip()
+        cp = request.form.get('current_password', '').strip()
+        np = request.form.get('new_password', '').strip()
+        cf = request.form.get('confirm_password', '').strip()
+        if not cp or not check_password_hash(admin.password, cp):
+            flash('❌ كلمة المرور الحالية غير صحيحة', 'danger')
+            return redirect(url_for('dashboard'))
+        if nu and nu != admin.username:
+            if AdminUser.query.filter_by(username=nu).first():
+                flash('❌ اسم المستخدم موجود', 'danger')
+                return redirect(url_for('dashboard'))
+            admin.username = nu
+            session['admin_name'] = nu
+        if np:
+            if np != cf:
+                flash('❌ كلمتا المرور غير متطابقتين', 'danger')
+                return redirect(url_for('dashboard'))
+            if len(np) < 6:
+                flash('❌ 6 أحرف على الأقل', 'danger')
+                return redirect(url_for('dashboard'))
+            admin.password = generate_password_hash(np)
+        db.session.commit()
+        log_event('تعديل بيانات الحساب', 'المدير', f'تحديث بيانات المدير {admin.username}')
+        flash('✅ تم التحديث بنجاح', 'success')
+    except Exception as e:
+        db.session.rollback()
+        flash(f'❌ {str(e)}', 'danger')
+    return redirect(url_for('dashboard'))
+
+
+# ============ Admin Settings ============
+
 @app.route('/admin-settings', methods=['GET'])
 def admin_settings():
     settings = TelegramSetting.query.first()
@@ -2719,9 +2825,10 @@ def save_telegram_settings():
     settings.notify_bulk_add = 'notify_bulk_add' in request.form
     settings.notify_admin_action = 'notify_admin_action' in request.form
     settings.notify_router_status = 'notify_router_status' in request.form
-    settings.notify_expiry_reminder = 'notify_expiry_reminder' in request.form
+    settings.notify_expiry_reminder = 'notify_expiry_reminder' in request.form  # ✅ جديد
     db.session.add(settings)
     db.session.commit()
+    log_event('تعديل إعدادات التلجرام', 'الإعدادات', f'مُفعّل: {settings.enabled}')
     flash('✅ تم حفظ إعدادات التلجرام بنجاح', 'success')
     return redirect(url_for('admin_settings'))
 
@@ -2739,39 +2846,139 @@ def test_telegram():
         return jsonify({'success': True})
     return jsonify({'success': False, 'error': msg})
 
+
+# ============ Telegram Webhook ============
+
+@app.route('/api/telegram/webhook', methods=['POST'])
+def telegram_webhook():
+    try:
+        data = request.get_json(silent=True)
+        if not data:
+            return jsonify({'ok': True})
+        msg = data.get('message') or data.get('channel_post')
+        if msg:
+            chat_id = msg.get('chat', {}).get('id')
+            text = msg.get('text', '')
+            chat_title = msg.get('chat', {}).get('title', '')
+            user_info = msg.get('from', {})
+            if user_info.get('is_bot', False):
+                return jsonify({'ok': True})
+            user_name = user_info.get('username') or user_info.get('first_name', 'مستخدم')
+            log = TelegramLog(
+                message_type='incoming_group' if chat_title else 'incoming',
+                status='success',
+                message=f"📥 {chat_title} | {user_name}:\n{text}" if chat_title else f"📥 {user_name}:\n{text}"
+            )
+            db.session.add(log)
+            db.session.commit()
+            if text.strip() == '/start' and not chat_title:
+                send_telegram_message(
+                    f"أهلاً بك يا {user_name} 👋\nتم استلام رسالتك وربط حسابك بنجاح مع النظام.",
+                    message_type='reply', force=True
+                )
+        return jsonify({'ok': True})
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'ok': False}), 500
+
+
+# ============ Payments ============
+
 @app.route('/payments')
 def payments():
-    pay_list = Payment.query.order_by(Payment.created_at.desc()).all()
-    return render_template('payments.html', payments=pay_list)
+    from sqlalchemy import or_
 
-# ===== ZINAR RADIUS FIX - انشاء جداول الراديوس تلقائيا =====
-def ensure_radius_tables():
+    search = request.args.get('q', '').strip()
+    status_filter = request.args.get('status', '').strip()
+    page = request.args.get('page', 1, type=int)
+    per_page = 30
+
+    # استعلام أساسي مع JOIN
+    q = db.session.query(
+        Payment,
+        Subscriber.name.label('subscriber_name'),
+        Subscriber.username.label('subscriber_username'),
+    ).outerjoin(Subscriber, Payment.subscriber_id == Subscriber.id)
+
+    if search:
+        q = q.filter(or_(
+            Subscriber.name.ilike(f'%{search}%'),
+            Subscriber.username.ilike(f'%{search}%'),
+        ))
+
+    if status_filter in ('pending', 'completed'):
+        q = q.filter(Payment.status == status_filter)
+
+    q = q.order_by(Payment.created_at.desc())
+    pagination = q.paginate(page=page, per_page=per_page, error_out=False)
+
+    # تحويل النتائج
+    payments = []
+    for row in pagination.items:
+        p = row[0]
+        p.subscriber_name = row.subscriber_name
+        p.subscriber_username = row.subscriber_username
+        payments.append(p)
+
+    # إحصائيات
+    now = datetime.utcnow()
+    start_month = datetime(now.year, now.month, 1)
+
+    stats = {
+        'completed_count': Payment.query.filter_by(status='completed').count(),
+        'pending_count': Payment.query.filter_by(status='pending').count(),
+        'completed_total': db.session.query(db.func.sum(Payment.amount)).filter(
+            Payment.status == 'completed'
+        ).scalar() or 0,
+        'month_total': db.session.query(db.func.sum(Payment.amount)).filter(
+            Payment.status == 'completed',
+            Payment.created_at >= start_month,
+        ).scalar() or 0,
+    }
+
+    return render_template(
+        'payments.html',
+        payments=payments,
+        pagination=pagination,
+        stats=stats,
+        search=search,
+        status_filter=status_filter,
+    )
+
+
+@app.route('/payments/<int:payment_id>/complete', methods=['POST'])
+def complete_payment(payment_id):
+    """تأكيد دفعة معلّقة"""
+    if not session.get('admin_id'):
+        return jsonify({'ok': False, 'error': 'غير مصرح'}), 401
+
+    payment = Payment.query.get(payment_id)
+    if not payment:
+        return jsonify({'ok': False, 'error': 'الدفعة غير موجودة'}), 404
+
+    if payment.status == 'completed':
+        return jsonify({'ok': False, 'error': 'الدفعة مؤكدة مسبقًا'}), 400
+
     try:
-        db_url = os.environ.get('DATABASE_URL')
-        if not db_url:
-            return
-        import psycopg2
-        conn = psycopg2.connect(db_url)
-        cur = conn.cursor()
-        cur.execute("""
-            CREATE TABLE IF NOT EXISTS radcheck (
-                id SERIAL PRIMARY KEY,
-                username VARCHAR(64) NOT NULL,
-                attribute VARCHAR(64) NOT NULL,
-                op VARCHAR(2) NOT NULL,
-                value VARCHAR(253) NOT NULL
-            );
-        """)
-        conn.commit()
-        cur.close()
-        conn.close()
-        print("✅ radcheck ready")
+        payment.status = 'completed'
+        db.session.commit()
+
+        log_event(
+            'تأكيد دفعة',
+            f'دفعة #{payment.id}',
+            f'المبلغ: {payment.amount:.0f} ل.س | المشترك: {payment.subscriber_id}',
+        )
+
+        return jsonify({
+            'ok': True,
+            'message': 'تم تأكيد الدفعة بنجاح',
+            'payment_id': payment.id,
+        })
+
     except Exception as e:
-        print(f"Radius init error: {e}")
-
-ensure_radius_tables()
-# ===== END FIX =====
-
+        db.session.rollback()
+        logger.error(f'خطأ تأكيد دفعة {payment_id}: {e}')
+        return jsonify({'ok': False, 'error': str(e)}), 500
 
 
 # ============ Main ============
