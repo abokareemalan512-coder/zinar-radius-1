@@ -1,72 +1,102 @@
 {% extends "base.html" %}
 {% block title %}الباقات{% endblock %}
 
+{% block head %}
+<link rel="stylesheet" href="{{ url_for('static', filename='css/packages.css') }}">
+{% endblock %}
+
 {% block content %}
-<h2 class="mb-4">📦 الباقات المتاحة</h2>
+
+<div class="d-flex justify-content-between align-items-center mb-4 flex-wrap gap-2">
+    <div>
+        <h2 class="fw-bold mb-1">📦 الباقات المتاحة</h2>
+        <small class="text-muted">إدارة باقات الإنترنت والأسعار والسرعات</small>
+    </div>
+    <div>
+        <span class="badge bg-info bg-opacity-10 text-info border border-info fs-6">
+            {{ packages|length }} باقة
+        </span>
+    </div>
+</div>
 
 <div class="row g-4">
+    <!-- عمود الإضافة -->
     <div class="col-lg-4">
-        <div class="card p-4">
+        <div class="card p-4 sticky-top" style="top: 20px;">
             <h5 class="text-accent mb-3">
                 <i class="bi bi-plus-circle"></i> إضافة باقة جديدة
             </h5>
-            <form method="POST" action="{{ url_for('packages') }}">
+            <form method="POST" action="{{ url_for('packages') }}" id="addPkgForm">
+
                 <div class="mb-3">
-                    <label class="form-label">اسم الباقة</label>
+                    <label class="form-label fw-bold">اسم الباقة *</label>
                     <input type="text" name="name" class="form-control"
-                           placeholder="مثال: شهرية 5M" required>
+                           placeholder="مثال: شهرية 5M"
+                           required maxlength="50"
+                           pattern="[A-Za-z0-9_\-\s]+">
+                    <small class="text-muted">أحرف إنجليزية، أرقام، مسافات، _ -</small>
                 </div>
+
                 <div class="mb-3">
-                    <label class="form-label">السرعة</label>
-                    <input type="text" name="speed" class="form-control"
-                           placeholder="5M/5M">
+                    <label class="form-label fw-bold">السرعة *</label>
+                    <input type="text" name="speed" class="form-control font-monospace"
+                           placeholder="5M/5M أو 10M/2M"
+                           required maxlength="30">
+                    <small class="text-muted">الصيغة: <code>تحميل/رفع</code> — مثال: <code>5M/5M</code></small>
                 </div>
+
                 <div class="mb-3">
-                    <label class="form-label">النوع</label>
-                    <select name="user_type" class="form-select">
+                    <label class="form-label fw-bold">النوع *</label>
+                    <select name="user_type" class="form-select" required>
                         <option value="pppoe">🌐 برودباند (PPPoE)</option>
                         <option value="hotspot">📶 هوت سبوت (Hotspot)</option>
                     </select>
                 </div>
+
                 <div class="mb-3">
-                    <label class="form-label">السعر</label>
+                    <label class="form-label fw-bold">السعر (ل.س)</label>
                     <input type="number" name="price" class="form-control"
-                           placeholder="0" step="0.01" required>
+                           placeholder="0" step="1" min="0" value="0">
                 </div>
-                <div class="mb-3">
-                    <label class="form-label">وحدة المدة</label>
-                    <div class="d-flex gap-3">
-                        <div class="form-check">
-                            <input class="form-check-input" type="radio"
-                                   name="duration_unit" value="days" checked id="ud_add">
-                            <label class="form-check-label" for="ud_add">📅 أيام</label>
-                        </div>
-                        <div class="form-check">
-                            <input class="form-check-input" type="radio"
-                                   name="duration_unit" value="months" id="um_add">
-                            <label class="form-check-label" for="um_add">🗓️ أشهر</label>
-                        </div>
+
+                <div class="row g-2 mb-3">
+                    <div class="col-8">
+                        <label class="form-label fw-bold">المدة *</label>
+                        <input type="number" name="duration" class="form-control"
+                               value="1" min="1" max="365" required>
+                    </div>
+                    <div class="col-4">
+                        <label class="form-label fw-bold">الوحدة</label>
+                        <select name="duration_unit" class="form-select">
+                            <option value="days">📅 يوم</option>
+                            <option value="months">🗓️ شهر</option>
+                        </select>
                     </div>
                 </div>
-                <div class="mb-3">
-                    <label class="form-label">المدة</label>
-                    <input type="number" name="duration" class="form-control"
-                           value="1" min="1" required>
-                </div>
-                <button type="submit" class="btn btn-primary w-100">
-                    <i class="bi bi-save"></i> حفظ
+
+                <button type="submit" class="btn btn-primary w-100 py-2 fw-bold">
+                    <i class="bi bi-save"></i> حفظ الباقة
                 </button>
             </form>
+
+            <div class="alert alert-info mt-3 mb-0 small">
+                <i class="bi bi-info-circle"></i>
+                <strong>ملاحظة:</strong> تعديل السرعة يُطبّق تلقائيًا على جميع المشتركين في هذه الباقة.
+            </div>
         </div>
     </div>
 
+    <!-- عمود الجدول -->
     <div class="col-lg-8">
         <div class="card">
-            <div class="card-header">
-                <h5 class="mb-0 text-accent">📋 الباقات الحالية</h5>
+            <div class="card-header d-flex justify-content-between align-items-center"
+                 style="background-color: var(--bg-hover); border-bottom: 1px solid var(--bg-hover);">
+                <h5 class="mb-0 text-accent">
+                    <i class="bi bi-list-ul"></i> الباقات الحالية
+                </h5>
             </div>
             <div class="table-responsive">
-                <table class="table table-hover mb-0">
+                <table class="table table-hover mb-0 text-center">
                     <thead>
                         <tr>
                             <th>#</th>
@@ -75,23 +105,41 @@
                             <th>السرعة</th>
                             <th>السعر</th>
                             <th>المدة</th>
-                            <th>إجراءات</th>
+                            <th style="width: 100px;">إجراءات</th>
                         </tr>
                     </thead>
                     <tbody>
                         {% for pkg in packages %}
                         <tr>
-                            <td>{{ pkg.id }}</td>
-                            <td class="text-accent fw-bold">{{ pkg.name }}</td>
+                            <td class="text-muted">#{{ pkg.id }}</td>
+                            <td>
+                                <span class="text-accent fw-bold">{{ pkg.name }}</span>
+                            </td>
                             <td>
                                 {% if pkg.user_type == 'hotspot' %}
-                                    <span class="badge bg-warning">📶 هوت سبوت</span>
+                                    <span class="badge bg-warning bg-opacity-10 text-warning border border-warning">
+                                        📶 هوت سبوت
+                                    </span>
                                 {% else %}
-                                    <span class="badge bg-info">🌐 برودباند</span>
+                                    <span class="badge bg-info bg-opacity-10 text-info border border-info">
+                                        🌐 برودباند
+                                    </span>
                                 {% endif %}
                             </td>
-                            <td>{{ pkg.speed or '-' }}</td>
-                            <td>{{ pkg.price }} ل.س</td>
+                            <td>
+                                {% if pkg.speed and pkg.speed != 'N/A' %}
+                                    <span class="speed-badge">{{ pkg.speed }}</span>
+                                {% else %}
+                                    <span class="text-muted">—</span>
+                                {% endif %}
+                            </td>
+                            <td>
+                                {% if pkg.price and pkg.price > 0 %}
+                                    <span class="fw-bold text-warning">{{ pkg.price|int }} ل.س</span>
+                                {% else %}
+                                    <span class="text-muted">مجاني</span>
+                                {% endif %}
+                            </td>
                             <td>
                                 {% if pkg.duration_unit == 'months' %}
                                     🗓️ {{ pkg.duration }} شهر
@@ -100,15 +148,23 @@
                                 {% endif %}
                             </td>
                             <td>
-                                <div class="d-flex gap-1">
-                                    <button class="btn btn-sm btn-primary"
-                                            type="button"
-                                            onclick="openPackageModal({{ pkg.id }}, '{{ pkg.name|replace('\'', '\\\'')|e }}', '{{ pkg.speed|replace('\'', '\\\'')|e }}', {{ pkg.price }}, {{ pkg.duration }}, '{{ pkg.duration_unit or 'days' }}', '{{ pkg.user_type or 'pppoe' }}')">
+                                <div class="d-flex gap-1 justify-content-center">
+                                    <button type="button"
+                                            class="btn btn-sm btn-primary js-edit-pkg"
+                                            title="تعديل"
+                                            data-pkg-id="{{ pkg.id }}"
+                                            data-pkg-name="{{ pkg.name }}"
+                                            data-pkg-speed="{{ pkg.speed or '' }}"
+                                            data-pkg-price="{{ pkg.price }}"
+                                            data-pkg-duration="{{ pkg.duration }}"
+                                            data-pkg-unit="{{ pkg.duration_unit or 'days' }}"
+                                            data-pkg-type="{{ pkg.user_type or 'pppoe' }}">
                                         <i class="bi bi-pencil"></i>
                                     </button>
                                     <a href="{{ url_for('delete_package', pkg_id=pkg.id) }}"
-                                       class="btn btn-sm btn-danger"
-                                       onclick="return confirm('تأكيد الحذف؟')">
+                                       class="btn btn-sm btn-danger js-delete-pkg"
+                                       data-pkg-name="{{ pkg.name }}"
+                                       title="حذف">
                                         <i class="bi bi-trash"></i>
                                     </a>
                                 </div>
@@ -117,7 +173,10 @@
                         {% else %}
                         <tr>
                             <td colspan="7" class="text-center py-5 text-muted">
-                                📭 لا توجد باقات
+                                <i class="bi bi-inbox" style="font-size: 2rem; display: block; margin-bottom: 10px;"></i>
+                                📭 لا توجد باقات بعد
+                                <br>
+                                <small>ابدأ بإضافة أول باقة من النموذج على اليسار</small>
                             </td>
                         </tr>
                         {% endfor %}
@@ -128,60 +187,56 @@
     </div>
 </div>
 
-<!-- Modal for editing package -->
-<div class="modal fade" id="editPackageModal" tabindex="-1">
+<!-- Modal تعديل الباقة -->
+<div class="modal fade" id="editPackageModal" tabindex="-1" aria-hidden="true">
     <div class="modal-dialog modal-dialog-centered">
-        <div class="modal-content">
+        <div class="modal-content border-0 shadow-lg">
             <form method="POST" id="editPackageForm">
-                <div class="modal-header border-secondary">
-                    <h5 class="modal-title text-accent">
+                <div class="modal-header" style="background: linear-gradient(135deg, #0ea5e9, #0284c7); color: white;">
+                    <h5 class="modal-title fw-bold">
                         <i class="bi bi-pencil-square"></i> تعديل الباقة
                     </h5>
                     <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
                 </div>
-                <div class="modal-body">
+                <div class="modal-body p-4">
                     <div class="mb-3">
-                        <label class="form-label">الاسم</label>
-                        <input type="text" name="name" id="pkg_name" class="form-control" required>
+                        <label class="form-label fw-bold">الاسم *</label>
+                        <input type="text" name="name" id="pkg_name"
+                               class="form-control" required maxlength="50">
                     </div>
                     <div class="mb-3">
-                        <label class="form-label">السرعة</label>
-                        <input type="text" name="speed" id="pkg_speed" class="form-control">
+                        <label class="form-label fw-bold">السرعة *</label>
+                        <input type="text" name="speed" id="pkg_speed"
+                               class="form-control font-monospace" required maxlength="30">
                     </div>
                     <div class="mb-3">
-                        <label class="form-label">النوع</label>
-                        <select name="user_type" id="pkg_user_type" class="form-select">
+                        <label class="form-label fw-bold">النوع *</label>
+                        <select name="user_type" id="pkg_user_type" class="form-select" required>
                             <option value="pppoe">🌐 برودباند</option>
                             <option value="hotspot">📶 هوت سبوت</option>
                         </select>
                     </div>
                     <div class="mb-3">
-                        <label class="form-label">السعر</label>
+                        <label class="form-label fw-bold">السعر (ل.س)</label>
                         <input type="number" name="price" id="pkg_price"
-                               class="form-control" step="0.01" required>
+                               class="form-control" step="1" min="0" required>
                     </div>
-                    <div class="mb-3">
-                        <label class="form-label">الوحدة</label>
-                        <div class="d-flex gap-3">
-                            <div class="form-check">
-                                <input class="form-check-input" type="radio"
-                                       name="duration_unit" value="days" id="ud_edit">
-                                <label class="form-check-label" for="ud_edit">📅 أيام</label>
-                            </div>
-                            <div class="form-check">
-                                <input class="form-check-input" type="radio"
-                                       name="duration_unit" value="months" id="um_edit">
-                                <label class="form-check-label" for="um_edit">🗓️ أشهر</label>
-                            </div>
+                    <div class="row g-2 mb-3">
+                        <div class="col-8">
+                            <label class="form-label fw-bold">المدة *</label>
+                            <input type="number" name="duration" id="pkg_duration"
+                                   class="form-control" min="1" max="365" required>
+                        </div>
+                        <div class="col-4">
+                            <label class="form-label fw-bold">الوحدة</label>
+                            <select name="duration_unit" id="pkg_unit" class="form-select">
+                                <option value="days">📅 يوم</option>
+                                <option value="months">🗓️ شهر</option>
+                            </select>
                         </div>
                     </div>
-                    <div class="mb-3">
-                        <label class="form-label">المدة</label>
-                        <input type="number" name="duration" id="pkg_duration"
-                               class="form-control" min="1" required>
-                    </div>
                 </div>
-                <div class="modal-footer border-secondary">
+                <div class="modal-footer border-top" style="background-color: var(--bg-hover);">
                     <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">إلغاء</button>
                     <button type="submit" class="btn btn-primary">
                         <i class="bi bi-save"></i> حفظ
@@ -192,28 +247,8 @@
     </div>
 </div>
 
-<script>
-function openPackageModal(id, name, speed, price, duration, unit, utype) {
-    // تعيين الـ action URL
-    document.getElementById('editPackageForm').action = '/packages/update/' + id;
-    
-    // ملء البيانات
-    document.getElementById('pkg_name').value = name;
-    document.getElementById('pkg_speed').value = speed;
-    document.getElementById('pkg_price').value = price;
-    document.getElementById('pkg_duration').value = duration;
-    document.getElementById('pkg_user_type').value = utype || 'pppoe';
-    
-    // تعيين الـ radio button للوحدة
-    if (unit === 'months') {
-        document.getElementById('um_edit').checked = true;
-    } else {
-        document.getElementById('ud_edit').checked = true;
-    }
-    
-    // فتح المودال
-    const modal = new bootstrap.Modal(document.getElementById('editPackageModal'));
-    modal.show();
-}
-</script>
+{% endblock %}
+
+{% block scripts %}
+<script src="{{ url_for('static', filename='js/packages.js') }}"></script>
 {% endblock %}
