@@ -1,126 +1,14 @@
 {% extends "base.html" %}
-{% block title %}المشتركين{% endblock %}
+{% block title %}المشتركون{% endblock %}
+
+{% block head %}
+<link rel="stylesheet" href="{{ url_for('static', filename='css/subscribers.css') }}">
+{% endblock %}
 
 {% block content %}
-<link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@400;500;700&display=swap" rel="stylesheet">
-<style>
-    body { font-family: 'Tajawal', sans-serif; }
-    .table > :not(caption) > * > * { padding: 1rem 0.75rem; vertical-align: middle; }
-    .table-hover tbody tr:hover { background-color: rgba(14, 165, 233, 0.05); transition: all 0.2s ease; }
-    .card { border: none; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06); border-radius: 12px; }
-    .btn-icon { width: 32px; height: 32px; padding: 0; display: inline-flex; align-items: center; justify-content: center; border-radius: 8px; }
-
-    .dropdown-menu {
-        border: 1px solid var(--bg-hover);
-        box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.3);
-        border-radius: 12px;
-        min-width: 200px;
-        padding: 10px;
-        background-color: var(--bg-card);
-    }
-    .dropdown-item.btn-mikrotik-style {
-        border: 1px dashed var(--text-muted);
-        border-radius: 8px;
-        margin-bottom: 8px;
-        padding: 8px 12px;
-        color: var(--text-main);
-        font-weight: 500;
-        transition: all 0.2s ease;
-        display: flex;
-        align-items: center;
-        gap: 10px;
-        background-color: transparent;
-    }
-    .dropdown-item.btn-mikrotik-style:last-child { margin-bottom: 0; }
-    .dropdown-item.btn-mikrotik-style:hover {
-        background-color: rgba(56, 189, 248, 0.1);
-        border-color: var(--accent);
-        color: var(--accent);
-        transform: translateY(-1px);
-    }
-    .dropdown-item.btn-mikrotik-style.delete-style {
-        border-color: rgba(239, 68, 68, 0.5);
-        color: #ef4444;
-    }
-    .dropdown-item.btn-mikrotik-style.delete-style:hover {
-        background-color: rgba(239, 68, 68, 0.1);
-        border-color: #ef4444;
-        color: #ef4444;
-    }
-
-    .search-group .input-group-text {
-        background-color: var(--bg-main) !important;
-        border: 1px solid var(--bg-hover) !important;
-        border-left: none !important;
-        color: var(--text-muted) !important;
-    }
-    .search-group .form-control {
-        background-color: var(--bg-main) !important;
-        border: 1px solid var(--bg-hover) !important;
-        border-right: none !important;
-        color: var(--text-main) !important;
-    }
-    .search-group .form-control:focus { border-color: var(--accent) !important; box-shadow: none !important; }
-    .filter-btn {
-        background-color: var(--bg-main) !important;
-        border: 1px solid var(--bg-hover) !important;
-        color: var(--text-muted) !important;
-    }
-    .filter-btn:hover { background-color: var(--bg-hover) !important; color: var(--text-main) !important; }
-    .filter-btn.active { background-color: var(--accent) !important; border-color: var(--accent) !important; color: #0f172a !important; font-weight: bold; }
-
-    .pagination-container {
-        background-color: var(--bg-card);
-        border-top: 1px solid var(--bg-hover);
-        padding: 20px;
-        border-radius: 0 0 12px 12px;
-    }
-    .pagination-info { color: var(--text-muted); font-size: 0.9rem; margin-bottom: 15px; font-weight: 500; }
-    .pagination .page-link {
-        background-color: var(--bg-main);
-        border-color: var(--bg-hover);
-        color: var(--text-main);
-        margin: 0 5px;
-        border-radius: 8px !important;
-        transition: all 0.2s;
-        font-weight: 600;
-        min-width: 40px;
-        text-align: center;
-    }
-    .pagination .page-link:hover { background-color: var(--bg-hover); color: var(--accent); border-color: var(--accent); transform: translateY(-2px); }
-    .pagination .page-item.active .page-link { background-color: var(--accent); border-color: var(--accent); color: #0f172a; font-weight: bold; box-shadow: 0 0 10px var(--accent-glow); }
-    .pagination .page-item.disabled .page-link { background-color: var(--bg-main); border-color: var(--bg-hover); color: var(--text-muted); opacity: 0.5; }
-
-    .modal-content { background-color: var(--bg-card) !important; border: 1px solid var(--bg-hover) !important; border-radius: 16px !important; box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.5), 0 10px 10px -5px rgba(0, 0, 0, 0.04) !important; }
-    .modal-header { border-bottom: 1px solid var(--bg-hover) !important; background-color: var(--bg-hover) !important; border-radius: 16px 16px 0 0 !important; }
-    .modal-footer { border-top: 1px solid var(--bg-hover) !important; background-color: var(--bg-hover) !important; border-radius: 0 0 16px 16px !important; }
-    .modal-body { background-color: var(--bg-card) !important; }
-    .modal-body .form-control { background-color: var(--bg-main) !important; border: 1px solid var(--bg-hover) !important; color: var(--text-main) !important; }
-    .modal-body .form-control:focus { border-color: var(--accent) !important; box-shadow: 0 0 0 0.25rem var(--accent-glow) !important; }
-    .modal-body .form-label { color: var(--text-muted) !important; }
-
-    /* ✅ IP Badge */
-    .ip-badge {
-        display: inline-flex;
-        align-items: center;
-        gap: 5px;
-        padding: 5px 10px;
-        border-radius: 8px;
-        font-size: 0.78rem;
-        font-weight: 600;
-        font-family: 'Courier New', monospace;
-        transition: all 0.2s;
-    }
-    .ip-online { background: rgba(34, 197, 94, 0.12); color: #22c55e; border: 1px solid rgba(34, 197, 94, 0.35); }
-    .ip-offline { background: rgba(148, 163, 184, 0.1); color: #94a3b8; border: 1px solid rgba(148, 163, 184, 0.3); }
-    .ip-time { display: block; font-size: 0.62rem; opacity: 0.7; margin-top: 2px; font-family: 'Tajawal', sans-serif; }
-
-    /* ✅ إضافة: للزر المعطّل أثناء المزامنة */
-    .sync-btn-loading { pointer-events: none; opacity: 0.7; }
-</style>
 
 <div class="d-flex justify-content-between align-items-center mb-4 flex-wrap gap-3">
-    <h2 class="fw-bold mb-0 text-dark">👥 إدارة المشتركين</h2>
+    <h2 class="fw-bold mb-0">👥 إدارة المشتركين</h2>
     <div class="d-flex gap-2 flex-wrap">
         <a href="{{ url_for('add_subscriber') }}" class="btn btn-primary shadow-sm rounded-3 px-3">
             <i class="bi bi-person-plus-fill"></i> إضافة فردية
@@ -128,11 +16,11 @@
         <a href="{{ url_for('bulk_add') }}" class="btn btn-warning shadow-sm rounded-3 px-3 text-dark">
             <i class="bi bi-people-fill"></i> إضافة جماعية
         </a>
-        <!-- ✅ إصلاح: type=button صريح -->
         <button type="button" class="btn btn-info shadow-sm rounded-3 px-3" id="syncBtn">
             <i class="bi bi-arrow-clockwise"></i> مزامنة من MikroTik
         </button>
-        <form method="POST" action="{{ url_for('delete_expired_subscribers') }}" style="display: inline;"
+        <form method="POST" action="{{ url_for('delete_expired_subscribers') }}"
+              style="display: inline;"
               class="js-confirm-form"
               data-confirm-msg="⚠️ سيتم حذف المنتهين من قاعدة البيانات فقط. متابعة؟">
             <button type="submit" class="btn btn-outline-danger shadow-sm rounded-3 px-3">
@@ -145,7 +33,8 @@
 <div class="alert alert-info border-0 shadow-sm rounded-4 small d-flex align-items-center gap-2">
     <i class="bi bi-info-circle-fill fs-5"></i>
     <div>
-        <strong>ملاحظة:</strong> عمود "IP المشترك" يُحدَّث تلقائياً كل دقيقتين من MikroTik. اضغط زر <strong>"مزامنة من MikroTik"</strong> للتحديث الفوري.
+        <strong>ملاحظة:</strong> عمود "IP المشترك" يُحدَّث تلقائياً كل دقيقتين.
+        اضغط <strong>"مزامنة من MikroTik"</strong> للتحديث الفوري.
     </div>
 </div>
 
@@ -156,28 +45,36 @@
             <form method="GET" class="d-flex gap-2">
                 <div class="input-group search-group">
                     <span class="input-group-text"><i class="bi bi-search"></i></span>
-                    <input type="text" name="q" class="form-control" placeholder="ابحث عن اسم، مستخدم، أو باقة..." value="{{ search }}">
+                    <input type="text" name="q" class="form-control"
+                           placeholder="ابحث عن اسم، مستخدم، أو باقة..."
+                           value="{{ search }}">
                 </div>
-                {% if filter_type %}<input type="hidden" name="type" value="{{ filter_type }}">{% endif %}
+                {% if filter_type %}
+                <input type="hidden" name="type" value="{{ filter_type }}">
+                {% endif %}
                 <button class="btn btn-primary px-4 rounded-3" type="submit">بحث</button>
             </form>
         </div>
         <div class="col-md-4">
             <div class="btn-group w-100 shadow-sm rounded-3" role="group">
-                <a href="{{ url_for('subscribers', q=search) }}" class="btn filter-btn {% if not filter_type %}active{% endif %}">الكل</a>
-                <a href="{{ url_for('subscribers', q=search, type='pppoe') }}" class="btn filter-btn {% if filter_type == 'pppoe' %}active{% endif %}">🌐 برودباند</a>
-                <a href="{{ url_for('subscribers', q=search, type='hotspot') }}" class="btn filter-btn {% if filter_type == 'hotspot' %}active{% endif %}">📶 هوت سبوت</a>
+                <a href="{{ url_for('subscribers', q=search) }}"
+                   class="btn filter-btn {% if not filter_type %}active{% endif %}">الكل</a>
+                <a href="{{ url_for('subscribers', q=search, type='pppoe') }}"
+                   class="btn filter-btn {% if filter_type == 'pppoe' %}active{% endif %}">🌐 برودباند</a>
+                <a href="{{ url_for('subscribers', q=search, type='hotspot') }}"
+                   class="btn filter-btn {% if filter_type == 'hotspot' %}active{% endif %}">📶 هوت سبوت</a>
             </div>
         </div>
         <div class="col-md-3">
             <div class="dropdown w-100">
-                <button type="button" class="btn btn-outline-info w-100 dropdown-toggle rounded-3" data-bs-toggle="dropdown">
+                <button type="button" class="btn btn-outline-info w-100 dropdown-toggle rounded-3"
+                        data-bs-toggle="dropdown">
                     <i class="bi bi-download"></i> تصدير البيانات
                 </button>
                 <ul class="dropdown-menu shadow">
-                    <!-- ✅ إصلاح: عرض CSV فقط لأن الـ backend يدعمه فقط -->
                     <li>
-                        <a class="dropdown-item" href="{{ url_for('export_subscribers', format='csv', type=filter_type) }}">
+                        <a class="dropdown-item"
+                           href="{{ url_for('export_subscribers', format='csv', type=filter_type) }}">
                             📊 تصدير CSV (كامل)
                         </a>
                     </li>
@@ -188,14 +85,22 @@
 </div>
 
 <!-- شريط الإجراءات الجماعية -->
-<div class="card mb-3 p-3 border-0" id="bulkBar" style="display: none; background: linear-gradient(135deg, #0ea5e9, #0284c7); color: white; border-radius: 12px; box-shadow: 0 10px 15px -3px rgba(14, 165, 233, 0.3);">
+<div class="card mb-3 p-3 border-0" id="bulkBar"
+     style="display: none; background: linear-gradient(135deg, #0ea5e9, #0284c7);
+            color: white; border-radius: 12px;
+            box-shadow: 0 10px 15px -3px rgba(14, 165, 233, 0.3);">
     <div class="d-flex justify-content-between align-items-center flex-wrap gap-2">
-        <div class="fw-bold fs-5"><i class="bi bi-check2-square"></i> تم تحديد <span id="selectedCount">0</span> مشترك</div>
+        <div class="fw-bold fs-5">
+            <i class="bi bi-check2-square"></i>
+            تم تحديد <span id="selectedCount">0</span> مشترك
+        </div>
         <div class="d-flex gap-2 flex-wrap">
-            <!-- ✅ إصلاح: إزالة الطباعة والتنسيقات غير المدعومة من الـ backend -->
-            <button type="button" class="btn btn-light btn-sm fw-bold text-success rounded-3 px-3" onclick="exportSelected('csv')">📊 تصدير CSV</button>
-            <button type="button" class="btn btn-danger btn-sm fw-bold rounded-3 px-3" onclick="deleteSelected()">🗑 حذف المحدد</button>
-            <button type="button" class="btn btn-outline-light btn-sm rounded-3 px-3" onclick="clearSelection()">✖ إلغاء</button>
+            <button type="button" class="btn btn-light btn-sm fw-bold text-success rounded-3 px-3"
+                    onclick="exportSelected('csv')">📊 تصدير CSV</button>
+            <button type="button" class="btn btn-danger btn-sm fw-bold rounded-3 px-3"
+                    onclick="deleteSelected()">🗑 حذف المحدد</button>
+            <button type="button" class="btn btn-outline-light btn-sm rounded-3 px-3"
+                    onclick="clearSelection()">✖ إلغاء</button>
         </div>
     </div>
 </div>
@@ -206,7 +111,9 @@
         <table class="table table-hover mb-0 text-center">
             <thead class="table-light">
                 <tr>
-                    <th style="width: 40px;"><input type="checkbox" id="selectAll" class="form-check-input"></th>
+                    <th style="width: 40px;">
+                        <input type="checkbox" id="selectAll" class="form-check-input">
+                    </th>
                     <th class="text-nowrap">#</th>
                     <th class="text-nowrap">اسم المشترك</th>
                     <th class="text-nowrap">اسم المستخدم</th>
@@ -224,20 +131,22 @@
             <tbody>
                 {% for sub in subscribers %}
                 <tr>
-                    <!-- ✅ إصلاح: إزالة onchange واستخدام event listener -->
-                    <td><input type="checkbox" class="form-check-input sub-checkbox" value="{{ sub.id }}"></td>
+                    <td>
+                        <input type="checkbox" class="form-check-input sub-checkbox" value="{{ sub.id }}">
+                    </td>
                     <td class="text-muted fw-bold">#{{ sub.id }}</td>
                     <td class="fw-bold text-primary">{{ sub.name or '-' }}</td>
                     <td class="text-muted">{{ sub.username }}</td>
                     <td>
-                        <!-- ✅ إصلاح: استخدام data-password بدل تمريرها في onclick -->
+                        {# ✅ إصلاح أمني: كلمة المرور تُجلب عند الطلب فقط #}
                         <div class="d-flex align-items-center justify-content-center gap-1">
                             <span class="password-field font-monospace"
                                   data-id="{{ sub.id }}"
-                                  data-password="{{ sub.password }}">••••••</span>
+                                  data-username="{{ sub.username }}">••••••</span>
                             <button type="button"
                                     class="btn btn-sm btn-link text-muted p-0 js-toggle-password"
                                     data-id="{{ sub.id }}"
+                                    data-username="{{ sub.username }}"
                                     aria-label="عرض كلمة المرور">
                                 <i class="bi bi-eye" id="eye-{{ sub.id }}"></i>
                             </button>
@@ -245,16 +154,21 @@
                     </td>
                     <td>
                         {% if sub.user_type == 'hotspot' %}
-                            <span class="badge bg-warning bg-opacity-10 text-warning border border-warning">📶 هوت سبوت</span>
+                            <span class="badge bg-warning bg-opacity-10 text-warning border border-warning">
+                                📶 هوت سبوت
+                            </span>
                         {% else %}
-                            <span class="badge bg-info bg-opacity-10 text-info border border-info">🌐 برودباند</span>
+                            <span class="badge bg-info bg-opacity-10 text-info border border-info">
+                                🌐 برودباند
+                            </span>
                         {% endif %}
                     </td>
                     <td><span class="fw-medium">{{ sub.package or '-' }}</span></td>
 
                     <td>
                         {% if sub.router_id and sub.router_id in routers %}
-                            <span class="badge bg-secondary bg-opacity-10 text-secondary border border-secondary" style="font-family: monospace; font-size: 0.75rem;">
+                            <span class="badge bg-secondary bg-opacity-10 text-secondary border border-secondary"
+                                  style="font-family: monospace; font-size: 0.75rem;">
                                 <i class="bi bi-router"></i> {{ routers[sub.router_id].ip_address }}
                             </span>
                         {% else %}
@@ -287,7 +201,9 @@
                         {% elif sub.status == 'expired' %}
                             <span class="badge bg-danger bg-opacity-10 text-danger border border-danger">🔴 منتهي</span>
                         {% else %}
-                            <span class="badge bg-secondary bg-opacity-10 text-secondary border border-secondary">{{ sub.status }}</span>
+                            <span class="badge bg-secondary bg-opacity-10 text-secondary border border-secondary">
+                                {{ sub.status }}
+                            </span>
                         {% endif %}
                     </td>
                     <td class="text-muted small">
@@ -315,12 +231,17 @@
                     </td>
                     <td>
                         <div class="dropdown">
-                            <button type="button" class="btn btn-sm btn-light border btn-icon shadow-sm" data-bs-toggle="dropdown" aria-expanded="false" title="الإجراءات">
+                            <button type="button"
+                                    class="btn btn-sm btn-light border btn-icon shadow-sm"
+                                    data-bs-toggle="dropdown"
+                                    aria-expanded="false"
+                                    title="الإجراءات">
                                 <i class="bi bi-three-dots-vertical fs-5 text-secondary"></i>
                             </button>
                             <ul class="dropdown-menu dropdown-menu-end text-end">
                                 <li>
-                                    <a class="dropdown-item btn-mikrotik-style" href="{{ url_for('toggle_subscriber', sub_id=sub.id) }}">
+                                    <a class="dropdown-item btn-mikrotik-style"
+                                       href="{{ url_for('toggle_subscriber', sub_id=sub.id) }}">
                                         {% if sub.status == 'active' %}
                                             <i class="bi bi-pause-circle-fill text-warning fs-5"></i> إيقاف مؤقت
                                         {% else %}
@@ -329,7 +250,6 @@
                                     </a>
                                 </li>
                                 <li>
-                                    <!-- ✅ إصلاح: استخدام data-confirm-msg بدل onclick inline -->
                                     <a class="dropdown-item btn-mikrotik-style js-confirm-link"
                                        data-confirm-msg="تصفير الباقة؟"
                                        href="{{ url_for('reset_subscriber', sub_id=sub.id) }}">
@@ -344,7 +264,6 @@
                                     </a>
                                 </li>
                                 <li>
-                                    <!-- ✅ إصلاح: استخدام data-* بدل onclick inline -->
                                     <button type="button"
                                             class="dropdown-item btn-mikrotik-style js-edit-sub"
                                             data-sub-id="{{ sub.id }}"
@@ -389,21 +308,26 @@
         <nav aria-label="Page navigation">
             <ul class="pagination mb-0">
                 <li class="page-item {% if not pagination.has_prev %}disabled{% endif %}">
-                    <a class="page-link" href="{{ url_for('subscribers', page=pagination.prev_num, q=search, type=filter_type) if pagination.has_prev else '#' }}">
+                    <a class="page-link"
+                       href="{{ url_for('subscribers', page=pagination.prev_num, q=search, type=filter_type) if pagination.has_prev else '#' }}">
                         <i class="bi bi-chevron-right"></i> السابق
                     </a>
                 </li>
                 {% for page_num in pagination.iter_pages(left_edge=1, right_edge=1, left_current=2, right_current=2) %}
                     {% if page_num %}
                         <li class="page-item {% if page_num == pagination.page %}active{% endif %}">
-                            <a class="page-link" href="{{ url_for('subscribers', page=page_num, q=search, type=filter_type) }}">{{ page_num }}</a>
+                            <a class="page-link"
+                               href="{{ url_for('subscribers', page=page_num, q=search, type=filter_type) }}">
+                                {{ page_num }}
+                            </a>
                         </li>
                     {% else %}
                         <li class="page-item disabled"><span class="page-link">...</span></li>
                     {% endif %}
                 {% endfor %}
                 <li class="page-item {% if not pagination.has_next %}disabled{% endif %}">
-                    <a class="page-link" href="{{ url_for('subscribers', page=pagination.next_num, q=search, type=filter_type) if pagination.has_next else '#' }}">
+                    <a class="page-link"
+                       href="{{ url_for('subscribers', page=pagination.next_num, q=search, type=filter_type) if pagination.has_next else '#' }}">
                         التالي <i class="bi bi-chevron-left"></i>
                     </a>
                 </li>
@@ -419,7 +343,9 @@
         <div class="modal-content border-0 shadow-lg">
             <form method="POST" id="editSubForm" autocomplete="off">
                 <div class="modal-header border-bottom" style="border-color: var(--bg-hover) !important;">
-                    <h5 class="modal-title text-accent fw-bold"><i class="bi bi-pencil-square"></i> تعديل بيانات المشترك</h5>
+                    <h5 class="modal-title text-accent fw-bold">
+                        <i class="bi bi-pencil-square"></i> تعديل بيانات المشترك
+                    </h5>
                     <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="إغلاق"></button>
                 </div>
                 <div class="modal-body p-4">
@@ -429,15 +355,19 @@
                     </div>
                     <div class="mb-3">
                         <label class="form-label fw-bold text-muted">اسم المستخدم</label>
-                        <input type="text" name="username" id="sub_username" class="form-control" required maxlength="100">
+                        <input type="text" name="username" id="sub_username" class="form-control"
+                               required maxlength="100">
                     </div>
                     <div class="mb-3">
                         <label class="form-label fw-bold text-muted">كلمة المرور</label>
-                        <input type="text" name="password" id="sub_password" class="form-control" placeholder="اتركها فارغة للإبقاء عليها" maxlength="150" autocomplete="new-password">
+                        <input type="text" name="password" id="sub_password" class="form-control"
+                               placeholder="اتركها فارغة للإبقاء عليها"
+                               maxlength="150" autocomplete="new-password">
                     </div>
                     <div class="mb-3">
                         <label class="form-label fw-bold text-muted">تفعيل الأيام (تمديد الباقة)</label>
-                        <input type="number" name="days_to_add" id="sub_days" class="form-control" placeholder="أدخل عدد الأيام (مثال: 30)" min="1">
+                        <input type="number" name="days_to_add" id="sub_days" class="form-control"
+                               placeholder="أدخل عدد الأيام (مثال: 30)" min="1">
                     </div>
                     <div class="mb-3">
                         <label class="form-label fw-bold text-muted">الباقة</label>
@@ -450,8 +380,11 @@
                     </div>
                 </div>
                 <div class="modal-footer border-top" style="border-color: var(--bg-hover) !important;">
-                    <button type="button" class="btn btn-outline-secondary rounded-3" data-bs-dismiss="modal">إلغاء</button>
-                    <button type="submit" class="btn btn-primary rounded-3 px-4"><i class="bi bi-save"></i> حفظ التعديلات</button>
+                    <button type="button" class="btn btn-outline-secondary rounded-3"
+                            data-bs-dismiss="modal">إلغاء</button>
+                    <button type="submit" class="btn btn-primary rounded-3 px-4">
+                        <i class="bi bi-save"></i> حفظ التعديلات
+                    </button>
                 </div>
             </form>
         </div>
@@ -459,170 +392,13 @@
 </div>
 
 <!-- نموذج حذف جماعي -->
-<form method="POST" action="{{ url_for('bulk_delete_subscribers') }}" id="bulkDeleteForm" style="display: none;">
+<form method="POST" action="{{ url_for('bulk_delete_subscribers') }}"
+      id="bulkDeleteForm" style="display: none;">
     <input type="hidden" name="ids" id="bulkDeleteIds">
 </form>
 
-<script>
-document.addEventListener('DOMContentLoaded', function () {
+{% endblock %}
 
-    // ==========================================
-    // ✅ مزامنة من MikroTik
-    // ==========================================
-    const syncBtn = document.getElementById('syncBtn');
-    syncBtn.addEventListener('click', function () {
-        const originalHTML = this.innerHTML;
-        this.disabled = true;
-        this.innerHTML = '<span class="spinner-border spinner-border-sm"></span> جاري المزامنة...';
-
-        fetch('/subscribers/sync-now', { method: 'POST' })
-            .then(r => r.json())
-            .then(data => {
-                if (data.ok) {
-                    let msg = `✅ تم المزامنة بنجاح!\n\n📊 عدد الراوترات: ${data.routers}\n🔍 تم فحص: ${data.checked} مشترك\n🟢 متصل الآن: ${data.online}\n🔄 تم تحديث: ${data.updated}`;
-                    if (data.errors && data.errors.length > 0) {
-                        msg += `\n\n⚠️ أخطاء:\n${data.errors.slice(0, 3).join('\n')}`;
-                    }
-                    alert(msg);
-                    location.reload();
-                } else {
-                    alert('❌ فشل المزامنة: ' + (data.error || 'خطأ غير معروف'));
-                }
-            })
-            .catch(err => alert('❌ خطأ في الاتصال: ' + err.message))
-            .finally(() => {
-                syncBtn.disabled = false;
-                syncBtn.innerHTML = originalHTML;
-            });
-    });
-
-    // ==========================================
-    // ✅ عرض/إخفاء كلمة المرور
-    // ==========================================
-    document.querySelectorAll('.js-toggle-password').forEach(btn => {
-        btn.addEventListener('click', function () {
-            const id = this.dataset.id;
-            const span = document.querySelector(`.password-field[data-id="${id}"]`);
-            const eye = document.getElementById(`eye-${id}`);
-            if (!span || !eye) return;
-
-            if (span.textContent === '••••••') {
-                span.textContent = span.dataset.password || '';
-                eye.className = 'bi bi-eye-slash text-primary';
-            } else {
-                span.textContent = '••••••';
-                eye.className = 'bi bi-eye text-muted';
-            }
-        });
-    });
-
-    // ==========================================
-    // ✅ فتح نموذج التعديل
-    // ==========================================
-    document.querySelectorAll('.js-edit-sub').forEach(btn => {
-        btn.addEventListener('click', function () {
-            const id = this.dataset.subId;
-            const name = this.dataset.subName;
-            const username = this.dataset.subUsername;
-            const pkg = this.dataset.subPackage;
-
-            const form = document.getElementById('editSubForm');
-            form.action = '/subscribers/update/' + id;
-            document.getElementById('sub_name').value = name;
-            document.getElementById('sub_username').value = username;
-            document.getElementById('sub_password').value = '';
-            document.getElementById('sub_days').value = '';
-            document.getElementById('sub_package').value = pkg || '';
-
-            new bootstrap.Modal(document.getElementById('editSubModal')).show();
-        });
-    });
-
-    // ==========================================
-    // ✅ تحديد الكل
-    // ==========================================
-    const selectAll = document.getElementById('selectAll');
-    selectAll.addEventListener('change', function () {
-        document.querySelectorAll('.sub-checkbox').forEach(cb => {
-            cb.checked = this.checked;
-        });
-        updateBulkBar();
-    });
-
-    // ==========================================
-    // ✅ تحديث الشريط عند تغيير أي checkbox
-    // ==========================================
-    document.querySelectorAll('.sub-checkbox').forEach(cb => {
-        cb.addEventListener('change', updateBulkBar);
-    });
-
-    // ==========================================
-    // ✅ تأكيدات الحذف/التصفير/التمديد
-    // ==========================================
-    document.querySelectorAll('.js-confirm-link').forEach(link => {
-        link.addEventListener('click', function (e) {
-            const msg = this.dataset.confirmMsg || 'هل أنت متأكد؟';
-            if (!confirm(msg)) {
-                e.preventDefault();
-                return false;
-            }
-        });
-    });
-
-    document.querySelectorAll('.js-confirm-form').forEach(form => {
-        form.addEventListener('submit', function (e) {
-            const msg = this.dataset.confirmMsg || 'هل أنت متأكد؟';
-            if (!confirm(msg)) {
-                e.preventDefault();
-                return false;
-            }
-        });
-    });
-});
-
-// ==========================================
-// ✅ دوال الشريط الجماعي (تُستدعى من onclick)
-// ==========================================
-function updateBulkBar() {
-    const checked = document.querySelectorAll('.sub-checkbox:checked');
-    const bar = document.getElementById('bulkBar');
-    const cnt = document.getElementById('selectedCount');
-    if (checked.length > 0) {
-        bar.style.display = 'block';
-        cnt.textContent = checked.length;
-    } else {
-        bar.style.display = 'none';
-    }
-}
-
-function clearSelection() {
-    document.querySelectorAll('.sub-checkbox').forEach(cb => { cb.checked = false; });
-    const sa = document.getElementById('selectAll');
-    if (sa) sa.checked = false;
-    updateBulkBar();
-}
-
-function getSelectedIds() {
-    const ids = [];
-    document.querySelectorAll('.sub-checkbox:checked').forEach(cb => { ids.push(cb.value); });
-    return ids;
-}
-
-function exportSelected(format) {
-    const ids = getSelectedIds();
-    if (ids.length === 0) {
-        alert('⚠️ الرجاء تحديد مشترك واحد على الأقل');
-        return;
-    }
-    window.location.href = `/subscribers/export/${format}?ids=` + ids.join(',');
-}
-
-function deleteSelected() {
-    const ids = getSelectedIds();
-    if (ids.length === 0) return;
-    if (!confirm(`⚠️ سيتم حذف ${ids.length} مشترك من قاعدة البيانات فقط.\nهل أنت متأكد؟`)) return;
-    document.getElementById('bulkDeleteIds').value = ids.join(',');
-    document.getElementById('bulkDeleteForm').submit();
-}
-</script>
+{% block scripts %}
+<script src="{{ url_for('static', filename='js/subscribers.js') }}"></script>
 {% endblock %}
