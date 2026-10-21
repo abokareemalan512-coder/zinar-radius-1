@@ -1,54 +1,71 @@
-# radius_sync.py
-import os
+"""
+radius_sync.py - نسخة "الموقع هو العقل"
+لا تتصل بـ MikroTik مباشرة، بل تُنشئ أوامر في قاعدة البيانات
+"""
 import logging
-
 logger = logging.getLogger(__name__)
 
-# إذا على Render — تجاهل كل شي
-ON_RENDER = os.environ.get('RENDER') == 'true' or os.environ.get('DATABASE_URL','').startswith('postgres')
 
-if not ON_RENDER:
-    import pymysql
-    DB = dict(host='localhost', user='radius', password='zinar512',
-              database='radius', charset='utf8mb4')
-
-def _conn():
-    return pymysql.connect(**DB)
-
-def _exec(sql, params=None, fetch=False):
-    if ON_RENDER: return True if not fetch else None
+def _queue(action, payload, router_name=None):
+    """استيراد مؤجل لتفادي الاستيراد الدائري"""
     try:
-        c = _conn()
-        cur = c.cursor()
-        cur.execute(sql, params or ())
-        if fetch:
-            r = cur.fetchall(); c.close(); return r
-        c.commit(); c.close(); return True
+        from app import queue_router_command
+        return queue_router_command(action, payload, router_name)
     except Exception as e:
-        logger.error(f"RADIUS-DB: {e}")
-        return None if fetch else False
+        logger.error(f"❌ radius_sync._queue: {e}")
+        return None
 
-def sync_user(username, password):
-    if ON_RENDER: return True
-    _exec("DELETE FROM radcheck WHERE username=%s", (username,))
-    _exec("INSERT INTO radcheck (username,attribute,op,value) VALUES (%s,'Cleartext-Password',':=',%s)", (username, password))
+
+def sync_user(username, password, package=None, user_type='hotspot'):
+    """إضافة/تحديث مستخدم - يُنشئ أمراً في الطابور"""
+    if not username or not password:
+        return False
+    _queue('sync_user', {
+        'username': username,
+        'password': password,
+        'package': package or 'default',
+        'user_type': user_type,
+    })
     return True
+
 
 def delete_user(username):
-    if ON_RENDER: return True
-    _exec("DELETE FROM radcheck WHERE username=%s", (username,))
+    if not username:
+        return False
+    _queue('delete_user', {'username': username})
     return True
+
 
 def pause_user(username):
-    if ON_RENDER: return True
-    _exec("DELETE FROM radcheck WHERE username=%s", (username,))
-    _exec("INSERT INTO radcheck (username,attribute,op,value) VALUES (%s,'Auth-Type',':=','Reject')", (username,))
+    if not username:
+        return False
+    _queue('pause_user', {'username': username})
     return True
 
-def resume_user(username, password):
-    return sync_user(username, password)
 
-def user_exists(username):
-    if ON_RENDER: return False
-    r = _exec("SELECT id FROM radcheck WHERE username=%s AND attribute='Cleartext-Password'", (username,), fetch=True)
-    return bool(r)
+def resume_user(username, password=None):
+    if not username:
+        return False
+    _queue('resume_user', {'username': username, 'password': password})
+    return True
+
+
+def sync_all_users():
+    """مزامنة كل المستخدمين"""
+    try:
+        from app import db, Subscriber, app as flask_app
+        with flask_app.app_context():
+            subs = Subscriber.query.all()
+            payload = [{
+                'username': s.username,
+                'password': s.password,
+                'package': s.package or 'default',
+                'status': s.status or 'active',
+                'user_type': s.user_type or 'hotspot',
+            } for s in subs]
+            _queue('sync_all', {'users': payload})
+            logger.info(f"📤 أمر مزامنة شاملة لـ {len(subs)} مشترك")
+            return len(subs)
+    except Exception as e:
+        logger.error(f"❌ sync_all_users: {e}")
+        return 0

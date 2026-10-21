@@ -1,48 +1,268 @@
-{% extends 'base.html' %}
-{% block title %}إعدادات حساب المسؤول{% endblock %}
+{% extends "base.html" %}
+{% block title %}إعدادات التلجرام{% endblock %}
+
+{% block head %}
+<link rel="stylesheet" href="{{ url_for('static', filename='css/admin_settings.css') }}">
+{% endblock %}
 
 {% block content %}
-<div class="container-fluid" style="max-width: 800px;">
-    <div class="d-flex justify-content-between align-items-center mb-4">
-        <div>
-            <h3 class="fw-bold m-0 text-white"><i class="fa-solid fa-user-gear text-info me-2"></i> إعدادات حساب المنصة (Admin)</h3>
-            <span class="text-muted fs-6">تعديل اسم المستخدم وكلمة المرور للدخول إلى منصة إدارة زينار</span>
+
+<div class="d-flex justify-content-between align-items-center mb-4 flex-wrap gap-2">
+    <div>
+        <h2 class="fw-bold mb-1">
+            <i class="bi bi-telegram" style="color: #229ED9;"></i>
+            إعدادات التلجرام
+        </h2>
+        <small class="text-muted">إدارة الإشعارات والتكامل مع Telegram Bot</small>
+    </div>
+    <div>
+        {% if telegram_settings and telegram_settings.enabled %}
+            <span class="status-badge status-active">
+                <span class="pulse-dot"></span> الإشعارات مُفعّلة
+            </span>
+        {% else %}
+            <span class="status-badge status-inactive">
+                <i class="bi bi-x-circle-fill"></i> الإشعارات معطّلة
+            </span>
+        {% endif %}
+    </div>
+</div>
+
+<div class="row g-3">
+    <!-- عمود الإعدادات -->
+    <div class="col-md-5">
+        <div class="card settings-card h-100">
+            <div class="card-header settings-header">
+                <h6 class="mb-0 fw-bold">
+                    <i class="bi bi-plug-fill"></i> إعدادات الاتصال
+                </h6>
+            </div>
+            <div class="card-body p-3">
+                <form method="POST" action="{{ url_for('save_telegram_settings') }}" id="telegramForm">
+
+                    <!-- Token -->
+                    <div class="mb-3">
+                        <label class="form-label fw-bold">
+                            <i class="bi bi-robot"></i> Bot Token
+                        </label>
+                        <div class="input-group">
+                            <input type="password" name="telegram_token"
+                                   id="input_token"
+                                   class="form-control font-monospace"
+                                   value="{{ telegram_settings.token or '' }}"
+                                   placeholder="1234567890:AAA..."
+                                   autocomplete="off">
+                            <button type="button" class="btn btn-outline-secondary"
+                                    id="toggleTokenBtn" title="عرض/إخفاء">
+                                <i class="bi bi-eye" id="toggleTokenIcon"></i>
+                            </button>
+                        </div>
+                        <small class="text-muted">
+                            احصل على التوكن من <strong>@BotFather</strong>
+                        </small>
+                    </div>
+
+                    <!-- Chat ID -->
+                    <div class="mb-3">
+                        <label class="form-label fw-bold">
+                            <i class="bi bi-chat-dots-fill"></i> Chat ID
+                        </label>
+                        <input type="text" name="telegram_chat_id"
+                               class="form-control font-monospace"
+                               value="{{ telegram_settings.chat_id or '' }}"
+                               placeholder="-1001234567890 أو 123456789">
+                        <small class="text-muted">
+                            احصل عليه من <strong>@userinfobot</strong>
+                            — للمجموعات يبدأ بـ <code>-100</code>
+                        </small>
+                    </div>
+
+                    <!-- تفعيل -->
+                    <div class="form-check form-switch mb-3">
+                        <input class="form-check-input" type="checkbox"
+                               name="telegram_enabled" id="telegram_enabled"
+                               {% if telegram_settings.enabled %}checked{% endif %}>
+                        <label class="form-check-label fw-bold" for="telegram_enabled">
+                            <i class="bi bi-bell-fill"></i> تفعيل الإشعارات
+                        </label>
+                    </div>
+
+                    <hr>
+
+                    <!-- أنواع الإشعارات -->
+                    <h6 class="fw-bold mb-3">
+                        <i class="bi bi-list-check"></i> أنواع الإشعارات
+                    </h6>
+
+                    <div class="row g-2">
+                        <div class="col-md-6">
+                            <div class="form-check">
+                                <input class="form-check-input" type="checkbox"
+                                       name="notify_new_subscriber"
+                                       id="notify_new_subscriber"
+                                       {% if telegram_settings.notify_new_subscriber %}checked{% endif %}>
+                                <label class="form-check-label" for="notify_new_subscriber">
+                                    <i class="bi bi-person-plus text-success"></i> مشترك جديد
+                                </label>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="form-check">
+                                <input class="form-check-input" type="checkbox"
+                                       name="notify_subscriber_expired"
+                                       id="notify_subscriber_expired"
+                                       {% if telegram_settings.notify_subscriber_expired %}checked{% endif %}>
+                                <label class="form-check-label" for="notify_subscriber_expired">
+                                    <i class="bi bi-x-circle text-danger"></i> انتهاء الاشتراك
+                                </label>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="form-check">
+                                <input class="form-check-input" type="checkbox"
+                                       name="notify_bulk_add"
+                                       id="notify_bulk_add"
+                                       {% if telegram_settings.notify_bulk_add %}checked{% endif %}>
+                                <label class="form-check-label" for="notify_bulk_add">
+                                    <i class="bi bi-people-fill text-warning"></i> إضافة جماعية
+                                </label>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="form-check">
+                                <input class="form-check-input" type="checkbox"
+                                       name="notify_admin_action"
+                                       id="notify_admin_action"
+                                       {% if telegram_settings.notify_admin_action %}checked{% endif %}>
+                                <label class="form-check-label" for="notify_admin_action">
+                                    <i class="bi bi-gear-fill text-secondary"></i> إجراءات إدارية
+                                </label>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="form-check">
+                                <input class="form-check-input" type="checkbox"
+                                       name="notify_router_status"
+                                       id="notify_router_status"
+                                       {% if telegram_settings.notify_router_status %}checked{% endif %}>
+                                <label class="form-check-label" for="notify_router_status">
+                                    <i class="bi bi-router text-info"></i> حالة الراوترات
+                                </label>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="form-check">
+                                <input class="form-check-input" type="checkbox"
+                                       name="notify_expiry_reminder"
+                                       id="notify_expiry_reminder"
+                                       {% if telegram_settings.notify_expiry_reminder %}checked{% endif %}>
+                                <label class="form-check-label" for="notify_expiry_reminder">
+                                    <i class="bi bi-alarm text-primary"></i> تذكير الانتهاء
+                                </label>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="d-flex gap-2 mt-4">
+                        <button type="submit" class="btn btn-primary flex-grow-1 fw-bold">
+                            <i class="bi bi-save"></i> حفظ الإعدادات
+                        </button>
+                        <button type="button" class="btn btn-info text-white fw-bold"
+                                id="testTelegramBtn">
+                            <i class="bi bi-send"></i> اختبار
+                        </button>
+                    </div>
+                </form>
+            </div>
         </div>
     </div>
 
-    {% if message %}
-    <div class="alert alert-success d-flex align-items-center mb-4" role="alert">
-        <i class="fa-solid fa-circle-check fs-5 me-2"></i>
-        <div>{{ message }}</div>
-    </div>
-    {% endif %}
-
-    {% if error %}
-    <div class="alert alert-danger d-flex align-items-center mb-4" role="alert">
-        <i class="fa-solid fa-triangle-exclamation fs-5 me-2"></i>
-        <div>{{ error }}</div>
-    </div>
-    {% endif %}
-
-    <div class="card card-custom p-4">
-        <form action="/admin_settings" method="POST">
-            <div class="mb-4">
-                <label class="form-label fw-bold"><i class="fa-solid fa-user text-info me-1"></i> اسم مستخدم الأدمن الحالي / الجديد</label>
-                <input type="text" name="username" class="form-control fs-5" value="{{ admin.username }}" required placeholder="أدخل اسم المستخدم الجديد">
+    <!-- عمود الإحصائيات -->
+    <div class="col-md-7">
+        <div class="card settings-card h-100">
+            <div class="card-header settings-header">
+                <h6 class="mb-0 fw-bold">
+                    <i class="bi bi-bar-chart-fill"></i> إحصائيات الإشعارات
+                </h6>
             </div>
+            <div class="card-body p-3">
 
-            <div class="mb-4">
-                <label class="form-label fw-bold"><i class="fa-solid fa-key text-warning me-1"></i> كلمة المرور الجديدة للمنصة</label>
-                <input type="password" name="password" class="form-control fs-5" value="{{ admin.password }}" required placeholder="أدخل كلمة المرور الجديدة">
-            </div>
+                <div class="row g-2 text-center mb-4">
+                    <div class="col-6">
+                        <div class="stat-box">
+                            <h3 class="fw-bold mb-0 text-info" id="stat-total-notifications">
+                                {{ total_notifications }}
+                            </h3>
+                            <small class="text-muted">إجمالي الإشعارات</small>
+                        </div>
+                    </div>
+                    <div class="col-6">
+                        <div class="stat-box">
+                            <h3 class="fw-bold mb-0 text-success" id="stat-new-subscribers">
+                                {{ new_subscribers }}
+                            </h3>
+                            <small class="text-muted">مشتركون جدد</small>
+                        </div>
+                    </div>
+                    <div class="col-6">
+                        <div class="stat-box">
+                            <h3 class="fw-bold mb-0 text-danger" id="stat-expired-subscribers">
+                                {{ expired_subscribers }}
+                            </h3>
+                            <small class="text-muted">اشتراكات منتهية</small>
+                        </div>
+                    </div>
+                    <div class="col-6">
+                        <div class="stat-box">
+                            <h3 class="fw-bold mb-0 text-warning" id="stat-bulk-adds">
+                                {{ bulk_adds }}
+                            </h3>
+                            <small class="text-muted">إضافات جماعية</small>
+                        </div>
+                    </div>
+                </div>
 
-            <div class="d-flex gap-2 justify-content-end mt-4">
-                <a href="/dashboard" class="btn btn-outline-secondary px-4"><i class="fa-solid fa-arrow-right me-1"></i> إلغاء ورجوع</a>
-                <button type="submit" class="btn btn-info px-4 py-2 text-dark fw-bold">
-                    <i class="fa-solid fa-floppy-disk me-1"></i> حفظ التغيرات
-                </button>
+                <hr>
+
+                <div class="d-flex justify-content-between align-items-center mb-3">
+                    <h6 class="fw-bold mb-0">
+                        <i class="bi bi-clock-history"></i> آخر الرسائل
+                    </h6>
+                    <button type="button" class="btn btn-sm btn-outline-secondary"
+                            id="refreshLogsBtn" title="تحديث">
+                        <i class="bi bi-arrow-clockwise"></i>
+                    </button>
+                </div>
+
+                <div class="list-group list-group-flush telegram-logs"
+                     id="telegram-logs-container">
+                    {% if telegram_logs %}
+                        {% for log in telegram_logs %}
+                        <div class="list-group-item">
+                            <div class="d-flex justify-content-between align-items-center mb-1">
+                                <span class="badge {% if log.status == 'success' %}bg-success{% else %}bg-danger{% endif %} bg-opacity-75">
+                                    {{ log.message_type }}
+                                </span>
+                                <small class="text-muted">
+                                    {{ log.created_at | localtime('%Y-%m-%d %H:%M:%S') }}
+                                </small>
+                            </div>
+                            <div class="small text-truncate">
+                                {{ log.message }}
+                            </div>
+                        </div>
+                        {% endfor %}
+                    {% else %}
+                        <div class="text-center text-muted py-3">لا توجد رسائل بعد</div>
+                    {% endif %}
+                </div>
             </div>
-        </form>
+        </div>
     </div>
 </div>
+
+{% endblock %}
+
+{% block scripts %}
+<script src="{{ url_for('static', filename='js/admin_settings.js') }}"></script>
 {% endblock %}

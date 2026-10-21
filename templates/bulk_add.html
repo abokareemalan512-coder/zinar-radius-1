@@ -2,8 +2,9 @@
 {% block title %}إضافة جماعية{% endblock %}
 
 {% block content %}
-<div class="d-flex justify-content-between align-items-center mb-4">
-    <h2>👥 إضافة جماعية للمستخدمين</h2>
+
+<div class="d-flex justify-content-between align-items-center mb-4 flex-wrap gap-2">
+    <h2 class="fw-bold mb-0">👥 إضافة جماعية للمستخدمين</h2>
     <a href="{{ url_for('add_subscriber') }}" class="btn btn-secondary">
         <i class="bi bi-arrow-right"></i> رجوع
     </a>
@@ -12,22 +13,18 @@
 <div class="row g-4">
     <div class="col-lg-8">
         <div class="card p-4">
+            <form method="POST" id="bulkForm" autocomplete="off">
 
-            <!-- تنبيه: يطبق على كل الراوترات -->
-            <div class="alert alert-info mb-4">
-                <i class="bi bi-info-circle"></i>
-                <strong>ملاحظة مهمة:</strong>
-                سيتم إنشاء كل مستخدم على <strong>جميع الراوترات النشطة</strong> تلقائيًا.
-            </div>
-
-            <form method="POST" id="bulkForm">
-
+                <!-- نوع المستخدم -->
                 <div class="mb-3">
-                    <label class="form-label">نوع المستخدم *</label>
-                    <div class="d-flex gap-3">
+                    <label class="form-label fw-bold">
+                        <i class="bi bi-diagram-3 text-accent"></i> نوع المستخدم *
+                    </label>
+                    <div class="d-flex gap-3 flex-wrap">
                         <div class="form-check">
                             <input class="form-check-input" type="radio"
-                                   name="user_type" value="pppoe" checked id="bt_pppoe">
+                                   name="user_type" value="pppoe"
+                                   id="bt_pppoe" checked>
                             <label class="form-check-label fw-bold" for="bt_pppoe">
                                 🌐 برودباند (PPPoE)
                             </label>
@@ -42,124 +39,151 @@
                     </div>
                 </div>
 
+                <!-- نمط الأسماء -->
                 <div class="mb-3">
-                    <label class="form-label">
+                    <label class="form-label fw-bold">
                         <i class="bi bi-shuffle text-accent"></i> نوع الأسماء *
                     </label>
                     <div class="d-flex gap-4 flex-wrap">
                         <div class="form-check">
                             <input class="form-check-input" type="radio"
-                                   name="char_mode" value="numbers" checked id="cm_numbers">
-                            <label class="form-check-label fw-bold" for="cm_numbers">
-                                🔢 أرقام
-                            </label>
+                                   name="char_mode" value="numbers"
+                                   id="cm_numbers" checked>
+                            <label class="form-check-label fw-bold" for="cm_numbers">🔢 أرقام</label>
                         </div>
                         <div class="form-check">
                             <input class="form-check-input" type="radio"
                                    name="char_mode" value="mixed" id="cm_mixed">
-                            <label class="form-check-label fw-bold" for="cm_mixed">
-                                🔤 أحرف وأرقام
-                            </label>
+                            <label class="form-check-label fw-bold" for="cm_mixed">🔤 أحرف وأرقام</label>
                         </div>
                         <div class="form-check">
                             <input class="form-check-input" type="radio"
                                    name="char_mode" value="letters" id="cm_letters">
-                            <label class="form-check-label fw-bold" for="cm_letters">
-                                🔡 أحرف
-                            </label>
+                            <label class="form-check-label fw-bold" for="cm_letters">🔡 أحرف</label>
                         </div>
                     </div>
                 </div>
 
+                <!-- البادئة -->
                 <div class="mb-3">
-                    <label class="form-label">بادئة الأسماء (Prefix) — اختياري</label>
-                    <input type="text" name="prefix" class="form-control"
-                           placeholder="مثال: user_ أو P">
+                    <label class="form-label fw-bold">
+                        <i class="bi bi-type text-accent"></i> بادئة الأسماء (اختياري)
+                    </label>
+                    <input type="text" name="prefix" id="input_prefix"
+                           class="form-control" maxlength="10"
+                           placeholder="مثال: user_ أو P"
+                           pattern="[A-Za-z0-9_\-]*">
+                    <small class="text-muted">حروف، أرقام، _ أو - فقط — بدون مسافات</small>
                 </div>
 
+                <!-- الطول والعدد -->
                 <div class="row">
                     <div class="col-md-6 mb-3">
-                        <label class="form-label">طول الاسم *</label>
-                        <input type="number" name="random_length" id="random_length"
-                               class="form-control" value="6" min="4" max="20">
-                        <small class="text-muted">مثال: 6 → <code>a3b7k9</code></small>
+                        <label class="form-label fw-bold">طول الاسم *</label>
+                        <input type="number" name="random_length" id="input_length"
+                               class="form-control" value="6" min="4" max="20" required>
+                        <small class="text-muted">بين 4 و 20</small>
                     </div>
                     <div class="col-md-6 mb-3">
-                        <label class="form-label">العدد الكلي *</label>
-                        <input type="number" name="count" class="form-control"
-                               value="10" min="1" max="500">
+                        <label class="form-label fw-bold">العدد الكلي *</label>
+                        <input type="number" name="count" id="input_count"
+                               class="form-control" value="10" min="1" max="500" required>
+                        <small class="text-muted">بين 1 و 500</small>
                     </div>
                 </div>
 
-                <div class="alert alert-info small">
-                    <strong>📋 معاينة (3 عينات):</strong>
-                    <div id="previewText" class="mt-2" style="font-family: monospace; font-size: 14px; font-weight: 600;"></div>
+                <!-- معاينة الأسماء -->
+                <div class="alert alert-info small mb-3">
+                    <strong>📋 معاينة (5 عينات):</strong>
+                    <div id="previewText" class="mt-2"
+                         style="font-family: monospace; font-size: 14px; font-weight: 600; direction: ltr; text-align: center; min-height: 20px;">
+                        —
+                    </div>
                 </div>
 
+                <!-- نمط كلمة المرور -->
                 <div class="mb-3">
-                    <label class="form-label">طريقة كلمة المرور *</label>
+                    <label class="form-label fw-bold">
+                        <i class="bi bi-key text-accent"></i> طريقة كلمة المرور *
+                    </label>
                     <div class="d-flex gap-3 flex-wrap">
                         <div class="form-check">
                             <input class="form-check-input" type="radio"
                                    name="password_mode" value="random"
                                    id="pm_random" checked>
                             <label class="form-check-label fw-bold" for="pm_random">
-                                🎲 كلمة مرور عشوائية
+                                🎲 عشوائية
                             </label>
                         </div>
                         <div class="form-check">
                             <input class="form-check-input" type="radio"
                                    name="password_mode" value="same_as_username"
                                    id="pm_same">
-                            <label class="form-check-label" for="pm_same">
-                                نفس اسم المستخدم
+                            <label class="form-check-label fw-bold" for="pm_same">
+                                = نفس اسم المستخدم
                             </label>
                         </div>
                         <div class="form-check">
                             <input class="form-check-input" type="radio"
                                    name="password_mode" value="fixed" id="pm_fixed">
-                            <label class="form-check-label" for="pm_fixed">
-                                ثابتة للجميع
+                            <label class="form-check-label fw-bold" for="pm_fixed">
+                                📌 ثابتة
                             </label>
                         </div>
                     </div>
                 </div>
 
                 <div class="mb-3" id="random_pass_div">
-                    <label class="form-label">طول كلمة المرور</label>
-                    <input type="number" name="password_length" id="password_length"
+                    <label class="form-label fw-bold">طول كلمة المرور</label>
+                    <input type="number" name="password_length" id="input_pw_length"
                            class="form-control" value="6" min="4" max="20">
                 </div>
 
                 <div class="mb-3" id="fixed_password_div" style="display: none;">
-                    <label class="form-label">كلمة المرور الثابتة</label>
-                    <input type="text" name="fixed_password" class="form-control">
+                    <label class="form-label fw-bold">كلمة المرور الثابتة *</label>
+                    <input type="text" name="fixed_password" id="input_fixed_pw"
+                           class="form-control font-monospace" maxlength="50"
+                           placeholder="مثال: zinar2026">
+                    <small class="text-muted">ستُستخدم لجميع المستخدمين</small>
                 </div>
 
+                <!-- الباقة -->
                 <div class="mb-3">
-                    <label class="form-label">الباقة *</label>
-                    <select name="package" class="form-select" required>
+                    <label class="form-label fw-bold">
+                        <i class="bi bi-box-seam text-accent"></i> الباقة *
+                    </label>
+                    <select name="package" id="input_package" class="form-select" required>
                         <option value="">— اختر باقة —</option>
                         {% for pkg in packages %}
-                        <option value="{{ pkg.name }}">
-                            {{ pkg.name }} — {{ pkg.duration }}
+                        <option value="{{ pkg.name }}"
+                                data-type="{{ pkg.user_type }}"
+                                data-duration="{{ pkg.duration }}"
+                                data-duration-unit="{{ pkg.duration_unit }}"
+                                data-price="{{ pkg.price }}">
+                            {{ pkg.name }}
+                            — {{ pkg.duration }}
                             {% if pkg.duration_unit == 'months' %}شهر{% else %}يوم{% endif %}
-                            — {{ pkg.price }} ل.س
+                            — {{ pkg.price|int }} ل.س
+                            ({{ 'هوت سبوت' if pkg.user_type == 'hotspot' else 'برودباند' }})
                         </option>
                         {% endfor %}
                     </select>
+                    <small class="text-muted" id="pkgHint">
+                        اختر نوع المستخدم أولاً لفلترة الباقات
+                    </small>
                 </div>
 
-                <div class="form-check mb-4">
-                    <input type="checkbox" name="push_to_router"
-                           class="form-check-input" id="push_r" checked>
-                    <label class="form-check-label fw-bold" for="push_r">
-                        <i class="bi bi-cloud-upload"></i> رفع تلقائي إلى جميع الراوترات
-                    </label>
+                <!-- ملخص -->
+                <div class="alert alert-success small mb-3" id="summaryBox">
+                    <div class="d-flex justify-content-between flex-wrap gap-2">
+                        <span>👥 <strong>العدد:</strong> <span id="sum_count">10</span></span>
+                        <span>📦 <strong>الباقة:</strong> <span id="sum_pkg">—</span></span>
+                        <span>🔑 <strong>المرور:</strong> <span id="sum_pw">عشوائي</span></span>
+                    </div>
                 </div>
 
-                <button type="submit" class="btn btn-primary w-100 py-2 fw-bold"
-                        onclick="return confirm('إنشاء المستخدمين على كل الراوترات النشطة؟')">
+                <button type="submit" class="btn btn-primary w-100 py-2 fw-bold js-confirm-form"
+                        data-confirm-msg="سيتم إنشاء المستخدمين وإضافتهم تلقائياً إلى RADIUS. متابعة؟">
                     <i class="bi bi-magic"></i> إنشاء المستخدمين
                 </button>
             </form>
@@ -168,16 +192,31 @@
 
     <div class="col-lg-4">
         <div class="card p-4">
-            <h5 class="text-accent mb-3">📡 الراوترات النشطة</h5>
-            {% if active_routers %}
+            <h5 class="text-accent mb-3">
+                <i class="bi bi-router"></i> الراوترات المسجّلة
+            </h5>
+            {% if routers %}
             <ul class="list-unstyled mb-0" style="line-height: 2;">
-                {% for r in active_routers %}
-                <li>✅ <strong>{{ r.name }}</strong> — <small class="text-muted">{{ r.ip_address }}</small></li>
+                {% for r in routers %}
+                <li>
+                    {% if r.is_active %}
+                        <span class="text-success">✅</span>
+                    {% else %}
+                        <span class="text-danger">❌</span>
+                    {% endif %}
+                    <strong>{{ r.name }}</strong>
+                    — <small class="text-muted">{{ r.ip_address }}</small>
+                </li>
                 {% endfor %}
             </ul>
+            <div class="alert alert-info small mt-3 mb-0">
+                <i class="bi bi-info-circle"></i>
+                سيُسجَّل المشتركون في قاعدة البيانات فقط.
+                <strong>FreeRADIUS</strong> سيتعرف عليهم تلقائياً على جميع الراوترات.
+            </div>
             {% else %}
             <div class="alert alert-warning mb-0">
-                ⚠️ لا يوجد راوترات نشطة! أضف راوتر أولًا.
+                ⚠️ لا يوجد راوترات مسجّلة. أضف راوتر أولاً.
             </div>
             {% endif %}
         </div>
@@ -186,57 +225,28 @@
             <h5 class="text-accent mb-3">📊 الإحصائيات</h5>
             <ul class="list-unstyled mb-0" style="line-height: 2;">
                 <li>🔢 <strong>الحد الأقصى:</strong> 500 مستخدم</li>
-                <li>⚡ <strong>السرعة:</strong> ~1 مستخدم/ثانية</li>
-                <li>💾 <strong>الحفظ:</strong> تلقائي</li>
-                <li>📡 <strong>الراوترات:</strong> {{ active_routers|length }}</li>
+                <li>⚡ <strong>السرعة:</strong> ~50 مستخدم/ثانية</li>
+                <li>💾 <strong>الحفظ:</strong> تلقائي في Neon</li>
+                <li>📡 <strong>RADIUS Sync:</strong> فوري (Trigger)</li>
+            </ul>
+        </div>
+
+        <div class="card p-4 mt-3">
+            <h5 class="text-accent mb-3">
+                <i class="bi bi-lightbulb"></i> نصائح
+            </h5>
+            <ul class="ps-3 mb-0" style="font-size: 0.85rem; line-height: 1.9;">
+                <li>استخدم <strong>بادئة</strong> لتمييز الحزم (مثلاً: <code>feb26_</code>)</li>
+                <li>الطول المُوصى به: <strong>6</strong></li>
+                <li>كلمات المرور العشوائية أكثر أماناً</li>
+                <li>يمكنك تصدير القائمة بعد الإنشاء عبر CSV</li>
             </ul>
         </div>
     </div>
 </div>
 
-<script>
-function randomString(len, mode) {
-    const letters = 'abcdefghijkmnpqrstuvwxyz';
-    const numbers = '23456789';
-    let chars = '';
-    if (mode === 'letters') chars = letters;
-    else if (mode === 'mixed') chars = letters + numbers;
-    else if (mode === 'numbers') chars = numbers;
-    let out = '';
-    for (let i = 0; i < len; i++) {
-        out += chars.charAt(Math.floor(Math.random() * chars.length));
-    }
-    return out;
-}
+{% endblock %}
 
-function updatePreview() {
-    const mode = document.querySelector('input[name="char_mode"]:checked').value;
-    const prefix = document.querySelector('input[name="prefix"]').value || '';
-    const len = parseInt(document.getElementById('random_length').value) || 6;
-    const samples = [];
-    for (let i = 0; i < 3; i++) {
-        samples.push(prefix + randomString(len, mode));
-    }
-    document.getElementById('previewText').textContent = samples.join('  |  ');
-}
-
-document.querySelectorAll('input[name="char_mode"]').forEach(el => {
-    el.addEventListener('change', updatePreview);
-});
-document.querySelectorAll('input[name="prefix"], input[name="random_length"]').forEach(el => {
-    el.addEventListener('input', updatePreview);
-});
-
-document.querySelectorAll('input[name="password_mode"]').forEach(el => {
-    el.addEventListener('change', () => {
-        const mode = document.querySelector('input[name="password_mode"]:checked').value;
-        document.getElementById('random_pass_div').style.display =
-            (mode === 'random') ? 'block' : 'none';
-        document.getElementById('fixed_password_div').style.display =
-            (mode === 'fixed') ? 'block' : 'none';
-    });
-});
-
-updatePreview();
-</script>
+{% block scripts %}
+<script src="{{ url_for('static', filename='js/bulk_add.js') }}"></script>
 {% endblock %}

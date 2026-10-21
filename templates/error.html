@@ -1,11 +1,51 @@
 {% extends "base.html" %}
-{% block title %}خطأ{% endblock %}
+{% block title %}خطأ {{ code or '' }}{% endblock %}
 
 {% block content %}
-<div class="text-center py-5">
-    <h1 class="display-1 text-accent">⚠️</h1>
-    <h2>حدث خطأ</h2>
-    <p class="text-muted">{{ error }}</p>
-    <a href="{{ url_for('dashboard') }}" class="btn btn-primary mt-3">العودة للوحة التحكم</a>
+
+<div class="error-container">
+    <div class="error-card">
+
+        <div class="error-icon">
+            {% if code == 404 %}
+                🔍
+            {% elif code == 403 %}
+                🚫
+            {% elif code == 500 %}
+                💥
+            {% else %}
+                ⚠️
+            {% endif %}
+        </div>
+
+        <h1 class="error-code">{{ code or 'خطأ' }}</h1>
+
+        <h2 class="error-title">
+            {% if code == 404 %}
+                الصفحة غير موجودة
+            {% elif code == 403 %}
+                غير مصرّح بالوصول
+            {% elif code == 500 %}
+                خطأ في الخادم
+            {% else %}
+                حدث خطأ غير متوقع
+            {% endif %}
+        </h2>
+
+        <p class="error-message">
+            {{ error or 'حدث خطأ غير معروف. يرجى المحاولة مجددًا.' }}
+        </p>
+
+        <div class="error-actions">
+            <a href="{{ url_for('dashboard') }}" class="btn btn-primary">
+                <i class="bi bi-house-door-fill"></i> العودة للوحة التحكم
+            </a>
+            <button type="button" class="btn btn-outline-secondary" onclick="history.back()">
+                <i class="bi bi-arrow-right"></i> رجوع
+            </button>
+        </div>
+
+    </div>
 </div>
+
 {% endblock %}

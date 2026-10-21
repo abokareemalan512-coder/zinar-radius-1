@@ -2,108 +2,669 @@
 <html lang="ar" dir="rtl">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-<title>ZINAR - خفيف</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+<meta name="theme-color" content="#0a0c1a">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="ZINAR">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="robots" content="noindex, nofollow">
+<title>ZINAR — الواجهة السريعة</title>
+
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>⚡</text></svg>">
+
 <style>
-  body{background:#0a0c1a; color:#fff; font-family:system-ui; margin:0; padding:0; padding-bottom:80px}
-  .topbar{padding:18px; background:#141735; display:flex; justify-content:space-between; font-size:18px; font-weight:bold}
-  .card{background:#151a35; border-radius:18px; margin:12px; padding:16px; border:1px solid #1f2750}
-  .grid2{display:grid; grid-template-columns:1fr 1fr; gap:0}
-  .stat{text-align:center; padding:20px 10px}
-  .stat .value{font-size:32px; font-weight:800; margin:8px 0}
-  .stat .label{color:#8a92c0; font-size:14px}
-  .up{color:#ffaa00} .down{color:#00ff88}
-  .link{text-decoration:none; color:#fff; display:block}
-  .link:active{transform:scale(0.97)}
-  select{width:100%; background:#0a0c1a; color:#fff; border:1px solid #2a3366; padding:12px; border-radius:12px; font-size:16px}
-  .bottom-nav{position:fixed; bottom:0; left:0; right:0; background:#141735; display:flex; justify-content:space-around; padding:10px 0; border-top:1px solid #1f2750}
-  .bottom-nav a{color:#6c769e; text-decoration:none; text-align:center; font-size:22px}
-  .bottom-nav a.active{color:#00ff88}
-  .bottom-nav small{display:block; font-size:11px; margin-top:2px}
-  #status{font-size:13px}
+  :root {
+    --bg: #0a0c1a;
+    --card: #151a35;
+    --topbar: #141735;
+    --border: #1f2750;
+    --border-light: #2a3366;
+    --text: #fff;
+    --text-muted: #8a92c0;
+    --nav-inactive: #6c769e;
+    --accent: #00ff88;
+    --warning: #ffaa00;
+    --danger: #ff4444;
+  }
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: system-ui, -apple-system, 'Segoe UI', Tahoma, sans-serif;
+    margin: 0;
+    padding: 0;
+    padding-bottom: calc(80px + env(safe-area-inset-bottom));
+    padding-top: env(safe-area-inset-top);
+    overscroll-behavior-y: contain;
+    user-select: none;
+  }
+
+  /* Top Bar */
+  .topbar {
+    padding: 16px 18px;
+    background: var(--topbar);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-size: 17px;
+    font-weight: bold;
+    position: sticky;
+    top: 0;
+    z-index: 100;
+    border-bottom: 1px solid var(--border);
+  }
+  .topbar .brand { display: flex; align-items: center; gap: 8px; }
+  .topbar .brand-icon {
+    width: 32px; height: 32px;
+    background: linear-gradient(135deg, #00ff88, #00cc6a);
+    border-radius: 8px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1rem;
+  }
+  #status {
+    font-size: 12px;
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    font-weight: 600;
+  }
+  .status-dot {
+    width: 7px; height: 7px;
+    border-radius: 50%;
+    background: currentColor;
+    animation: pulse 1.5s infinite;
+  }
+  @keyframes pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.4; }
+  }
+
+  /* Card */
+  .card {
+    background: var(--card);
+    border-radius: 16px;
+    margin: 12px;
+    padding: 16px;
+    border: 1px solid var(--border);
+    transition: transform 0.15s;
+  }
+  .card.no-padding { padding: 0; overflow: hidden; }
+
+  /* Grid 2 columns */
+  .grid2 {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 0;
+  }
+
+  /* Stats */
+  .stat {
+    text-align: center;
+    padding: 20px 10px;
+  }
+  .stat .icon {
+    font-size: 22px;
+    margin-bottom: 4px;
+  }
+  .stat .value {
+    font-size: 30px;
+    font-weight: 800;
+    margin: 6px 0;
+    font-variant-numeric: tabular-nums;
+    line-height: 1;
+  }
+  .stat .label {
+    color: var(--text-muted);
+    font-size: 13px;
+    font-weight: 500;
+  }
+  .up { color: var(--warning); }
+  .down { color: var(--accent); }
+
+  /* Links */
+  .link {
+    text-decoration: none;
+    color: var(--text);
+    display: block;
+  }
+  .link:active {
+    transform: scale(0.97);
+    background: var(--border);
+  }
+
+  /* Select */
+  .select-label {
+    color: var(--text-muted);
+    font-size: 13px;
+    display: block;
+    margin-bottom: 8px;
+    font-weight: 600;
+  }
+  select {
+    width: 100%;
+    background: var(--bg);
+    color: var(--text);
+    border: 1px solid var(--border-light);
+    padding: 12px 14px;
+    border-radius: 12px;
+    font-size: 15px;
+    font-weight: 500;
+    outline: none;
+    cursor: pointer;
+    transition: border-color 0.2s;
+    appearance: none;
+    background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8' fill='%238a92c0'><path d='M6 8L0 0h12z'/></svg>");
+    background-repeat: no-repeat;
+    background-position: left 14px center;
+    padding-left: 38px;
+  }
+  select:focus {
+    border-color: var(--accent);
+  }
+  select:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+  }
+
+  /* Bottom Nav */
+  .bottom-nav {
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    background: var(--topbar);
+    display: flex;
+    justify-content: space-around;
+    padding: 8px 0 calc(8px + env(safe-area-inset-bottom));
+    border-top: 1px solid var(--border);
+    z-index: 100;
+  }
+  .bottom-nav a {
+    color: var(--nav-inactive);
+    text-decoration: none;
+    text-align: center;
+    font-size: 20px;
+    padding: 4px 12px;
+    border-radius: 10px;
+    transition: color 0.2s;
+    flex: 1;
+    max-width: 100px;
+  }
+  .bottom-nav a:active {
+    background: rgba(255,255,255,0.05);
+  }
+  .bottom-nav a.active {
+    color: var(--accent);
+  }
+  .bottom-nav small {
+    display: block;
+    font-size: 10px;
+    margin-top: 2px;
+    font-weight: 600;
+  }
+
+  /* Info line */
+  .info-line {
+    text-align: center;
+    color: var(--text-muted);
+    font-size: 11px;
+    padding: 0 12px 8px;
+    font-variant-numeric: tabular-nums;
+  }
+
+  /* Error banner */
+  .error-banner {
+    background: rgba(255, 68, 68, 0.15);
+    border: 1px solid rgba(255, 68, 68, 0.4);
+    color: #ff8888;
+    padding: 10px 14px;
+    margin: 12px;
+    border-radius: 12px;
+    font-size: 13px;
+    display: none;
+    align-items: center;
+    gap: 8px;
+  }
+  .error-banner.show { display: flex; }
+
+  /* Router indicator */
+  .router-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    font-size: 11px;
+    color: var(--text-muted);
+    background: rgba(255,255,255,0.03);
+    padding: 4px 10px;
+    border-radius: 20px;
+    margin-bottom: 12px;
+  }
+
+  /* Pull to refresh */
+  .ptr-indicator {
+    position: fixed;
+    top: 0;
+    left: 50%;
+    transform: translateX(-50%) translateY(-100%);
+    background: var(--card);
+    border: 1px solid var(--border);
+    color: var(--accent);
+    padding: 8px 16px;
+    border-radius: 0 0 12px 12px;
+    font-size: 12px;
+    transition: transform 0.2s;
+    z-index: 99;
+  }
+  .ptr-indicator.show { transform: translateX(-50%) translateY(60px); }
+
+  /* Skeleton loading */
+  .skeleton {
+    background: linear-gradient(90deg, var(--border) 25%, var(--border-light) 50%, var(--border) 75%);
+    background-size: 200% 100%;
+    animation: shimmer 1.5s infinite;
+    border-radius: 6px;
+    height: 30px;
+    margin: 4px auto;
+    width: 80%;
+  }
+  @keyframes shimmer {
+    0% { background-position: 200% 0; }
+    100% { background-position: -200% 0; }
+  }
 </style>
 </head>
 <body>
+
 <header class="topbar">
-  <div>⚡ ZINAR</div>
-  <div id="status" style="color:#00ff88">● متصل</div>
+  <div class="brand">
+    <span class="brand-icon">⚡</span>
+    <span>ZINAR</span>
+  </div>
+  <div id="status" style="color: var(--accent);">
+    <span class="status-dot"></span>
+    <span id="statusText">متصل</span>
+  </div>
 </header>
 
+<div class="ptr-indicator" id="ptrIndicator">↓ اسحب للتحديث</div>
+
+<div class="error-banner" id="errorBanner">
+  <span>⚠️</span>
+  <span id="errorText">فشل الاتصال</span>
+</div>
+
 <main>
+
+  <!-- اختيار الراوتر والمنفذ -->
   <div class="card">
-    <label style="color:#8a92c0; font-size:13px; display:block; margin-bottom:8px">اختر المنفذ</label>
-    <select id="iface"><option>جاري التحميل...</option></select>
+    <label class="select-label" for="routerSelect">🖥️ الراوتر</label>
+    <select id="routerSelect" disabled>
+      <option>جاري التحميل...</option>
+    </select>
+
+    <label class="select-label" for="iface" style="margin-top: 14px;">🔌 المنفذ</label>
+    <select id="iface" disabled>
+      <option>اختر الراوتر أولاً...</option>
+    </select>
   </div>
 
+  <!-- سرعات مباشرة -->
   <div class="grid2">
     <div class="card stat">
-      <div style="font-size:24px">↑</div>
-      <div class="value up" id="up">0.0</div>
-      <div class="label">رفع Mbps</div>
+      <div class="icon">↑</div>
+      <div class="value up" id="up">—</div>
+      <div class="label">رفع (Mbps)</div>
     </div>
     <div class="card stat">
-      <div style="font-size:24px">↓</div>
-      <div class="value down" id="down">0.0</div>
-      <div class="label">تحميل Mbps</div>
+      <div class="icon">↓</div>
+      <div class="value down" id="down">—</div>
+      <div class="label">تحميل (Mbps)</div>
     </div>
   </div>
 
+  <!-- إجراءات سريعة -->
   <div class="grid2">
     <a href="/subscribers" class="card stat link">
-      <div style="font-size:28px">👥</div>
-      <div class="value" id="sub_count">{{ sub_count }}</div>
-      <div class="label">اضغط لعرض المشتركين</div>
+      <div class="icon">👥</div>
+      <div class="value" id="subCount">{{ sub_count or 0 }}</div>
+      <div class="label">المشتركون</div>
     </a>
     <a href="/routers" class="card stat link">
-      <div style="font-size:28px">📡</div>
-      <div class="value" id="router_count">{{ router_count }}</div>
-      <div class="label">النواشر - اضغط للفحص</div>
+      <div class="icon">📡</div>
+      <div class="value" id="routerCount">{{ router_count or 0 }}</div>
+      <div class="label">الراوترات</div>
     </a>
   </div>
 
-  <div class="card" style="text-align:center; color:#8a92c0; font-size:12px">
-    آخر تحديث: <span id="time">--:--:--</span> | خفيف للعين والبطارية
+  <!-- معلومات الحالة -->
+  <div class="info-line">
+    آخر تحديث: <span id="time">—</span>
+    <br>
+    <span id="ifaceChip" class="router-chip" style="margin-top: 6px;">
+      <span>—</span>
+    </span>
   </div>
+
 </main>
 
 <nav class="bottom-nav">
-  <a href="/mobile" class="active"><span>🏠</span><small>الرئيسية</small></a>
-  <a href="/subscribers"><span>👥</span><small>المشتركين</small></a>
-  <a href="/nawashir"><span>📡</span><small>النواشر</small></a>
-  <a href="/logout"><span>🚪</span><small>خروج</small></a>
+  <a href="/mobile" class="active">
+    <span>🏠</span>
+    <small>الرئيسية</small>
+  </a>
+  <a href="/subscribers">
+    <span>👥</span>
+    <small>المشتركون</small>
+  </a>
+  <a href="/traffic-monitor">
+    <span>📊</span>
+    <small>الترافيك</small>
+  </a>
+  <a href="/logout">
+    <span>🚪</span>
+    <small>خروج</small>
+  </a>
 </nav>
 
 <script>
-let ifaceEl = document.getElementById('iface');
-async function loadIfaces(){
-  try{
-    let r = await fetch('/api/ifaces'); let d = await r.json();
-    let cur = ifaceEl.value;
-    ifaceEl.innerHTML='';
-    (d.ifaces||[]).forEach(n=>{
-      let o=document.createElement('option'); o.value=n; o.textContent=n; ifaceEl.appendChild(o);
-    });
-    if(cur) ifaceEl.value=cur;
-  }catch(e){}
-}
-async function updateTraffic(){
-  let iface = ifaceEl.value; if(!iface) return;
-  try{
-    let r = await fetch(`/api/traffic?iface=${iface}`); let d = await r.json();
-    document.getElementById('up').textContent = (d.up||0).toFixed(1);
-    document.getElementById('down').textContent = (d.down||0).toFixed(1);
-    document.getElementById('time').textContent = new Date().toLocaleTimeString('ar-SY');
-    document.getElementById('status').textContent='● متصل';
-    document.getElementById('status').style.color='#00ff88';
-  }catch(e){
-    document.getElementById('status').textContent='● غير متصل';
-    document.getElementById('status').style.color='#ff4444';
+(function () {
+  'use strict';
+
+  // ==========================================
+  // الإعدادات
+  // ==========================================
+  const REFRESH_INTERVAL = 10000;   // 10 ثواني
+  const FETCH_TIMEOUT = 8000;
+  const STORAGE_KEY = 'mobile_monitor_state';
+
+  // ==========================================
+  // العناصر
+  // ==========================================
+  const routerSelect = document.getElementById('routerSelect');
+  const ifaceSelect = document.getElementById('iface');
+  const upEl = document.getElementById('up');
+  const downEl = document.getElementById('down');
+  const timeEl = document.getElementById('time');
+  const statusEl = document.getElementById('status');
+  const statusText = document.getElementById('statusText');
+  const errorBanner = document.getElementById('errorBanner');
+  const errorText = document.getElementById('errorText');
+  const ifaceChip = document.getElementById('ifaceChip');
+  const ptrIndicator = document.getElementById('ptrIndicator');
+
+  // ==========================================
+  // الحالة
+  // ==========================================
+  let monitoringTimer = null;
+  let isPageVisible = !document.hidden;
+
+  // ==========================================
+  // Helpers
+  // ==========================================
+  function setStatus(connected, message) {
+    if (connected) {
+      statusEl.style.color = 'var(--accent)';
+      statusText.textContent = message || 'متصل';
+    } else {
+      statusEl.style.color = 'var(--danger)';
+      statusText.textContent = message || 'غير متصل';
+    }
   }
-}
-ifaceEl.addEventListener('change', updateTraffic);
-loadIfaces();
-setInterval(updateTraffic, 15000); // كل 15 ثانية بدل 10 مشان البطارية
-setTimeout(updateTraffic, 1000);
+
+  function showError(msg) {
+    if (!msg) {
+      errorBanner.classList.remove('show');
+      return;
+    }
+    errorText.textContent = msg;
+    errorBanner.classList.add('show');
+    setTimeout(() => errorBanner.classList.remove('show'), 5000);
+  }
+
+  async function fetchJson(url) {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), FETCH_TIMEOUT);
+    try {
+      const res = await fetch(url, {
+        credentials: 'same-origin',
+        signal: controller.signal,
+      });
+      clearTimeout(timer);
+      if (!res.ok) throw new Error('HTTP ' + res.status);
+      return await res.json();
+    } catch (err) {
+      clearTimeout(timer);
+      throw err;
+    }
+  }
+
+  function saveState(routerId, iface) {
+    try {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify({ routerId, iface }));
+    } catch (e) {}
+  }
+
+  function loadState() {
+    try {
+      const raw = localStorage.getItem(STORAGE_KEY);
+      return raw ? JSON.parse(raw) : null;
+    } catch (e) { return null; }
+  }
+
+  // ==========================================
+  // جلب الراوترات
+  // ==========================================
+  async function loadRouters() {
+    try {
+      const data = await fetchJson('/api/mobile/routers');
+      const routers = data.routers || [];
+
+      if (routers.length === 0) {
+        routerSelect.innerHTML = '<option value="">لا يوجد راوترات</option>';
+        routerSelect.disabled = true;
+        setStatus(false, 'لا راوترات');
+        return;
+      }
+
+      routerSelect.innerHTML = routers.map(r =>
+        `<option value="${r.id}">${escapeHtml(r.name)}</option>`
+      ).join('');
+      routerSelect.disabled = false;
+
+      // استرجاع الحالة
+      const state = loadState();
+      if (state && state.routerId) {
+        const exists = routers.some(r => String(r.id) === String(state.routerId));
+        if (exists) routerSelect.value = state.routerId;
+      }
+
+      await loadInterfaces(routerSelect.value);
+    } catch (err) {
+      console.warn('Load routers failed:', err);
+      routerSelect.innerHTML = '<option>فشل التحميل</option>';
+      setStatus(false, 'فشل الاتصال');
+    }
+  }
+
+  // ==========================================
+  // جلب المنافذ
+  // ==========================================
+  async function loadInterfaces(routerId) {
+    if (!routerId) return;
+
+    ifaceSelect.disabled = true;
+    ifaceSelect.innerHTML = '<option>جاري التحميل...</option>';
+
+    try {
+      const data = await fetchJson(`/api/traffic/interfaces/${routerId}`);
+      const ifaces = data.interfaces || [];
+
+      if (ifaces.length === 0) {
+        ifaceSelect.innerHTML = '<option>لا توجد منافذ</option>';
+        return;
+      }
+
+      ifaceSelect.innerHTML = ifaces.map(i =>
+        `<option value="${escapeHtml(i.name)}">${escapeHtml(i.name)}</option>`
+      ).join('');
+      ifaceSelect.disabled = false;
+
+      // استرجاع الحالة
+      const state = loadState();
+      if (state && state.iface) {
+        const exists = ifaces.some(i => i.name === state.iface);
+        if (exists) ifaceSelect.value = state.iface;
+      }
+
+      saveState(routerSelect.value, ifaceSelect.value);
+      updateTraffic();
+      startMonitoring();
+    } catch (err) {
+      console.warn('Load interfaces failed:', err);
+      ifaceSelect.innerHTML = '<option>فشل التحميل</option>';
+      setStatus(false, 'فشل الاتصال');
+    }
+  }
+
+  // ==========================================
+  // تحديث الترافيك
+  // ==========================================
+  async function updateTraffic() {
+    if (!isPageVisible) return;
+
+    const routerId = routerSelect.value;
+    const iface = ifaceSelect.value;
+
+    if (!routerId || !iface) return;
+
+    try {
+      const data = await fetchJson(`/api/traffic/stats/${routerId}/${encodeURIComponent(iface)}`);
+      const stats = data.stats || {};
+
+      const up = parseSpeed(stats.tx_rate || stats.rx_rate);
+      const down = parseSpeed(stats.rx_rate || stats.tx_rate);
+
+      // tx = upload, rx = download
+      upEl.textContent = parseSpeed(stats.tx_rate).toFixed(1);
+      downEl.textContent = parseSpeed(stats.rx_rate).toFixed(1);
+
+      timeEl.textContent = new Date().toLocaleTimeString('ar-SY', {
+        hour: '2-digit', minute: '2-digit', second: '2-digit',
+      });
+
+      ifaceChip.innerHTML = `<span>📡</span> ${escapeHtml(iface)}`;
+      setStatus(true, 'متصل');
+    } catch (err) {
+      setStatus(false, 'فشل الاتصال');
+      upEl.textContent = '—';
+      downEl.textContent = '—';
+    }
+  }
+
+  function parseSpeed(str) {
+    if (!str) return 0;
+    const s = String(str);
+    if (s.includes('Gbps')) return parseFloat(s) * 1000;
+    if (s.includes('Mbps')) return parseFloat(s);
+    if (s.includes('kbps')) return parseFloat(s) / 1000;
+    const n = parseFloat(s);
+    return isNaN(n) ? 0 : n / 1000000;
+  }
+
+  function escapeHtml(str) {
+    if (str === null || str === undefined) return '';
+    return String(str).replace(/[&<>"']/g, m => ({
+      '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;',
+    }[m]));
+  }
+
+  // ==========================================
+  // Polling
+  // ==========================================
+  function startMonitoring() {
+    stopMonitoring();
+    monitoringTimer = setInterval(updateTraffic, REFRESH_INTERVAL);
+  }
+
+  function stopMonitoring() {
+    if (monitoringTimer) {
+      clearInterval(monitoringTimer);
+      monitoringTimer = null;
+    }
+  }
+
+  // ==========================================
+  // الأحداث
+  // ==========================================
+  routerSelect.addEventListener('change', function () {
+    saveState(this.value, '');
+    loadInterfaces(this.value);
+  });
+
+  ifaceSelect.addEventListener('change', function () {
+    saveState(routerSelect.value, this.value);
+    updateTraffic();
+    startMonitoring();
+  });
+
+  document.addEventListener('visibilitychange', function () {
+    isPageVisible = !document.hidden;
+    if (isPageVisible) {
+      updateTraffic();
+      startMonitoring();
+    } else {
+      stopMonitoring();
+    }
+  });
+
+  // Pull-to-refresh
+  let touchStartY = 0;
+  let pullDistance = 0;
+
+  document.addEventListener('touchstart', function (e) {
+    if (window.scrollY === 0) {
+      touchStartY = e.touches[0].clientY;
+    }
+  }, { passive: true });
+
+  document.addEventListener('touchmove', function (e) {
+    if (touchStartY === 0) return;
+    pullDistance = e.touches[0].clientY - touchStartY;
+    if (pullDistance > 80 && pullDistance < 150) {
+      ptrIndicator.classList.add('show');
+      ptrIndicator.textContent = '↓ ارفع للتحديث';
+    }
+  }, { passive: true });
+
+  document.addEventListener('touchend', function () {
+    if (pullDistance > 100) {
+      ptrIndicator.classList.add('show');
+      ptrIndicator.textContent = '🔄 جاري التحديث...';
+      updateTraffic().finally(() => {
+        setTimeout(() => {
+          ptrIndicator.classList.remove('show');
+          ptrIndicator.textContent = '↓ اسحب للتحديث';
+        }, 400);
+      });
+    } else {
+      ptrIndicator.classList.remove('show');
+    }
+    touchStartY = 0;
+    pullDistance = 0;
+  });
+
+  // ==========================================
+  // Init
+  // ==========================================
+  document.addEventListener('DOMContentLoaded', function () {
+    loadRouters();
+  });
+
+})();
 </script>
+
 </body>
 </html>

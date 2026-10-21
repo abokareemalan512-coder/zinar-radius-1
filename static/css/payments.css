@@ -1,0 +1,131 @@
+/* ============ Payments Page ============ */
+
+/* إحصائيات */
+.stat-card {
+    background: var(--bg-card);
+    border: 1px solid var(--bg-hover);
+    border-radius: 14px;
+    padding: 18px;
+    text-align: center;
+    transition: all 0.3s;
+}
+.stat-card:hover {
+    transform: translateY(-2px);
+    border-color: var(--accent);
+}
+.stat-icon {
+    width: 46px;
+    height: 46px;
+    border-radius: 50%;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.3rem;
+    margin-bottom: 10px;
+}
+.stat-value {
+    font-size: 1.6rem;
+    font-weight: 800;
+    color: var(--text-main);
+    margin: 0 0 4px;
+    line-height: 1;
+}
+.stat-card small {
+    font-size: 0.75rem;
+    font-weight: 600;
+}
+
+/* البحث */
+.input-group-text {
+    background: var(--bg-main) !important;
+    border: 1px solid var(--bg-hover) !important;
+}
+
+.filter-btn {
+    background-color: var(--bg-main) !important;
+    border: 1px solid var(--bg-hover) !important;
+    color: var(--text-muted) !important;
+    font-weight: 600;
+    font-size: 0.85rem;
+}
+.filter-btn:hover {
+    background-color: var(--bg-hover) !important;
+    color: var(--text-main) !important;
+}
+.filter-btn.active {
+    background-color: var(--accent) !important;
+    border-color: var(--accent) !important;
+    color: #0f172a !important;
+}
+
+/* الجدول */
+.table > :not(caption) > * > * {
+    padding: 1rem 0.75rem;
+    vertical-align: middle;
+}
+tr[data-payment-id] {
+    transition: background-color 0.2s;
+}
+tr[data-payment-id]:hover {
+    background-color: rgba(56, 189, 248, 0.05) !important;
+}
+
+/* Badge المبلغ */
+.amount-badge {
+    display: inline-block;
+    padding: 6px 14px;
+    border-radius: 8px;
+    background: rgba(245, 158, 11, 0.1);
+    color: #f59e0b;
+    border: 1px solid rgba(245, 158, 11, 0.3);
+    font-weight: 700;
+    font-family: 'Courier New', monospace;
+    font-size: 0.9rem;
+}
+
+/* زر التأكيد */
+.js-complete-payment {
+    transition: all 0.2s;
+}
+.js-complete-payment:hover:not(:disabled) {
+    transform: translateY(-1px);
+    box-shadow: 0 4px 8px rgba(56, 189, 248, 0.3);
+}
+.js-complete-payment:disabled {
+    opacity: 0.7;
+    cursor: not-allowed;
+}
+
+/* Pagination */
+.pagination-wrapper {
+    padding: 15px;
+    border-top: 1px solid var(--bg-hover);
+    background: var(--bg-card);
+    border-radius: 0 0 12px 12px;
+}
+.pagination .page-link {
+    background-color: var(--bg-main);
+    border-color: var(--bg-hover);
+    color: var(--text-main);
+    margin: 0 3px;
+    border-radius: 8px !important;
+    font-weight: 600;
+    min-width: 40px;
+    text-align: center;
+    transition: all 0.2s;
+}
+.pagination .page-link:hover {
+    background-color: var(--bg-hover);
+    color: var(--accent);
+    border-color: var(--accent);
+}
+.pagination .page-item.active .page-link {
+    background-color: var(--accent);
+    border-color: var(--accent);
+    color: #0f172a;
+    font-weight: 700;
+}
+.pagination .page-item.disabled .page-link {
+    opacity: 0.4;
+    cursor: not-allowed;
+}

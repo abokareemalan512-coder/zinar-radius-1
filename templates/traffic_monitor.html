@@ -1,0 +1,171 @@
+{% extends "base.html" %}
+{% block title %}مراقبة حركة المرور{% endblock %}
+
+{% block head %}
+<link rel="stylesheet" href="{{ url_for('static', filename='css/traffic_monitor.css') }}">
+{% endblock %}
+
+{% block content %}
+
+<!-- العنوان -->
+<div class="d-flex justify-content-between align-items-center mb-4 flex-wrap gap-3">
+    <div>
+        <h2 class="fw-bold mb-1">
+            <i class="bi bi-graph-up-arrow text-accent"></i>
+            مراقبة حركة المرور
+            <span class="api-badge ms-2">
+                <i class="bi bi-lightning-charge-fill"></i> MikroTik API
+            </span>
+        </h2>
+        <small class="text-muted">مراقبة مباشرة (Live) عبر المنفذ المحدد للـ API</small>
+    </div>
+
+    <div class="d-flex gap-2 flex-wrap align-items-center">
+        <!-- اختيار الراوتر -->
+        <select id="routerSelect" class="control-select" disabled>
+            <option value="">🔌 اختر الراوتر...</option>
+            {% for r in routers %}
+            <option value="{{ r.id }}"
+                    data-name="{{ r.name }}"
+                    data-ip="{{ r.ip_address }}"
+                    data-api-port="{{ r.api_port or 8728 }}">
+                {{ r.name }} — {{ r.ip_address }}:{{ r.api_port or 8728 }}
+            </option>
+            {% endfor %}
+        </select>
+
+        <!-- بحث المنافذ -->
+        <div class="interface-search-wrapper">
+            <input type="text"
+                   id="interfaceSearch"
+                   placeholder="🔍 ابحث عن منفذ..."
+                   autocomplete="off"
+                   disabled>
+            <i class="bi bi-search search-icon"></i>
+            <button class="clear-btn"
+                    id="clearSearchBtn"
+                    type="button"
+                    title="مسح"
+                    aria-label="مسح البحث">
+                <i class="bi bi-x-circle-fill"></i>
+            </button>
+            <div class="interface-dropdown" id="interfaceDropdown"></div>
+        </div>
+
+        <input type="hidden" id="interfaceSelect" value="">
+
+        <!-- تبديل الاتجاه -->
+        <button id="directionBtn"
+                class="direction-toggle"
+                type="button"
+                title="تبديل اتجاه الرفع والتحميل">
+            <i class="bi bi-arrow-left-right"></i>
+            <span id="directionText">الاتجاه: تلقائي</span>
+        </button>
+
+        <!-- بدء / إيقاف -->
+        <button id="startBtn"
+                class="btn btn-primary px-4 py-2 rounded-3"
+                type="button">
+            <i class="bi bi-play-fill"></i> بدء المراقبة
+        </button>
+        <button id="stopBtn"
+                class="btn btn-danger px-4 py-2 rounded-3"
+                type="button"
+                style="display: none;">
+            <i class="bi bi-stop-fill"></i> إيقاف
+        </button>
+    </div>
+</div>
+
+<!-- معلومات الاتجاه -->
+<div class="direction-info" id="directionInfo" style="display: none;">
+    <i class="bi bi-info-circle-fill text-info"></i>
+    <span id="directionInfoText">
+        الاتجاه التلقائي: <strong>WAN</strong> (منفذ الإنترنت)
+    </span>
+</div>
+
+<!-- حالة الاتصال -->
+<div id="connectionStatus" class="mb-3" style="display: none;">
+    <span class="status-indicator">
+        <span class="pulse-dot"></span>
+        <span id="statusText">جاري الاتصال...</span>
+    </span>
+</div>
+
+<!-- منطقة المراقبة -->
+<div class="row g-4" id="monitoringArea" style="display: none;">
+    <div class="col-md-6">
+        <div class="traffic-card">
+            <div class="traffic-header">
+                <h5 class="fw-bold mb-0 download-color">
+                    <i class="bi bi-arrow-down-circle-fill"></i> تحميل (Download)
+                </h5>
+                <span class="badge px-3 py-2 rate-badge download-badge" id="downloadRateBadge">0 Mbps</span>
+            </div>
+            <div class="text-center">
+                <div class="traffic-value download-color">
+                    <span id="downloadRate">0.00</span>
+                    <span class="traffic-unit">Mbps</span>
+                </div>
+            </div>
+            <div class="traffic-progress">
+                <div class="traffic-progress-bar bg-download" id="downloadProgress" style="width: 0%;"></div>
+            </div>
+            <div class="d-flex justify-content-between text-muted small">
+                <span><i class="bi bi-hdd-stack"></i> إجمالي التحميل:</span>
+                <span id="downloadTotal" class="fw-bold">0 GB</span>
+            </div>
+            <div class="chart-container">
+                <canvas id="downloadChart"></canvas>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-md-6">
+        <div class="traffic-card">
+            <div class="traffic-header">
+                <h5 class="fw-bold mb-0 upload-color">
+                    <i class="bi bi-arrow-up-circle-fill"></i> رفع (Upload)
+                </h5>
+                <span class="badge px-3 py-2 rate-badge upload-badge" id="uploadRateBadge">0 Mbps</span>
+            </div>
+            <div class="text-center">
+                <div class="traffic-value upload-color">
+                    <span id="uploadRate">0.00</span>
+                    <span class="traffic-unit">Mbps</span>
+                </div>
+            </div>
+            <div class="traffic-progress">
+                <div class="traffic-progress-bar bg-upload" id="uploadProgress" style="width: 0%;"></div>
+            </div>
+            <div class="d-flex justify-content-between text-muted small">
+                <span><i class="bi bi-hdd-stack"></i> إجمالي الرفع:</span>
+                <span id="uploadTotal" class="fw-bold">0 GB</span>
+            </div>
+            <div class="chart-container">
+                <canvas id="uploadChart"></canvas>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- شرح زر الاتجاه -->
+<div class="alert alert-info border-0 rounded-4 small mt-4 d-flex align-items-center gap-2">
+    <i class="bi bi-info-circle-fill fs-5"></i>
+    <div>
+        <strong>كيف تستخدم زر الاتجاه؟</strong>
+        <ul class="mb-0 mt-1" style="padding-right: 20px;">
+            <li>إذا كان <strong>التحميل أعلى من الرفع</strong> — الاتجاه صحيح ✅</li>
+            <li>إذا كان <strong>الرفع أعلى من التحميل</strong> — اضغط زر <strong>الاتجاه</strong> لتبديله 🔄</li>
+        </ul>
+    </div>
+</div>
+
+{% endblock %}
+
+{% block scripts %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<script src="{{ url_for('static', filename='js/traffic_monitor.js') }}"></script>
+{% endblock %}

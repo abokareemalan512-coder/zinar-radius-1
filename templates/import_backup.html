@@ -1,0 +1,141 @@
+{% extends "base.html" %}
+{% block title %}استيراد من الميكروتيك{% endblock %}
+
+{% block head %}
+<link rel="stylesheet" href="{{ url_for('static', filename='css/import_backup.css') }}">
+{% endblock %}
+
+{% block content %}
+
+<div class="d-flex justify-content-between align-items-center mb-4 flex-wrap gap-2">
+    <div>
+        <h2 class="fw-bold mb-1">
+            <i class="bi bi-cloud-upload text-accent"></i> استيراد من الميكروتيك
+        </h2>
+        <small class="text-muted">رفع ملف .rsc لاستيراد الباقات والمشتركين</small>
+    </div>
+</div>
+
+<div class="row g-3 justify-content-center">
+    <div class="col-lg-9">
+
+        <!-- خطوات الاستخراج -->
+        <div class="card info-card mb-3">
+            <div class="card-body p-4">
+                <h6 class="fw-bold text-accent mb-3">
+                    <i class="bi bi-info-circle-fill"></i> كيف تحصل على ملف النسخة الاحتياطية؟
+                </h6>
+                <ol class="steps-list mb-0">
+                    <li>افتح <strong>WinBox</strong> واتصل بجهاز MikroTik</li>
+                    <li>اذهب إلى <strong>New Terminal</strong></li>
+                    <li>
+                        اكتب الأمر التالي:
+                        <code class="terminal-cmd">/export file=zinar_backup</code>
+                    </li>
+                    <li>سيُحفظ الملف في <strong>Files</strong> باسم <code>zinar_backup.rsc</code></li>
+                    <li>حمّله إلى جهازك ثم ارفعه هنا ⬇️</li>
+                </ol>
+            </div>
+        </div>
+
+        <!-- إحصائيات -->
+        <div class="row g-3 mb-3">
+            <div class="col-6">
+                <div class="stat-box">
+                    <div class="stat-icon" style="background: rgba(56, 189, 248, 0.15); color: #38bdf8;">
+                        <i class="bi bi-box-seam"></i>
+                    </div>
+                    <h3 class="stat-number">{{ total_packages }}</h3>
+                    <small class="text-muted">باقات حالية في الموقع</small>
+                </div>
+            </div>
+            <div class="col-6">
+                <div class="stat-box">
+                    <div class="stat-icon" style="background: rgba(34, 197, 94, 0.15); color: #22c55e;">
+                        <i class="bi bi-people"></i>
+                    </div>
+                    <h3 class="stat-number">{{ total_subscribers }}</h3>
+                    <small class="text-muted">مشتركون حاليون</small>
+                </div>
+            </div>
+        </div>
+
+        <!-- بطاقة الرفع -->
+        <div class="card upload-card mb-3">
+            <div class="card-body p-4">
+
+                <form method="POST" enctype="multipart/form-data" id="uploadForm">
+
+                    <label class="form-label fw-bold mb-3">
+                        <i class="bi bi-file-earmark-arrow-up"></i> اختر ملف النسخة الاحتياطية
+                    </label>
+
+                    <!-- منطقة Drag & Drop -->
+                    <div class="dropzone" id="dropzone">
+                        <input type="file" name="backup_file" id="fileInput"
+                               accept=".rsc,.txt,.backup" hidden>
+                        <div class="dropzone-content">
+                            <div class="dropzone-icon">
+                                <i class="bi bi-cloud-arrow-up"></i>
+                            </div>
+                            <h5 class="dropzone-title">اسحب الملف هنا</h5>
+                            <p class="dropzone-sub">أو <strong>اضغط للاختيار</strong> من جهازك</p>
+                            <small class="text-muted">
+                                الصيغ المدعومة: <code>.rsc</code> أو <code>.txt</code>
+                                — الحد الأقصى: <strong>20 MB</strong>
+                            </small>
+                        </div>
+                    </div>
+
+                    <!-- معاينة الملف -->
+                    <div id="filePreview" class="file-preview d-none">
+                        <div class="file-preview-icon">
+                            <i class="bi bi-file-earmark-code-fill"></i>
+                        </div>
+                        <div class="file-preview-info">
+                            <div class="file-preview-name" id="fileName">—</div>
+                            <div class="file-preview-size text-muted" id="fileSize">—</div>
+                        </div>
+                        <button type="button" class="file-preview-remove" id="removeFileBtn"
+                                title="إزالة" aria-label="إزالة الملف">
+                            <i class="bi bi-x-lg"></i>
+                        </button>
+                    </div>
+
+                    <!-- شريط التقدم -->
+                    <div id="progressBar" class="progress-bar-custom d-none">
+                        <div class="progress-bar-custom-inner" id="progressBarInner"></div>
+                    </div>
+
+                    <!-- زر الإرسال -->
+                    <button type="submit" class="btn-import w-100" id="submitBtn" disabled>
+                        <i class="bi bi-upload"></i>
+                        <span id="submitText">بدء الاستيراد إلى الموقع</span>
+                    </button>
+                </form>
+
+            </div>
+        </div>
+
+        <!-- ملاحظات -->
+        <div class="alert alert-warning notes-box">
+            <i class="bi bi-exclamation-triangle-fill"></i>
+            <div>
+                <strong>ملاحظات مهمة قبل الاستيراد:</strong>
+                <ul class="mb-0 mt-2">
+                    <li>إذا كان المشترك موجودًا مسبقًا، سيتم <strong>تحديث بياناته</strong></li>
+                    <li>الباقات الجديدة ستُضاف بسعر 0 ومدة 30 يومًا — عدّلها لاحقًا من صفحة الباقات</li>
+                    <li>الباقات الافتراضية (<code>default</code>، <code>default-encryption</code>) تُتجاهل تلقائيًا</li>
+                    <li>الحسابات المعطلة (Disabled) تُستورد بحالة <strong>موقوف</strong></li>
+                </ul>
+            </div>
+        </div>
+
+    </div>
+</div>
+
+{% endblock %}
+
+{% block scripts %}
+<script src="{{ url_for('static', filename='js/import_backup.js') }}"></script>
+{% endblock %}

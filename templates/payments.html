@@ -1,57 +1,211 @@
 {% extends "base.html" %}
 {% block title %}الدفعات{% endblock %}
 
-{% block content %}
-<h2 class="mb-4">💰 الدفعات</h2>
+{% block head %}
+<link rel="stylesheet" href="{{ url_for('static', filename='css/payments.css') }}">
+{% endblock %}
 
+{% block content %}
+
+<div class="d-flex justify-content-between align-items-center mb-4 flex-wrap gap-2">
+    <div>
+        <h2 class="fw-bold mb-1">💰 الدفعات</h2>
+        <small class="text-muted">إدارة دفعات المشتركين — تأكيد / بحث / تقارير</small>
+    </div>
+</div>
+
+<!-- إحصائيات -->
+<div class="row g-3 mb-4">
+    <div class="col-md-3 col-6">
+        <div class="stat-card">
+            <div class="stat-icon" style="background: rgba(34, 197, 94, 0.15); color: #22c55e;">
+                <i class="bi bi-check-circle-fill"></i>
+            </div>
+            <h3 class="stat-value">{{ stats.completed_count or 0 }}</h3>
+            <small class="text-muted">دفعات مكتملة</small>
+        </div>
+    </div>
+    <div class="col-md-3 col-6">
+        <div class="stat-card">
+            <div class="stat-icon" style="background: rgba(245, 158, 11, 0.15); color: #f59e0b;">
+                <i class="bi bi-hourglass-split"></i>
+            </div>
+            <h3 class="stat-value">{{ stats.pending_count or 0 }}</h3>
+            <small class="text-muted">في الانتظار</small>
+        </div>
+    </div>
+    <div class="col-md-3 col-6">
+        <div class="stat-card">
+            <div class="stat-icon" style="background: rgba(56, 189, 248, 0.15); color: #38bdf8;">
+                <i class="bi bi-cash-stack"></i>
+            </div>
+            <h3 class="stat-value">{{ stats.completed_total|int or 0 }}</h3>
+            <small class="text-muted">إجمالي (ل.س)</small>
+        </div>
+    </div>
+    <div class="col-md-3 col-6">
+        <div class="stat-card">
+            <div class="stat-icon" style="background: rgba(168, 85, 247, 0.15); color: #a855f7;">
+                <i class="bi bi-calendar-month"></i>
+            </div>
+            <h3 class="stat-value">{{ stats.month_total|int or 0 }}</h3>
+            <small class="text-muted">هذا الشهر (ل.س)</small>
+        </div>
+    </div>
+</div>
+
+<!-- البحث والفلترة -->
+<div class="card mb-3 p-3">
+    <form method="GET" class="row g-2 align-items-center">
+        <div class="col-md-5">
+            <div class="input-group">
+                <span class="input-group-text bg-secondary text-light border-secondary">
+                    <i class="bi bi-search"></i>
+                </span>
+                <input type="text" name="q" class="form-control"
+                       placeholder="ابحث برقم المشترك أو اسمه..."
+                       value="{{ search or '' }}">
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="btn-group w-100" role="group">
+                <a href="{{ url_for('payments', q=search) }}"
+                   class="btn filter-btn {% if not status_filter %}active{% endif %}">
+                    الكل
+                </a>
+                <a href="{{ url_for('payments', q=search, status='pending') }}"
+                   class="btn filter-btn {% if status_filter == 'pending' %}active{% endif %}">
+                    ⏳ معلّقة
+                </a>
+                <a href="{{ url_for('payments', q=search, status='completed') }}"
+                   class="btn filter-btn {% if status_filter == 'completed' %}active{% endif %}">
+                    ✅ مكتملة
+                </a>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <button type="submit" class="btn btn-primary w-100">
+                <i class="bi bi-funnel"></i> تطبيق
+            </button>
+        </div>
+    </form>
+</div>
+
+<!-- الجدول -->
 <div class="card">
     <div class="table-responsive">
-        <table class="table table-hover mb-0">
+        <table class="table table-hover mb-0 text-center">
             <thead>
                 <tr>
                     <th>#</th>
-                    <th>رقم المشترك</th>
+                    <th>المشترك</th>
                     <th>المبلغ</th>
                     <th>الحالة</th>
                     <th>التاريخ</th>
-                    <th>إجراء</th>
+                    <th style="width: 120px;">إجراء</th>
                 </tr>
             </thead>
             <tbody>
                 {% for p in payments %}
-                <tr>
-                    <td>{{ p.id }}</td>
-                    <td class="text-accent">#{{ p.subscriber_id }}</td>
-                    <td>{{ "%.0f"|format(p.amount) }} ل.س</td>
+                <tr data-payment-id="{{ p.id }}">
+                    <td class="text-muted">#{{ p.id }}</td>
                     <td>
-                        {% if p.status == 'completed' %}
-                            <span class="badge bg-success">مكتملة</span>
-                        {% else %}
-                            <span class="badge bg-warning">معلقة</span>
+                        <div class="fw-bold text-accent">
+                            {{ p.subscriber_name or ('مشترك #' ~ p.subscriber_id) }}
+                        </div>
+                        {% if p.subscriber_username %}
+                            <small class="text-muted font-monospace">
+                                {{ p.subscriber_username }}
+                            </small>
                         {% endif %}
                     </td>
-                    <td>{{ p.created_at.strftime('%Y-%m-%d %H:%M') if p.created_at else '-' }}</td>
+                    <td>
+                        <span class="amount-badge">
+                            {{ "%.0f"|format(p.amount or 0) }} ل.س
+                        </span>
+                    </td>
+                    <td>
+                        {% if p.status == 'completed' %}
+                            <span class="badge bg-success bg-opacity-10 text-success border border-success">
+                                ✅ مكتملة
+                            </span>
+                        {% else %}
+                            <span class="badge bg-warning bg-opacity-10 text-warning border border-warning">
+                                ⏳ معلّقة
+                            </span>
+                        {% endif %}
+                    </td>
+                    <td class="text-muted small">
+                        {{ p.created_at | localtime('%Y-%m-%d %H:%M') if p.created_at else '-' }}
+                    </td>
                     <td>
                         {% if p.status != 'completed' %}
-                        <button class="btn btn-sm btn-primary"
-                                onclick="completePayment({{ p.id }})">✅ تأكيد</button>
+                            <button type="button"
+                                    class="btn btn-sm btn-primary js-complete-payment"
+                                    data-payment-id="{{ p.id }}">
+                                <i class="bi bi-check2-circle"></i> تأكيد
+                            </button>
+                        {% else %}
+                            <span class="text-success small">
+                                <i class="bi bi-check-circle-fill"></i> مكتملة
+                            </span>
                         {% endif %}
                     </td>
                 </tr>
                 {% else %}
-                <tr><td colspan="6" class="text-center py-5 text-muted">📭 لا توجد دفعات بعد</td></tr>
+                <tr>
+                    <td colspan="6" class="text-center py-5 text-muted">
+                        <i class="bi bi-inbox" style="font-size: 2rem; display: block; margin-bottom: 8px;"></i>
+                        📭 لا توجد دفعات بعد
+                    </td>
+                </tr>
                 {% endfor %}
             </tbody>
         </table>
     </div>
+
+    {% if pagination and pagination.pages > 1 %}
+    <div class="pagination-wrapper">
+        <nav>
+            <ul class="pagination mb-0 justify-content-center">
+                {% if pagination.has_prev %}
+                    <li class="page-item">
+                        <a class="page-link"
+                           href="{{ url_for('payments', page=pagination.prev_num, q=search, status=status_filter) }}">
+                            السابق
+                        </a>
+                    </li>
+                {% endif %}
+
+                {% for num in pagination.iter_pages(left_edge=1, right_edge=1, left_current=2, right_current=2) %}
+                    {% if num %}
+                        <li class="page-item {% if num == pagination.page %}active{% endif %}">
+                            <a class="page-link"
+                               href="{{ url_for('payments', page=num, q=search, status=status_filter) }}">
+                                {{ num }}
+                            </a>
+                        </li>
+                    {% else %}
+                        <li class="page-item disabled"><span class="page-link">...</span></li>
+                    {% endif %}
+                {% endfor %}
+
+                {% if pagination.has_next %}
+                    <li class="page-item">
+                        <a class="page-link"
+                           href="{{ url_for('payments', page=pagination.next_num, q=search, status=status_filter) }}">
+                            التالي
+                        </a>
+                    </li>
+                {% endif %}
+            </ul>
+        </nav>
+    </div>
+    {% endif %}
 </div>
 
-<script>
-async function completePayment(id) {
-    const r = await fetch(`/payments/${id}/complete`, { method: 'POST' });
-    const data = await r.json();
-    if (data.ok) location.reload();
-    else alert(data.error);
-}
-</script>
+{% endblock %}
+
+{% block scripts %}
+<script src="{{ url_for('static', filename='js/payments.js') }}"></script>
 {% endblock %}

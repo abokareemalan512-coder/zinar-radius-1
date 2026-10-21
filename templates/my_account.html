@@ -1,0 +1,237 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl" data-bs-theme="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <meta name="theme-color" content="#0f172a">
+    <meta name="robots" content="noindex, nofollow">
+    <title>حسابي | ZINAR</title>
+
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>⚡</text></svg>">
+
+    <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.rtl.min.css" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css" rel="stylesheet">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/my_account.css') }}">
+</head>
+<body>
+
+<div class="top-bar">
+    <div class="brand-mini">
+        <div class="brand-icon-mini">⚡</div>
+        <div class="brand-name-mini">ZINAR</div>
+    </div>
+    <a href="{{ url_for('my_account_logout') }}" class="btn-logout">
+        <i class="bi bi-box-arrow-right"></i> خروج
+    </a>
+</div>
+
+<div class="main-container">
+
+    <!-- رأس الحساب -->
+    <div class="profile-header">
+        <div class="avatar"><i class="bi bi-person-fill"></i></div>
+        <h2 class="profile-name">{{ sub.name or sub.username }}</h2>
+        <p class="profile-username">{{ sub.username }}</p>
+        <div>
+            {% if sub.status == 'active' and sub.current_ip %}
+                <span class="status-badge status-online"><span class="pulse-dot"></span> متصل الآن</span>
+            {% elif sub.status == 'active' %}
+                <span class="status-badge status-offline"><i class="bi bi-wifi-off"></i> غير متصل</span>
+            {% elif sub.status == 'paused' %}
+                <span class="status-badge status-paused"><i class="bi bi-pause-circle-fill"></i> موقوف</span>
+            {% elif sub.status == 'expired' %}
+                <span class="status-badge status-expired"><i class="bi bi-x-circle-fill"></i> منتهي</span>
+            {% else %}
+                <span class="status-badge status-offline">{{ sub.status }}</span>
+            {% endif %}
+        </div>
+    </div>
+
+    <!-- تنبيه انتهاء الاشتراك -->
+    {% if days_left is not none %}
+        {% if days_left <= 3 and days_left >= 0 %}
+            <div class="expiry-alert {% if days_left == 0 %}critical{% elif days_left == 1 %}danger{% elif days_left == 2 %}warning{% else %}info{% endif %}">
+                <div class="expiry-alert-icon">
+                    {% if days_left == 0 %}🔴
+                    {% elif days_left == 1 %}⚠️
+                    {% elif days_left == 2 %}⏰
+                    {% else %}📢{% endif %}
+                </div>
+                <div class="expiry-alert-content">
+                    <h4 class="expiry-alert-title">
+                        {% if days_left == 0 %}اشتراكك ينتهي اليوم!
+                        {% elif days_left == 1 %}اشتراكك ينتهي غداً!
+                        {% elif days_left == 2 %}اشتراكك ينتهي خلال يومين
+                        {% else %}اشتراكك ينتهي خلال 3 أيام{% endif %}
+                    </h4>
+                    <p class="expiry-alert-text">
+                        {% if days_left == 0 %}
+                            يرجى تجديد اشتراكك <strong>فوراً</strong> لتجنب انقطاع الخدمة.
+                        {% else %}
+                            يرجى التواصل مع الإدارة لتجديد اشتراكك قبل
+                            <strong>{{ sub.expires_at.strftime('%Y-%m-%d') }}</strong>.
+                        {% endif %}
+                    </p>
+                    <div class="expiry-alert-info">
+                        <span>
+                            <i class="bi bi-calendar-check"></i>
+                            تاريخ الانتهاء: <strong>{{ sub.expires_at.strftime('%Y-%m-%d') }}</strong>
+                        </span>
+                        <span>
+                            <i class="bi bi-hourglass-split"></i>
+                            المتبقي: <strong>{{ days_left }} يوم</strong>
+                        </span>
+                    </div>
+                </div>
+            </div>
+        {% elif days_left < 0 %}
+            <div class="expiry-alert expired">
+                <div class="expiry-alert-icon">🚫</div>
+                <div class="expiry-alert-content">
+                    <h4 class="expiry-alert-title">اشتراكك منتهي!</h4>
+                    <p class="expiry-alert-text">
+                        انتهى اشتراكك بتاريخ <strong>{{ sub.expires_at.strftime('%Y-%m-%d') }}</strong>.
+                        يرجى التجديد لاستعادة الخدمة.
+                    </p>
+                </div>
+            </div>
+        {% endif %}
+
+        <!-- بطاقة الأيام المتبقية -->
+        <div class="days-card {% if days_left <= 3 %}danger{% elif days_left <= 7 %}warning{% endif %}">
+            <div class="days-number">{{ days_left }}</div>
+            <div class="days-label">
+                {% if days_left > 0 %}يوم متبقٍ على انتهاء الاشتراك
+                {% elif days_left == 0 %}ينتهي اليوم
+                {% else %}انتهى الاشتراك{% endif %}
+            </div>
+        </div>
+    {% endif %}
+
+    <!-- السرعة الحية -->
+    <div class="live-speed-section" id="liveSpeedSection"
+         data-endpoint="{{ url_for('my_account_live_speed') }}">
+        <div class="live-header">
+            <div class="live-title">
+                <i class="bi bi-speedometer2"></i>
+                <span>السرعة المباشرة الآن</span>
+            </div>
+            <span class="live-badge" id="liveStatus">
+                <span class="live-dot-anim"></span> مباشر
+            </span>
+        </div>
+
+        <div class="row g-3">
+            <div class="col-6">
+                <div class="speed-box download">
+                    <div class="speed-icon-box download">
+                        <i class="bi bi-arrow-down-circle-fill"></i>
+                    </div>
+                    <div class="speed-live-value download">
+                        <span id="liveDownload">0.0</span>
+                        <span class="speed-live-unit" id="liveDownloadUnit">kbps</span>
+                    </div>
+                    <div class="speed-live-label">⬇ سرعة التحميل الآن</div>
+                </div>
+            </div>
+            <div class="col-6">
+                <div class="speed-box upload">
+                    <div class="speed-icon-box upload">
+                        <i class="bi bi-arrow-up-circle-fill"></i>
+                    </div>
+                    <div class="speed-live-value upload">
+                        <span id="liveUpload">0.0</span>
+                        <span class="speed-live-unit" id="liveUploadUnit">kbps</span>
+                    </div>
+                    <div class="speed-live-label">⬆ سرعة الرفع الآن</div>
+                </div>
+            </div>
+        </div>
+
+        <div class="total-section">
+            <div class="total-row">
+                <div class="total-label download">
+                    <i class="bi bi-download"></i> إجمالي التحميل
+                </div>
+                <div class="total-value download" id="totalDownload">0 MB</div>
+            </div>
+            <div class="total-row">
+                <div class="total-label upload">
+                    <i class="bi bi-upload"></i> إجمالي الرفع
+                </div>
+                <div class="total-value upload" id="totalUpload">0 MB</div>
+            </div>
+            <div class="progress-live">
+                <div class="bar-down" id="barDown" style="width: 50%;"></div>
+                <div class="bar-up" id="barUp" style="width: 50%;"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- معلومات الحساب -->
+    <div class="info-card">
+        <div class="info-card-header">
+            <i class="bi bi-person-badge-fill"></i> معلومات الحساب
+        </div>
+        <div class="info-row">
+            <div class="info-label"><i class="bi bi-box-seam"></i> الباقة</div>
+            <div class="info-value">{{ sub.package or '-' }}</div>
+        </div>
+        <div class="info-row">
+            <div class="info-label"><i class="bi bi-router"></i> نوع الاتصال</div>
+            <div class="info-value">
+                {% if sub.user_type == 'hotspot' %}📶 هوت سبوت{% else %}🌐 برودباند{% endif %}
+            </div>
+        </div>
+        <div class="info-row">
+            <div class="info-label"><i class="bi bi-wifi"></i> عنوان IP</div>
+            <div class="info-value" id="ipValue">{{ sub.current_ip or '—' }}</div>
+        </div>
+        <div class="info-row">
+            <div class="info-label"><i class="bi bi-clock-history"></i> وقت الاتصال</div>
+            <div class="info-value" id="connectedAt">
+                {{ sub.connected_at | localtime('%Y-%m-%d %H:%M:%S') if sub.connected_at else '—' }}
+            </div>
+        </div>
+        <div class="info-row">
+            <div class="info-label"><i class="bi bi-hourglass-split"></i> مدة الاتصال</div>
+            <div class="info-value" id="uptimeValue">{{ sub.session_uptime or '—' }}</div>
+        </div>
+        <div class="info-row">
+            <div class="info-label"><i class="bi bi-calendar-check"></i> تاريخ انتهاء الاشتراك</div>
+            <div class="info-value">
+                {{ sub.expires_at.strftime('%Y-%m-%d') if sub.expires_at else 'غير محدد' }}
+            </div>
+        </div>
+    </div>
+
+    <!-- زر التواصل مع المدير -->
+    {% if days_left is not none and days_left <= 5 %}
+        {% set wa_number = config.get('WHATSAPP_ADMIN', '') if config else '' %}
+        {% set wa_msg = 'السلام عليكم، اشتراكي ينتهي بتاريخ ' + (sub.expires_at.strftime('%Y-%m-%d') if sub.expires_at else '') + ' وأرغب بتجديده. اسم المستخدم: ' + sub.username %}
+        {% if wa_number %}
+            {% set wa_url = 'https://wa.me/' + wa_number + '?text=' + (wa_msg | urlencode) %}
+        {% else %}
+            {% set wa_url = 'https://wa.me/?text=' + (wa_msg | urlencode) %}
+        {% endif %}
+        <a href="{{ wa_url }}" target="_blank" rel="noopener" class="contact-admin-btn">
+            <i class="bi bi-whatsapp"></i>
+            تواصل مع الإدارة لتجديد الاشتراك
+        </a>
+    {% endif %}
+
+    <button class="btn-refresh" id="refreshBtn"
+            data-endpoint="{{ url_for('my_account_refresh') }}">
+        <i class="bi bi-arrow-clockwise"></i> تحديث البيانات الكاملة
+    </button>
+
+    <div class="last-update" id="lastUpdate">
+        آخر تحديث: {{ sub.ip_updated_at | localtime('%H:%M:%S') if sub.ip_updated_at else 'لم يُحدَّث بعد' }}
+    </div>
+
+</div>
+
+<script src="{{ url_for('static', filename='js/my_account.js') }}"></script>
+</body>
+</html>
