@@ -16,7 +16,7 @@ from flask import (
 from flask_sqlalchemy import SQLAlchemy
 from werkzeug.security import generate_password_hash, check_password_hash
 import paramiko
-import radius_sync
+import radius_sync_render as radius_sync
 
 # ============ الإعدادات ============
 app = Flask(__name__)
@@ -27,14 +27,11 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 # ============ Database ============
-database_url = os.environ.get('DATABASE_URL')
-if not database_url:
-    database_url = 'sqlite:///zinar.db'
-else:
-    if database_url.startswith('postgres://'):
-        database_url = database_url.replace('postgres://', 'postgresql://', 1)
-    if 'postgresql://' in database_url and '+psycopg' not in database_url:
-        database_url = database_url.replace('postgresql://', 'postgresql+psycopg://', 1)
+database_url = "postgresql://radius:zinar512@127.0.0.1:5432/radius"
+if database_url.startswith('postgres://'):
+    database_url = database_url.replace('postgres://', 'postgresql://', 1)
+if 'postgresql://' in database_url and '+psycopg' not in database_url:
+    database_url = database_url.replace('postgresql://', 'postgresql+psycopg2://')
 
 app.config['SQLALCHEMY_DATABASE_URI'] = database_url
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
@@ -43,9 +40,6 @@ _masked = database_url.split('@')[-1] if '@' in database_url else database_url
 logger.info(f"📊 DB: ...@{_masked}")
 
 db = SQLAlchemy(app)
-
-from api_sync import sync_bp
-app.register_blueprint(sync_bp)
 
 # ============ Models ============
 
@@ -1061,4 +1055,4 @@ def server_error(e):
 
 
 if __name__ == '__main__':
-    app.run(host='0.0.0.0', port=int(os.environ.get('PORT', 5000)), debug=False)
+    app.run(host='0.0.0.0', port=8080, debug=False)
