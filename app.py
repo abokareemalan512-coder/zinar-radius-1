@@ -26,7 +26,6 @@ from flask import (
 from flask_sqlalchemy import SQLAlchemy
 from werkzeug.security import generate_password_hash, check_password_hash
 import paramiko
-<<<<<<< HEAD
 import radius_sync_render as radius_sync
 =======
 
