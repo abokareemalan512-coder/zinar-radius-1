@@ -27,7 +27,6 @@ from flask_sqlalchemy import SQLAlchemy
 from werkzeug.security import generate_password_hash, check_password_hash
 import paramiko
 import radius_sync_render as radius_sync
-=======
 
 try:
     import requests
@@ -35,7 +34,7 @@ except ImportError:
     requests = None
 
 try:
-    import radius_sync
+    import radius_sync_render as radius_sync
 except ImportError:
     radius_sync = None
 
@@ -45,7 +44,6 @@ try:
     LIBROUTEROS_AVAILABLE = True
 except ImportError:
     LIBROUTEROS_AVAILABLE = False
->>>>>>> ca5f2b30162b179abbe24a377c9dfe8ec1f769b7
 
 # ============ الإعدادات ============
 
@@ -59,14 +57,12 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
-<<<<<<< HEAD
 # ============ Database ============
 database_url = "postgresql://radius:zinar512@127.0.0.1:5432/radius"
 if database_url.startswith('postgres://'):
     database_url = database_url.replace('postgres://', 'postgresql://', 1)
 if 'postgresql://' in database_url and '+psycopg' not in database_url:
     database_url = database_url.replace('postgresql://', 'postgresql+psycopg2://')
-=======
 if not LIBROUTEROS_AVAILABLE:
     logger.warning("⚠️ مكتبة librouteros غير مثبتة - مراقبة الترافيك معطلة")
 
@@ -87,7 +83,6 @@ else:
         database_url = database_url.replace('postgres://', 'postgresql://', 1)
     if 'postgresql://' in database_url and '+psycopg' not in database_url:
         database_url = database_url.replace('postgresql://', 'postgresql+psycopg://', 1)
->>>>>>> ca5f2b30162b179abbe24a377c9dfe8ec1f769b7
 
 app.config['SQLALCHEMY_DATABASE_URI'] = database_url
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
@@ -111,8 +106,6 @@ logger.info(f"📊 DB: ...@{_masked}")
 
 db = SQLAlchemy(app)
 
-<<<<<<< HEAD
-=======
 
 @app.teardown_appcontext
 def shutdown_session(exception=None):
@@ -145,7 +138,6 @@ except ImportError:
     logger.warning("⚠️ Blueprint hotspot غير موجود")
 
 
->>>>>>> ca5f2b30162b179abbe24a377c9dfe8ec1f769b7
 # ============ Models ============
 
 class Router(db.Model):
@@ -2999,9 +2991,6 @@ def complete_payment(payment_id):
 # ============ Main ============
 
 if __name__ == '__main__':
-<<<<<<< HEAD
     app.run(host='0.0.0.0', port=8080, debug=False)
-=======
     port = int(os.environ.get('PORT', 5000))
     app.run(host='0.0.0.0', port=port, debug=False)
->>>>>>> ca5f2b30162b179abbe24a377c9dfe8ec1f769b7
